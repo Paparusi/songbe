@@ -188,7 +188,7 @@
         <div class="kicker" style="position:absolute;left:48px;top:40px;font-size:36px;font-weight:700;letter-spacing:3px;text-transform:uppercase">${esc(c.kicker || '')}</div>
         ${c.button ? `<div class="pill ghost" style="position:absolute;right:48px;top:36px;font-size:30px;font-weight:600;padding:8px 22px">${esc(c.button)}</div>` : ''}
         <div class="nm" style="position:absolute;left:46px;top:124px;font-size:120px;font-weight:900;color:var(--ink);letter-spacing:-3px;white-space:nowrap">
-          ${lines(c.number).map((g, i) => `<span class="mask" style="position:relative;display:inline-block;vertical-align:top;margin-left:${i ? 18 : 0}px"><span class="ng">${esc(g)}</span></span>`).join('')}</div>
+          ${lines(c.number).map((g, i) => `<span class="mask" style="position:relative;display:inline-block;vertical-align:top;margin-left:${i ? 26 : 0}px"><span class="ng">${esc(g)}</span></span>`).join('')}</div>
         <div class="cs" style="position:absolute;left:48px;top:292px;font-size:34px;font-weight:500;color:var(--muted);white-space:nowrap">${esc(c.sub || '')}</div></div>` : ''}
       <div class="a ft" style="left:70px;top:${1352 + down}px;width:940px;height:110px">
         ${logo.mark ? `<img src="${logo.mark}" style="position:absolute;left:0;top:6px;height:96px">` : ''}
