@@ -51,6 +51,11 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
 - Use only facts the user gave you. Never invent prices, salaries, phone numbers, addresses or benefits; ask instead.
 - Do not put another company's logo in the video unless the user says they may use it.
 
+## Timing
+
+You do not set times. A scene lasts as long as its `say`, and each cut is moved onto a beat of the music, so the length changes by a
+few tenths of a second when the music is first generated. Report the duration from `out/check.json`, not from your own estimate.
+
 ## Cost and cache
 
 Voice, music and generated footage cost money on the user's own key. Everything generated is cached in `<dir>/.songbe/cache`

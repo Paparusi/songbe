@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.7): six scene types, two looks, three frames (9:16, 1:1, 16:9), captions, built-in checks, a local studio. Tested on Linux / WSL only.
+> Early version (0.8): six scene types, two looks, any frame size, captions, cuts on the beat, built-in checks, a local studio. Tested on Linux / WSL only.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -20,7 +20,8 @@ Two examples are included: `examples/app-launch-en` (an app launch, English, gra
 - **One file in, one video out.** The spec is plain JSON you can diff, review and regenerate.
 - **Deterministic picture.** Scenes are HTML/CSS; every frame is a pure function of time, rendered by headless Chrome with real motion blur (two samples per frame).
 - **Sound follows picture.** Effects are synthesised from the cue list the animation itself reports, music ducks under the voice, the mix is normalised to −14 LUFS.
-- **The timeline follows the voice.** Each scene opens just before its line is spoken; change a sentence and everything re-times itself.
+- **The timeline follows the voice, the cuts follow the music.** Each scene opens just before its line is spoken, and every cut is
+  moved onto a beat of the music; change a sentence and everything re-times itself.
 - **Bring your own keys — or none.** With `FAL_KEY` you get voice, music and generated footage. Without it the build still completes (no voice or music, plain backgrounds).
 - **No npm dependencies.** Node 22+, ffmpeg and a Chrome/Chromium binary. Chrome is driven directly over the DevTools protocol.
 - **It checks its own work.** Before drawing: nothing may leave the frame, overlap, or be covered by captions. After building: no black
@@ -76,7 +77,8 @@ Set `notice` (for example "Illustration generated with AI") on scenes that use g
 ## Frames
 
 One spec, several frames. `"format"` is `tall` (1080×1920, the default), `square` (1080×1080) or `wide` (1920×1080);
-`"size": [w, h]` sets anything else.
+`"size": [w, h]` sets anything else. Scenes are laid out in design units, so `[540, 960]` and `[2160, 3840]` are the same picture
+drawn smaller and larger, with type rendered sharp at that size.
 
 ```bash
 node bin/songbe.mjs build my-ad --format=wide                 # out/video-wide.mp4, same voice and music
@@ -87,6 +89,15 @@ Every scene is designed once, for the tall frame, as a few blocks (heading, medi
 moved and scaled as wholes: in a wide frame the heading goes left and the rest right; in a square one the same stack is tightened.
 Footage is cropped to cover the frame, leaning upward in a square; a portrait clip in a wide frame is not cropped but shown whole at
 the side, over a blurred copy of itself. Voice, music and timing are identical across frames, so extra frames cost nothing to generate.
+
+## Music and cuts
+
+The beat of the music is found from the sound itself (onsets, the tempo at which they repeat, and the phase where the bass falls) —
+no service, no metadata, about a tenth of a second per track. Each cut then moves to a beat: to one just before it when that is
+within 0.15 s, otherwise to the next, pushing the following scenes back by that much. A sentence is never cut into, and a video gets
+a few tenths of a second longer. Music shorter than the video repeats on a whole number of bars.
+
+Music without a steady pulse is left alone and the report says so. `"music": { "sync": false }` or `--no-sync` keeps the voice's own timing.
 
 ## Captions
 
@@ -140,7 +151,7 @@ project's `media/` folder from the form. The server listens on 127.0.0.1 only an
 
 ```bash
 node bin/songbe.mjs lint my-ad      # layout only, a few seconds: what leaves the frame, overlaps, or would be covered
-npm test                            # the test suite (36 tests, about ten seconds; drawing tests need Chrome and ffmpeg)
+npm test                            # the test suite (about ten seconds; drawing tests need Chrome and ffmpeg)
 ```
 
 **Layout check** (`songbe lint`, and automatically with `frames` and `build`). Each scene is drawn near its end and its content is
@@ -163,7 +174,7 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 
 - Six scene types and two looks. Scene types live in `kit/scenes.js`, looks in `kit/styles/`.
 - One provider (fal.ai) for voice, images, image-to-video and music.
-- Frames other than the three named ones use the nearest layout family and have not been tuned.
+- Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The studio edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
 
 ## License

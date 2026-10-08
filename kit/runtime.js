@@ -67,16 +67,20 @@
     SB.style = STYLES[plan.style] || STYLES.soft;
     document.documentElement.dataset.style = STYLES[plan.style] ? plan.style : 'soft';
     // the frame: its size and which family of layouts applies (tall 9:16, square 1:1 or 4:5, wide 16:9)
+    // Scenes are laid out in design units: 1080 across for tall and square frames, 1080 high for wide ones. Any output size is that
+    // design drawn larger or smaller (540×960 and 2160×3840 are the same picture), so type stays sharp at every resolution.
+    const [PW, PH] = plan.size, ratio = PW / PH, kind = ratio < .7 ? 'tall' : ratio > 1.3 ? 'wide' : 'square', caps = (plan.captions || []).length > 0;
+    const zoom = kind === 'wide' ? PH / 1080 : PW / 1080, W = Math.round(PW / zoom), FH = Math.round(PH / zoom);
     // H is the height scenes lay themselves out in: square and wide frames give up a band at the bottom when captions are on
-    const [W, FH] = plan.size, ratio = W / FH, kind = ratio < .7 ? 'tall' : ratio > 1.3 ? 'wide' : 'square', caps = (plan.captions || []).length > 0;
     const H = FH - (caps && kind !== 'tall' ? 165 : 0);
     // floor: the lowest line content may reach. In a tall frame that is where phone apps start their own caption, or the caption band.
-    SB.frame = { W, H, FH, kind, floor: kind === 'tall' ? (caps ? 1470 : 1590) : H - 12 };
+    SB.frame = { W, H, FH, kind, zoom, floor: kind === 'tall' ? (caps ? 1470 : 1590) : H - 12 };
     document.documentElement.dataset.format = kind; document.documentElement.dataset.captions = caps ? 'on' : 'off';
     const root = document.documentElement.style, b = plan.brand;
     for (const [k, v] of Object.entries({ ink: b.ink, primary: b.primary, accent: b.accent, paper: b.paper, muted: b.muted })) if (v) root.setProperty('--' + k, v);
     const stage = document.getElementById('stage');
     stage.style.width = W + 'px'; stage.style.height = FH + 'px';
+    if (zoom !== 1) stage.style.transform = `scale(${zoom})`;
     plan.scenes.forEach((sc, i) => {
       const el = document.createElement('div'); el.className = 'scene'; el.id = 's' + i; stage.appendChild(el);
       const inst = SB.scenes[sc.type](el, sc, plan, i);
@@ -209,7 +213,7 @@
   // Preview in a normal browser: scale to the window and add a scrubber. The renderer opens the page with #render and never sees this.
   SB.preview = function () {
     const plan = SB.plan, stage = document.getElementById('stage');
-    const scale = () => { const k = Math.min(innerWidth / plan.size[0], (innerHeight - 56) / plan.size[1]); stage.style.transform = `scale(${k})`; stage.style.left = (innerWidth - plan.size[0] * k) / 2 + 'px'; };
+    const { W: dw, FH: dh } = SB.frame, scale = () => { const k = Math.min(innerWidth / dw, (innerHeight - 56) / dh); stage.style.transform = `scale(${k})`; stage.style.left = (innerWidth - dw * k) / 2 + 'px'; };
     scale(); addEventListener('resize', scale);
     document.body.insertAdjacentHTML('beforeend', `<div id="player"><button id="pp">Play</button><input id="sk" type="range" min="0" max="${plan.duration}" step="0.01" value="0"><span id="tt">0.00</span></div>`);
     const sk = document.getElementById('sk'), pp = document.getElementById('pp'), tt = document.getElementById('tt');

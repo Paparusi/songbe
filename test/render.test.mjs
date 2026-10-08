@@ -35,6 +35,18 @@ test('the layout check notices text that cannot fit', { skip: !ready && 'Chrome 
   assert.equal(found.filter((f) => f.level === 'problem').length, 0, 'but the rows were squeezed to stay inside the frame');
 });
 
+test('any size is the same design drawn larger or smaller', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
+  const dir = path.join(copies, 'sizes'); fs.cpSync(path.join(root, 'examples', 'app-launch-en'), dir, { recursive: true, filter: (f) => !/[\\/](\.songbe|out)([\\/]|$)/.test(f) });
+  const spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8'));
+  for (const size of [[540, 960], [1440, 2560], [1280, 720], [720, 720]]) {
+    fs.writeFileSync(path.join(dir, 'video.json'), JSON.stringify({ ...spec, size, captions: true }));
+    const plan = await makePlan(dir, { offline: true }), found = await lintLayout(dir, plan);
+    assert.deepEqual(found.map((f) => f.message), [], size.join('×'));
+    const { files } = await stills(dir, plan, [1.5]);
+    assert.equal(run(tools.ffprobe, ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', files[0]]).trim(), size.join(','));
+  }
+});
+
 test('a still has the size of its frame', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
   for (const [format, [w, h]] of Object.entries(FORMATS)) {
     const { files } = await stills(copy('app-launch-en'), await makePlan(copy('app-launch-en'), { offline: true, format }), [1.5]);

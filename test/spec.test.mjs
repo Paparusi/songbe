@@ -30,6 +30,10 @@ test('a scene needs something to say or a duration', () => {
   assert.deepEqual(validate({ brand: {}, scenes: [{ type: 'end', duration: 3 }] }), []);
 });
 
+test('voice and music can be switched off with false', () => {
+  assert.deepEqual(validate({ brand: {}, voice: false, music: false, scenes: [{ type: 'end', duration: 2 }] }), []);
+});
+
 test('missing files are reported with their place in the spec', () => {
   const [spec, dir] = example('recruitment-vi');
   spec.scenes[0].media = 'media/nope.mp4';

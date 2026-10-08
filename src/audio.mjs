@@ -2,8 +2,7 @@
 // effects are synthesised here from the cue list the page reported (so they always land on the animation).
 import fs from 'node:fs';
 import path from 'node:path';
-import * as fal from './providers/fal.mjs';
-import { run, sha, mkdir, exists, tools, log } from './util.mjs';
+import { run, mkdir, exists, tools, duration } from './util.mjs';
 
 const SR = 48000;
 
@@ -49,13 +48,7 @@ export async function makeAudio(dir, plan) {
   const sfx = path.join(work, 'effects.wav'); effects(cues, D, sfx);
 
   const voice = plan.scenes.flatMap((s) => s.say).filter((s) => s.file);
-  let music = null;
-  if (plan.music?.file) music = path.resolve(dir, plan.music.file);
-  else if (plan.music?.prompt) {                       // reuse a cached track even when no key is set
-    const file = path.join(cache, `music-${sha(['music', plan.music])}.wav`);
-    if (!exists(file) && fal.available()) { log('  music:', plan.music.prompt.slice(0, 70) + '…'); await fal.music(plan.music.prompt, plan.music, file); }
-    if (exists(file)) music = file;
-  }
+  const music = plan.musicFile && exists(plan.musicFile) ? plan.musicFile : null;       // found (or generated) while planning
 
   const inputs = ['-i', sfx], f = []; let idx = 1, mix = [];
   if (voice.length) {
@@ -64,7 +57,14 @@ export async function makeAudio(dir, plan) {
   }
   if (music) {
     inputs.push('-i', music);
-    f.push(`[${idx}]atrim=0:${D},asetpts=PTS-STARTPTS,volume=${plan.music.volume ?? 0.5},afade=t=in:d=0.15,afade=t=out:st=${(D - 1.6).toFixed(2)}:d=1.6[m0]`);
+    // a track shorter than the video is repeated; with a known beat the repeat is a whole number of bars, so the pulse never stumbles
+    let loop = '';
+    const b = plan.beats, len = b?.length ?? duration(music);
+    if (D > len - .3) {
+      const bar = b ? b.period * 4 : 0, from = b ? b.first : 0, span = b && Math.floor((len - .4 - from) / bar) >= 2 ? Math.floor((len - .4 - from) / bar) * bar : len - from;
+      loop = `aresample=${SR},aloop=loop=-1:size=${Math.round(span * SR)}:start=${Math.round(from * SR)},`;
+    }
+    f.push(`[${idx}]${loop}atrim=0:${D},asetpts=PTS-STARTPTS,volume=${plan.music.volume ?? 0.5},afade=t=in:d=0.15,afade=t=out:st=${(D - 1.6).toFixed(2)}:d=1.6[m0]`);
     f.push(voice.length ? '[m0][vk]sidechaincompress=threshold=0.025:ratio=7:attack=8:release=260[m]' : '[m0]anull[m]');
     mix.push('[m]');
   } else if (voice.length) f.push('[vk]anullsink');

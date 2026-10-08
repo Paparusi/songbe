@@ -7,6 +7,7 @@ import * as fal from './providers/fal.mjs';
 import { run, sha, mkdir, exists, tools, duration, log } from './util.mjs';
 import { validate, FORMATS } from './spec.mjs';
 import { spokenOf, shownOf, pausesIn, timedWords, captionLines } from './captions.mjs';
+import { beatsOf, snapCuts } from './beats.mjs';
 
 const GAP = 0.35;          // pause between sentences
 const LEAD = 0.25;         // silence before the first word
@@ -71,6 +72,25 @@ export async function makePlan(dir, opts = {}) {
     talkEnd = sc.say.length ? cursor - GAP : sc.start + (sc.duration || 3);
     t = Math.max(talkEnd + GAP + 0.03, sc.start + (sc.duration || sc.minDuration || 2.6) + 0.10);
   });
+  // ---- music: found here rather than at mixing time, because its beat decides where the cuts fall ----
+  let musicFile = null, beats = null;
+  if (spec.music?.file) musicFile = path.resolve(dir, spec.music.file);
+  else if (spec.music?.prompt) {
+    const file = path.join(cache, `music-${sha(['music', spec.music])}.wav`);
+    if (!exists(file) && canGen) { log('  music:', spec.music.prompt.slice(0, 70) + '…'); await fal.music(spec.music.prompt, spec.music, file); }
+    if (exists(file)) musicFile = file;
+    else notes.push(opts.offline ? 'The music is not generated yet: cuts will move onto its beat at the next build.' : 'FAL_KEY not set: built without music.');
+  }
+  // each cut moves to a beat: a little earlier when one is close, otherwise later, pushing the scenes after it back by that much
+  if (musicFile && spec.music.sync !== false && opts.sync !== false && scenes.length > 1) {
+    const found = beatsOf(musicFile, cache);
+    if (found.confidence >= 4) {
+      const moved = snapCuts(scenes.slice(1).map((sc) => sc.start), found);
+      scenes.forEach((sc, i) => { if (!i) return; const { at, delay } = moved[i - 1]; sc.start = at; for (const line of sc.say) { line.start = +(line.start + delay).toFixed(3); line.end = +(line.end + delay).toFixed(3); } });
+      talkEnd += moved.at(-1).delay;
+      beats = { bpm: found.bpm, period: +found.period.toFixed(4), first: +found.first.toFixed(3), confidence: found.confidence, length: found.length };
+    } else notes.push('The music has no steady beat that could be found: cuts were left where the voice puts them.');
+  }
   const total = +(talkEnd + (spec.tail ?? 2.3)).toFixed(2);
   scenes.forEach((sc, i) => { sc.end = i < scenes.length - 1 ? scenes[i + 1].start : total; });
 
@@ -118,7 +138,7 @@ export async function makePlan(dir, opts = {}) {
   if (brand.logo) brand.logo = Object.fromEntries(Object.entries(brand.logo).map(([k, v]) => [k, url(path.resolve(dir, v))]));
   const plan = {
     size, fps, duration: total, brand, style: opts.style || spec.style || 'soft', tag: opts.format ? '-' + opts.format : '', motionBlur: spec.motionBlur !== false, music: spec.music || null,
-    cuts: scenes.slice(1).map((s) => s.start), captions,
+    cuts: scenes.slice(1).map((s) => s.start), captions, musicFile, beats,
     scenes: scenes.map(({ minDuration, mediaOffset, ...sc }) => ({ ...sc, say: sc.say.map(({ raw, ...line }) => line) })),
     previewAudio: url(path.join(dir, 'out', 'audio.wav')), notes,
   };

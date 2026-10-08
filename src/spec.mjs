@@ -38,7 +38,7 @@ export const TOP = {
   style: STYLES, format: Object.keys(FORMATS), captions: 'bool', size: ['num'], fps: 'num', tail: 'num', motionBlur: 'bool',
   'brand!': { name: 'str', ink: COLOUR, primary: COLOUR, accent: COLOUR, paper: COLOUR, muted: COLOUR, logo: { mark: 'str', word: 'str' } },
   voice: { model: 'str', voice: 'str', language: 'str', speed: 'num', emotion: 'str' },
-  music: { prompt: 'str', file: 'str', volume: 'num', avoid: 'str', model: 'str', seed: 'num' },
+  music: { prompt: 'str', file: 'str', volume: 'num', sync: 'bool', avoid: 'str', model: 'str', seed: 'num' },
 };
 
 const key = (k) => (k.endsWith('!') ? [k.slice(0, -1), true] : [k, false]);
@@ -86,6 +86,7 @@ export function validate(spec, dir) {
   const errs = [];
   if (!isObj(spec)) return ['video.json must be an object'];
   const { scenes, ...top } = spec;
+  for (const k of ['voice', 'music']) if (top[k] === false) delete top[k];      // false switches the voice or the music off
   walk(top, TOP, 'video', errs, dir);
   if (top.size && (top.size.length !== 2)) errs.push('video.size: expected [width, height]');
   for (const f of ['mark', 'word']) { const v = top.brand?.logo?.[f]; if (typeof v === 'string' && dir && !fs.existsSync(path.resolve(dir, v))) errs.push(`video.brand.logo.${f}: file not found: ${v}`); }

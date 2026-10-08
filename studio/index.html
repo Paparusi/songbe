@@ -72,7 +72,7 @@ const LABEL = { captions: 'Captions that follow the voice', format: 'Frame <b>·
   from: 'From', contact: 'Contact card', kicker: 'Kicker', button: 'Button', number: 'Number <b>· one group per line</b>', footer: 'Footer', name: 'Name', line: 'Line', tagline: 'Tagline', cta: 'Button text',
   badges: 'Badges <b>· one per line</b>', url: 'Address', duration: 'Duration when silent (seconds)', minDuration: 'Minimum duration (seconds)', size: 'Size', fps: 'Frames per second', tail: 'Hold after the last word (seconds)',
   motionBlur: 'Motion blur', brand: 'Brand', voice: 'Voice', music: 'Music', ink: 'Ink (dark)', primary: 'Primary', accent: 'Accent (bright)', paper: 'Paper (light background)', muted: 'Muted text', logo: 'Logo',
-  mark: 'Logo mark', word: 'Wordmark (for dark backgrounds)', model: 'Model', language: 'Language', speed: 'Speed', emotion: 'Emotion', prompt: 'Describe the music', file: 'Or use a file', volume: 'Volume (0–1)', avoid: 'Avoid', seed: 'Seed' };
+  mark: 'Logo mark', word: 'Wordmark (for dark backgrounds)', model: 'Model', language: 'Language', speed: 'Speed', emotion: 'Emotion', prompt: 'Describe the music', file: 'Or use a file', volume: 'Volume (0–1)', sync: 'Move cuts onto the beat (on unless unticked)', avoid: 'Avoid', seed: 'Seed' };
 const COLOURS = new Set(['ink', 'primary', 'accent', 'paper', 'muted']), FILES = new Set(['mark', 'word', 'file']), ICONS = ['check', 'star', 'bolt', 'heart', 'shield', 'drop', 'clock', 'bell', 'sun', 'pin', 'number'];
 const BASIC = ['str', 'num', 'bool', 'text', 'media'];
 const isEnum = (s) => Array.isArray(s) && (s.length > 1 || (typeof s[0] === 'string' && !BASIC.includes(s[0])));
