@@ -290,6 +290,8 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
 
   const server = http.createServer(async (req, res) => {
     try {
+      // SONGBE_TRACE=1: one line per request (who asked for what, never the query), for finding out what a window really loaded
+      if (process.env.SONGBE_TRACE) console.log(`${req.method} ${String(req.url).split('?')[0]} · ${String(req.headers['user-agent'] || '-').slice(0, 90)}`);
       if (!trusted(req)) return send(res, 403, { error: 'This address only answers the Songbe pages on this computer.' });
       const u = new URL(req.url, 'http://x'), route = `${req.method} ${u.pathname}`, m = /^\/p\/([0-9a-f]{16})(\/.*)?$/.exec(u.pathname);
       if (m) {

@@ -28,12 +28,13 @@ fs.rmSync(path.join(TAURI, 'resources'), { recursive: true, force: true });
 for (const f of files) { const to = path.join(core, f); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(path.join(ROOT, f), to); }
 say(`core: ${files.length} files`);
 
-// ---- the engine's runtime: this Node, named the way the bundler looks for side programs ----
+// ---- the engine's runtime: this Node under a name of its own (a package must not claim `node`), spelled the way the bundler looks
+// for side programs ----
 const host = /host: (\S+)/.exec(out('rustc', ['-vV']))?.[1];
 if (!host) throw new Error('rustc did not say which system it builds for');
 if (process.platform === 'win32' && host.endsWith('-gnu')) say('note: the default Rust toolchain is GNU; if linking fails, set RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-msvc');
 const bins = path.join(TAURI, 'binaries'); fs.rmSync(bins, { recursive: true, force: true }); fs.mkdirSync(bins, { recursive: true });
-fs.copyFileSync(process.execPath, path.join(bins, `node-${host}${process.platform === 'win32' ? '.exe' : ''}`));
+fs.copyFileSync(process.execPath, path.join(bins, `songbe-engine-${host}${process.platform === 'win32' ? '.exe' : ''}`));
 say(`engine: Node ${process.version} for ${host}`);
 
 // ---- licences of what is shipped alongside: Node's must travel with its program ----
@@ -47,7 +48,7 @@ if (!text) {
 }
 if (!/Node\.js is licensed for use as follows/.test(text)) throw new Error('that does not look like the Node.js licence');
 fs.writeFileSync(path.join(lic, 'NODE-LICENSE.txt'), text);
-fs.writeFileSync(path.join(lic, 'README.txt'), `Songbe is licensed under the Apache License 2.0 (see core/LICENSE and core/NOTICE).\n\nThis folder holds the licences of programs shipped next to it:\n  NODE-LICENSE.txt   Node.js ${process.version}, the runtime of the Songbe engine (node${process.platform === 'win32' ? '.exe' : ''})\n\nffmpeg is not part of this package. When you ask Songbe to fetch it, it is downloaded from its publisher under its own licence (GPL).\n`);
+fs.writeFileSync(path.join(lic, 'README.txt'), `Songbe is licensed under the Apache License 2.0 (see core/LICENSE and core/NOTICE).\n\nThis folder holds the licences of programs shipped next to it:\n  NODE-LICENSE.txt   Node.js ${process.version}, the runtime of the Songbe engine: songbe-engine${process.platform === 'win32' ? '.exe' : ''} is an unmodified copy of it\n\nffmpeg is not part of this package. When you ask Songbe to fetch it, it is downloaded from its publisher under its own licence (GPL).\n`);
 
 // ---- and of the Rust crates compiled into the window's program: who wrote each, under which licence ----
 try {
@@ -65,9 +66,10 @@ if (pkg !== crate) say(`note: package.json says ${pkg} but app/src-tauri/Cargo.t
 // One kind of installer per system unless asked otherwise: a setup program on Windows, an AppImage and a .deb on Linux, a disk image on macOS.
 const KINDS = { win32: 'nsis', linux: 'appimage,deb', darwin: 'dmg' }, rest = process.argv.slice(2), plain = rest.includes('--no-bundle') || rest.includes('--bundles');
 const args = ['tauri', 'build', ...(rest.includes('--target') ? [] : ['--target', host]), ...(plain || !KINDS[process.platform] ? [] : ['--bundles', KINDS[process.platform]]), ...rest];
+const made = path.join(TAURI, 'target', rest.includes('--target') ? rest[rest.indexOf('--target') + 1] : host, 'release'), bundles = path.join(made, 'bundle');
+fs.rmSync(bundles, { recursive: true, force: true });      // installers of earlier versions must not be mistaken for this one
 say('cargo ' + args.join(' '));
 const r = spawnSync('cargo', args, { cwd: APP, stdio: 'inherit' });
 if (r.status !== 0) process.exit(r.status ?? 1);
-const made = path.join(TAURI, 'target', host, 'release'), bundles = path.join(made, 'bundle');
 say('program: ' + path.join(made, 'songbe' + (process.platform === 'win32' ? '.exe' : '')));
 if (fs.existsSync(bundles)) for (const kind of fs.readdirSync(bundles)) for (const f of fs.readdirSync(path.join(bundles, kind))) if (/\.(exe|msi|dmg|AppImage|deb|rpm)$/.test(f)) say('installer: ' + path.join(bundles, kind, f));

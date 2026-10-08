@@ -12,13 +12,13 @@ A picture or clip made in ArtCraft is a fine thing to put into a Songbe scene.
 | --- | --- | --- |
 | What you get at the end | Generated images and clips | A finished short ad: voice, graphics, captions, music, effects |
 | How you work | A visual canvas: 2D layers, 3D staging, posing, camera | A description, a form with live preview, or a JSON file; scenes from a kit |
-| AI models | A catalogue of about sixty (image, video, sound, 3D, worlds), through its own services and other providers, each with its own controls | Any picture, picture-to-clip or music model in fal.ai's catalogue, filled in from fal's description of it (four defaults); one voice model; a writer for the script. No 3D, no per-model controls |
+| AI models | A catalogue of about sixty (image, video, sound, 3D, worlds), through its own services and other providers, each with its own controls | Any picture, picture-to-clip, music or voice model in fal.ai's catalogue, filled in from fal's description of it (four defaults); a writer for the script. No 3D, no per-model controls |
 | Runs without an account or key | The app, yes; generating needs a provider | Yes, and still builds: motion graphics and sound effects, no voice or music |
 | Driven by a script or an AI agent | Not its purpose | Its first purpose: every step is a command, the input is one file |
 | Checks its own output | — | Layout before drawing; black frames, flashes, sound, length and a transcript after |
 | Licence | "Fair source", work in progress: free to use; not for resale or for building a competing product | Apache-2.0 |
 | Extending it | In its monorepo, under that licence | Packs: looks and starters as folders with their own licence, no code |
-| Installers | Windows and macOS; Linux from source | Windows; Linux and macOS from source (`songbe app`), installers prepared but not yet released |
+| Installers | Windows and macOS; Linux from source | Windows and Linux (AppImage, `.deb`), built and checked but not yet published; macOS from source (`songbe app`) |
 | Written in | Rust and TypeScript (Tauri) | JavaScript without dependencies; a small Rust shell for the window (Tauri) |
 | Maturity | An established project with a large community | Young: started in October 2026 |
 

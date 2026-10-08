@@ -121,6 +121,21 @@ test('requests from anywhere else are refused before anything happens', async ()
   assert.ok(!fs.existsSync(path.join(process.env.SONGBE_HOME, 'x')));
 });
 
+test('SONGBE_TRACE says who asked for what, without the query', async () => {
+  const lines = [], say = console.log; console.log = (x) => lines.push(String(x)); process.env.SONGBE_TRACE = '1';
+  try { await fetch(u + '/api/home?secret=1', { headers: { 'User-Agent': 'a-test' } }); } finally { console.log = say; delete process.env.SONGBE_TRACE; }
+  assert.deepEqual(lines, ['GET /api/home · a-test']);
+  await fetch(u + '/api/home'); assert.equal(lines.length, 1, 'silent when not asked for');
+});
+
+test('the command says which version it is', async () => {
+  const { spawnSync } = await import('node:child_process'), r = spawnSync(process.execPath, [path.join(ROOT, 'bin', 'songbe.mjs'), '--version'], { encoding: 'utf8' });
+  assert.equal(r.stdout.trim(), JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
+  assert.equal(r.stdout.trim(), (await (await fetch(u + '/api/home')).json()).version, 'the app and the command agree');
+  const cargo = fs.readFileSync(path.join(ROOT, 'app', 'src-tauri', 'Cargo.toml'), 'utf8');
+  assert.equal(/^version = "([^"]+)"/m.exec(cargo)[1], r.stdout.trim(), 'the desktop shell carries the same number');
+});
+
 test('keys are saved on this computer and never sent back', async () => {
   const put = (data) => fetch(u + '/api/keys', { method: 'PUT', headers: mine, body: JSON.stringify(data) });
   const r = await put({ FAL_KEY: 'test-key-0123456789' }), text = await r.text();

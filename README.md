@@ -11,9 +11,9 @@ motion graphics, captions, music and sound effects, and then checks its own work
 line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
 people who would rather click than type.
 
-> Version 0.17. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
-> that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux / WSL and Windows 11; macOS
-> has not been tried. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
+> Version 0.18. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux and Windows 11; on macOS
+> the tests pass and the app has not been built. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 
 ```
 songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.mp4  (+ sheet.jpg, check.json)
@@ -92,8 +92,9 @@ The table above is a summary; `songbe schema` prints the exact shape and `songbe
 `media` is a path to a video or image, or `{ "generate": { "image": "prompt", "motion": "prompt" } }` to create footage with the configured provider.
 Set `notice` (for example "Illustration generated with AI") on scenes that use generated people or places.
 
-**Any model on fal.ai.** The picture, the clip and the music each have a default model, and none is fixed: `"imageModel"` and
-`"videoModel"` inside `generate`, and `"model"` inside `music`, take any endpoint in fal.ai's catalogue.
+**Any model on fal.ai.** The picture, the clip, the music and the voice each have a default model, and none is fixed:
+`"imageModel"` and `"videoModel"` inside `generate`, and `"model"` inside `music` and `voice`, take any endpoint in fal.ai's
+catalogue (with another voice model, `voice.voice` is one of that model's voices).
 
 ```json
 "media": { "generate": { "image": "A steaming bowl of pho at dawn…", "motion": "Steam rises, the camera pushes in",
@@ -263,16 +264,20 @@ The pages are served to this computer only, and the server treats every request 
 requires a header that forms and image tags cannot set on anything that changes something, serves no file outside the project and
 the kit, never serves an `.env`, and never sends a key back to the page.
 
-### Installed on Windows
+### Installed
 
-`app/` wraps the same engine in a native window (Tauri): an installer, a Start-menu entry, no terminal. The window shows exactly
-the pages above; the shell only starts the engine — Node, shipped next to it — and goes to the address the engine prints.
+`app/` wraps the same engine in a native window (Tauri): an installer, an entry in the system's menu, no terminal. The window
+shows exactly the pages above; the shell only starts the engine — Node, shipped next to it — and goes to the address the engine
+prints.
 
 ```bash
-node app/build.mjs          # → Songbe_<version>_x64-setup.exe (the path is printed at the end)
+node app/build.mjs          # Windows: Songbe_<version>_x64-setup.exe · Linux: an AppImage and a .deb (the paths are printed at the end)
+node app/smoke.mjs          # start what was built and check that it works
 ```
 
-Needs Rust and `cargo install tauri-cli`; see `app/README.md`. The installer is not code-signed yet, so Windows asks before running it.
+Needs Rust and `cargo install tauri-cli`; see `app/README.md`. The `.deb` brings ffmpeg with it and puts `songbe` on the path,
+where it is the command line as well as the app. Nothing is code-signed yet, so Windows asks before running the installer.
+From a checkout on Linux, `songbe app --add-launcher` puts the app in the applications menu without building anything.
 
 ## Checks
 
@@ -301,19 +306,19 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 ## Limits today
 
 - Nine scene types; three looks (two in the kit, one bundled as a pack). Scene types live in `kit/scenes.js` and cannot come from packs.
-- One provider (fal.ai), though any of its picture, clip and music models can be used; the voice is one model (MiniMax). The writer also takes an Anthropic key.
+- One provider (fal.ai), though any of its picture, clip, music and voice models can be used. The writer also takes an Anthropic key.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
-- The installed app exists for Windows only so far, unsigned; on Linux `songbe app --add-launcher` puts the app in the
-  applications menu from a checkout. *Open a folder* takes a typed path rather than a system dialog.
+- Installers are built for Windows and Linux (AppImage, `.deb`), unsigned, and none is published as a release yet; no macOS app
+  has been built. *Open a folder* takes a typed path rather than a system dialog.
 
 ## More to read
 
 - `docs/packs.md` — making a pack: looks and starters outside the core.
 - `docs/comparison.md` — how Songbe relates to ArtCraft, plainly.
 - `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
-- `app/README.md` — the desktop shell and how installers are built; `.github/workflows/` builds them for Windows, Linux and macOS
-  on a tagged release once the repository is public (the workflows have not run yet).
+- `app/README.md` — the desktop shell, how installers are built and what has been checked on which system. `.github/workflows/`
+  runs the tests and builds the installers on a tagged release once the repository is public; until then they are started by hand.
 
 ## License
 

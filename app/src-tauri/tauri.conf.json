@@ -14,7 +14,7 @@
     "targets": "all",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "resources": { "resources/core/": "core/", "resources/licenses/": "licenses/" },
-    "externalBin": ["binaries/node"],
+    "externalBin": ["binaries/songbe-engine"],
     "publisher": "Songbe",
     "category": "Video",
     "shortDescription": "Short ads from a single video.json",
@@ -23,6 +23,9 @@
     "windows": {
       "nsis": { "installMode": "currentUser" },
       "webviewInstallMode": { "type": "downloadBootstrapper" }
+    },
+    "linux": {
+      "deb": { "depends": ["ffmpeg"] }
     }
   }
 }

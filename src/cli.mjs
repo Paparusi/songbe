@@ -16,7 +16,7 @@ const HELP = `Songbe — short ads from a single video.json
                                   (Linux: "songbe app --add-launcher" puts Songbe in the applications menu, "--remove-launcher" takes it out)
   songbe studio <dir> [--port=N]  the same editor, opened straight on one project (http://127.0.0.1:4173)
 
-  songbe doctor                   check that ffmpeg, ffprobe and a browser are found and which keys are set
+  songbe doctor                   check that ffmpeg, ffprobe and a browser are found and which keys are set (songbe --version: which Songbe)
   songbe setup ffmpeg             Windows: fetch ffmpeg into Songbe's own folder (elsewhere: says which package to install)
   songbe write <dir> "<brief>"    draft video.json from a description of the ad, check the draft and fix what the checks find
                                   (--style= --format= --no-captions --footage --brief=FILE --force; needs a key, see below)
@@ -53,6 +53,7 @@ function report(r) {
 export async function main(argv) {
   const [cmd, target, ...rest] = argv, flags = new Set(rest.filter((x) => x.startsWith('--')));
   if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') return log(HELP);
+  if (cmd === '--version' || cmd === '-v' || cmd === 'version') return log(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   if (cmd === 'doctor') {
     for (const [label, name] of [['ffmpeg', 'ffmpeg'], ['ffprobe', 'ffprobe'], ['browser', 'chrome']]) {
       try { log(`ok   ${label}: ${tools[name]}`); } catch (e) { log(`MISSING ${label}: ${e.message}`); process.exitCode = 1; }

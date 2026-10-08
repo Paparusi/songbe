@@ -88,3 +88,11 @@ test('a request is shaped to what each model takes', async () => {
   assert.deepEqual(requestFor({ prompt: any, duration: any }, { kind: 'music', prompt: 'guitar', avoid: 'vocals', seconds: 30 }), { prompt: 'guitar', duration: 30 });
   assert.deepEqual(requestFor({ prompt: any, negative_prompt: any, seed: any }, { kind: 'music', prompt: 'guitar', avoid: 'vocals', seed: 808 }), { prompt: 'guitar', seed: 808, negative_prompt: 'vocals' });
 });
+
+test('another voice model gets the text, the voice and the language under its own names', async () => {
+  const { speechFor } = await import('../src/providers/fal.mjs'), any = { options: null, object: false };
+  assert.deepEqual(speechFor({ text: any, voice: any, language_code: any, stability: any }, 'Xin chào', { voice: 'Aria', language: 'Vietnamese', speed: 1.1 }), { text: 'Xin chào', voice: 'Aria', language_code: 'vi' });
+  assert.deepEqual(speechFor({ input: any, voice_id: any, speed: any, language: { options: ['English', 'Vietnamese'], object: false } }, 'Hi', { voice: 'v1', language: 'vietnamese', speed: 1.1 }), { input: 'Hi', voice_id: 'v1', speed: 1.1, language: 'Vietnamese' });
+  assert.deepEqual(speechFor({ text: any }, 'Hi', {}), { text: 'Hi' });
+  assert.throws(() => speechFor({ image_url: any }, 'Hi', {}, 'fal-ai/some-image-model'), /does not look like a text-to-speech model/);
+});

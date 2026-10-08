@@ -25,6 +25,18 @@ fn plain(p: &Path) -> PathBuf {
     }
 }
 
+// The engine's runtime and its script, wherever this program was put: next to it (Windows, a build run in place), under ../lib/Songbe
+// (a .deb, an AppImage) or under ../Resources (a macOS app). The runtime is an unmodified Node.js under a name of its own, so that
+// a package never claims the name `node`.
+fn engine(resources: Option<PathBuf>) -> (PathBuf, PathBuf) {
+    let here = std::env::current_exe().ok().and_then(|p| p.parent().map(plain)).unwrap_or_default();
+    let node = here.join(if cfg!(windows) { "songbe-engine.exe" } else { "songbe-engine" });
+    let at = |root: PathBuf| root.join("core").join("bin").join("songbe.mjs");
+    let script = resources.into_iter().chain([here.clone(), here.join("../lib/Songbe"), here.join("../Resources")])
+        .map(at).find(|p| p.exists()).unwrap_or_else(|| at(here));
+    (node, script)
+}
+
 fn note(log: &Log, line: &str) {
     if let Some(f) = log.lock().unwrap().as_mut() {
         let _ = writeln!(f, "{line}");
@@ -50,9 +62,7 @@ fn start(app: &AppHandle, window: WebviewWindow, splash: Url) {
     }
     let log: Log = Arc::new(Mutex::new(OpenOptions::new().create(true).append(true).open(&log_file).ok()));
 
-    let here = std::env::current_exe().ok().and_then(|p| p.parent().map(plain)).unwrap_or_default();
-    let node = here.join(if cfg!(windows) { "node.exe" } else { "node" });
-    let script = app.path().resource_dir().map(|p| plain(&p)).unwrap_or_else(|_| here.clone()).join("core").join("bin").join("songbe.mjs");
+    let (node, script) = engine(app.path().resource_dir().ok().map(|p| plain(&p)));
     note(&log, &format!("--- start: engine {} {}", node.display(), script.display()));
     if !node.exists() || !script.exists() {
         return fail(&window, &splash, "missing", &log_file);
@@ -102,6 +112,19 @@ fn start(app: &AppHandle, window: WebviewWindow, splash: Url) {
 }
 
 fn main() {
+    // From a terminal the installed program is also the command line: `songbe build my-ad` hands everything after the name to the
+    // engine and becomes it. (Not on Windows, where a program with a window has no console to print to.)
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        if args.first().is_some_and(|a| a != "app" && !a.to_string_lossy().starts_with("-psn")) {
+            let (node, script) = engine(None);
+            let failed = Command::new(&node).arg(&script).args(&args).exec();
+            eprintln!("songbe: could not start the engine at {}: {failed}", node.display());
+            std::process::exit(127);
+        }
+    }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(w) = app.get_webview_window("main") {

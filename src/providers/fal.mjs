@@ -25,12 +25,28 @@ const dataUri = (file) => `data:image/${file.endsWith('.png') ? 'png' : 'jpeg'};
 
 export const available = () => !!process.env.FAL_KEY;
 
-// text → speech (mp3)
+// text → speech. The default is MiniMax speech (v.voice is one of its voice ids, with speed, emotion and a language hint); with
+// v.model set to another text-to-speech endpoint the text, the voice and the speed go in under the names that model uses.
+const VOICE = 'fal-ai/minimax/speech-02-hd';
+const CODES = { vietnamese: 'vi', english: 'en', chinese: 'zh', japanese: 'ja', korean: 'ko', french: 'fr', german: 'de', spanish: 'es', portuguese: 'pt', indonesian: 'id', thai: 'th', hindi: 'hi', arabic: 'ar', russian: 'ru', italian: 'it' };
 export async function speak(text, v, file) {
-  const r = await quick(v.model || 'fal-ai/minimax/speech-02-hd', {
-    text, voice_setting: { voice_id: v.voice || 'Casual_Guy', speed: v.speed ?? 1.08, vol: 1, pitch: 0, emotion: v.emotion || 'happy' },
-    language_boost: v.language || 'auto', output_format: 'url' });
-  return save(urlOf(r.audio), file);
+  const model = v.model || VOICE, inputs = model === VOICE ? null : await inputsOf(model);
+  if (!inputs || 'voice_setting' in inputs) {      // MiniMax's own shape
+    const r = await quick(model, { text, voice_setting: { voice_id: v.voice || 'Casual_Guy', speed: v.speed ?? 1.08, vol: 1, pitch: 0, emotion: v.emotion || 'happy' }, language_boost: v.language || 'auto', output_format: 'url' });
+    return save(urlOf(r.audio), file);
+  }
+  return save(fileIn(await queued(model, speechFor(inputs, text, v, model))), file);
+}
+// the request for a text-to-speech model that is not MiniMax's
+export function speechFor(inputs, text, v, model = 'that model') {
+  const a = {}, has = (n) => n in inputs, said = ['text', 'input', 'prompt', 'gen_text'].find(has);
+  if (!said) throw new Error(`${model} does not look like a text-to-speech model (it takes: ${Object.keys(inputs).join(', ')})`);
+  a[said] = text;
+  for (const n of ['voice', 'voice_id', 'speaker']) if (has(n) && v.voice) { a[n] = v.voice; break; }
+  if (has('speed') && v.speed) a.speed = v.speed;
+  const code = CODES[String(v.language || '').toLowerCase()];
+  if (has('language_code') && code) a.language_code = code; else if (has('language') && v.language && v.language !== 'auto') a.language = inputs.language.options?.find((o) => String(o).toLowerCase() === String(v.language).toLowerCase() || o === code) ?? v.language;
+  return a;
 }
 // ---- any model on fal.ai ----
 // Pictures, clips and music are not tied to the models named below. fal publishes what every model takes (its OpenAPI description);

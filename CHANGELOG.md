@@ -2,6 +2,17 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.18
+- The voice can be any text-to-speech model on fal.ai (`voice.model`), not only the default.
+- **Linux packages.** The engine's runtime is now called `songbe-engine` on every system, so the `.deb` no longer claims
+  `/usr/bin/node`; the `.deb` brings ffmpeg with it. On Linux and macOS the installed program is also the command line:
+  `songbe build my-ad`, `songbe --version`.
+- `app/smoke.mjs` starts a built app and checks it: the engine, its version, every starter, the window loading its page, nothing
+  left running afterwards. The release workflow installs each package and runs this before attaching it.
+- `songbe --version`. `SONGBE_TRACE=1` prints one line per request the app's pages make.
+- The workflows use current action versions and keep the Tauri command between runs, which takes a release run from eighteen
+  minutes to about seven.
+
 ## 0.17
 - The editor: click words in the preview to edit the field they come from; undo and redo.
 - The test and release workflows can be started by hand for one system at a time.
