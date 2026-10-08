@@ -187,6 +187,29 @@
         const now = parseFloat(getComputedStyle(el).fontSize), was = +el.dataset.designed;
         if (now < was * .7) say('note', `"${(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 34)}" is too long for its place: the type was shrunk from ${Math.round(was)} px to ${Math.round(now)} px`);
       }
+      // The words themselves, wherever they are: none may be cut off by the box it sits in, leave the frame, or lie against its edge.
+      const said = new Set(), once = (level, message) => { if (!said.has(message)) { said.add(message); say(level, message); } };
+      const walk = document.createTreeWalker(s.el, NodeFilter.SHOW_TEXT), texts = [];
+      for (let n; (n = walk.nextNode());) {
+        const words = n.nodeValue.replace(/\s+/g, ' ').trim(); if (!words || !seen(n.parentElement)) continue;
+        const range = document.createRange(); range.selectNodeContents(n);
+        const r = rect(range), quoted = `"${words.slice(0, 34)}"`; if (r.r - r.l < 2) continue;
+        texts.push({ r, quoted, host: n.parentElement });
+        let cut = false;
+        for (let a = n.parentElement; a && a !== s.el && !cut; a = a.parentElement) { if (getComputedStyle(a).overflowX === 'visible') continue; const b = rect(a); cut = r.r > b.r + 3 || r.l < b.l - 3; }
+        if (cut) once('problem', `${quoted} is cut off: it is wider than the place it sits in`);
+        else if (r.l < -3 || r.r > W + 3) once('problem', `${quoted} runs off the ${r.l < -3 ? 'left' : 'right'} of the frame`);
+        else if (r.l < 22 || r.r > W - 22) once('note', `${quoted} lies against the ${r.l < 22 ? 'left' : 'right'} edge of the frame`);
+      }
+      // ...nor may one run into another. A text box is as tall as its font's full line, which the lines above and below share by
+      // design, so only the middle band of each counts; and words inside one another's element (a highlight in a headline) are one text.
+      const mid = ({ r }) => ({ l: r.l, r: r.r, t: r.t + (r.b - r.t) * .26, b: r.b - (r.b - r.t) * .26 });
+      for (let x = 0; x < texts.length; x++) for (let y = x + 1; y < texts.length; y++) {
+        const A = texts[x], B = texts[y]; if (A.host.contains(B.host) || B.host.contains(A.host) || A.host.parentElement === B.host.parentElement && A.host.parentElement.classList.contains('mask')) continue;
+        const a = mid(A), b = mid(B), w = Math.min(a.r, b.r) - Math.max(a.l, b.l), h = Math.min(a.b, b.b) - Math.max(a.t, b.t);
+        if (w > 6 && h > 4) once('problem', `${A.quoted} runs into ${B.quoted}`);
+      }
+      if (s.el.querySelector('[data-placeholder]')) say('note', 'the phone has no screenshot to show and draws a placeholder: give the scene "screens"');
       const label = (b) => (b.text && b.name !== 'phone' && b.name !== 'media card' && b.name !== 'footage frame' ? `${b.name} "${b.text}"` : b.name);
       for (const b of boxes) {
         const over = { left: -b.l, right: b.r - W, top: -b.t, bottom: b.b - FH };

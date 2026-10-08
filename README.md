@@ -124,7 +124,7 @@ frame — and `node tools/fit.mjs --check` tells when the kit has drifted from i
 | Small label | 30 | 30 |
 | List row / its second line (up to 4 rows) | 30 / 40 | 30 / 40 |
 | Callout on the phone | 22 | 22 |
-| Chat message | 40 | 56 |
+| Chat message (it may wrap to three lines) | 80 | 80 |
 | Tagline / button on the end card | 40 / 26 | 40 / 26 |
 
 `songbe validate` lists every text longer than its place. Longer text is still drawn — the kit shrinks type to fit — it just
@@ -233,8 +233,9 @@ npm test                            # the test suite (about half a minute; drawi
 ```
 
 **Layout check** (`songbe lint`, and automatically with `frames` and `build`). Each scene is drawn near its end and its content is
-measured. *Problems*: something runs off the frame, two things overlap, captions would cover something. *Notes*: text that had to be
-shrunk a lot to fit, content in the bottom 330 px of a tall frame (phone apps cover it). Scenes do most of the fitting themselves —
+measured, down to the words themselves. *Problems*: something runs off the frame, two things overlap, a text is cut off by the box
+it sits in or runs into another text, captions would cover something. *Notes*: text that had to be shrunk a lot to fit, words lying
+against the edge of the frame, content in the bottom 330 px of a tall frame (phone apps cover it), a phone with no screenshot to show. Scenes do most of the fitting themselves —
 they squeeze toward the floor of the usable area and make room for the caption band — so a problem here usually means too many words.
 
 **After a build** the whole picture is watched once for black frames, for flashes (the picture jumps and comes straight back), for

@@ -20,6 +20,8 @@
   const type = (size, step, boxed) => { const k = SB.style.title; return k.scale === 1 ? [size, step] : [Math.round(size * k.scale), Math.round(size * k.scale * ((boxed && k.boxLead) || k.lead))]; };
   const wait = (sc) => (sc.start === 0 ? 0 : .26);       // let the cut's colour sweep pass first
   const fitTitle = (tl, size, width = 920) => { let z = size; for (const l of tl) z = Math.min(z, fit(l, width)); for (const l of tl) l.style.fontSize = z + 'px'; };
+  // every one-line text has a widest it may get; past that its type shrinks (and past a third smaller the layout check speaks up)
+  const fitAll = (el, widths) => { for (const [sel, max] of Object.entries(widths)) for (const x of el.querySelectorAll(sel)) fit(x, max); };
   const blk = (name, html) => (html ? `<div class="blk ${name}">${html}</div>` : '');
   // put a block so that its design point (dx, dy) lands on (x, y) of the frame, drawn at scale k
   const put = (el, name, dx, dy, x, y, k = 1) => { const b = $(el, '.' + name); if (b) b.style.transform = `translate(${(x - dx * k).toFixed(2)}px,${(y - dy * k).toFixed(2)}px) scale(${k})`; };
@@ -73,18 +75,18 @@
       ${sc.media ? '<div class="shade-top"></div><div class="shade-bottom"></div>' : ''}
       ${side ? `<div class="a sideframe sf" style="left:${W - 110 - sw}px;top:70px;width:${sw}px;height:${sh}px"><img class="fill sd"></div>` : ''}` + blk('head', `
       ${sc.label ? (pill
-        ? `<div class="a pill tag label lb" style="left:70px;top:206px;padding:14px 30px 14px 34px;font-size:28px;transform-origin:0 50%">${esc(sc.label)}</div>`
+        ? `<div class="a pill tag label lb" style="left:70px;top:206px;padding:14px 30px 14px 34px;font-size:28px;white-space:nowrap;transform-origin:0 50%">${esc(sc.label)}</div>`
         : `<div class="mask label lb" style="left:72px;top:214px;color:var(--accent)"><span>${sc.pin ? PIN(30, 'var(--accent)') : ''}${esc(sc.label)}</span></div>`) : ''}
       ${ts.map((s, i) => `<div class="mask title on-dark tl" style="left:68px;top:${top + i * step}px;font-size:${size}px;padding-top:8px"><span>${rich(s)}</span></div>`).join('')}
       ${sc.sub ? `<div class="mask sub on-dark sb" style="left:72px;top:${top + ts.length * step + 28}px;font-size:44px"><span>${rich(sc.sub)}</span></div>` : ''}`) + blk('foot',
-      sc.chip ? `<div class="a pill chip ch" style="left:70px;top:1296px;font-size:40px;font-weight:700;padding:22px 38px 22px 30px;transform-origin:0 50%">${PIN(40, 'var(--primary)')}${esc(sc.chip)}</div>` : '');
+      sc.chip ? `<div class="a pill chip ch" style="left:70px;top:1296px;font-size:40px;font-weight:700;padding:22px 38px 22px 30px;white-space:nowrap;transform-origin:0 50%">${PIN(40, 'var(--primary)')}${esc(sc.chip)}</div>` : '');
     if (kind === 'square') { put(el, 'head', 68, 206, 64, 92, .78); put(el, 'foot', 70, 1296, 64, H - 176, .85); }
     if (kind === 'wide') { put(el, 'head', 68, 206, 110, 140, .92); put(el, 'foot', 70, 1296, 110, H - 170, .92); }
     const bg = $(el, '.bg'), sf = $(el, '.sf'), sd = $(el, '.sd'), lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], sb = $(el, '.sb'), ch = $(el, '.ch');
     const dur = sc.end - sc.start, t0 = sc.start === 0 ? 0 : .3;            // later scenes wait for the wipe to pass
     const at = { label: t0 + .12, title: t0 + .26, sub: t0 + 1.1, chip: Math.min(t0 + 2.2, Math.max(1.2, dur - 1.6)) };
     return {
-      layout() { fitTitle(tl, size, 900); if (sb) fit(sb, 900); },
+      layout() { fitTitle(tl, size, 900); fitAll(el, { '.lb': 936, '.sb': 900, '.ch': 940 }); },
       cues: [...(lb && pill ? [{ t: at.label, kind: 'pop' }] : []), ...(ch ? [{ t: at.chip, kind: 'pop' }] : [])],
       async draw(u) {
         if (bg) { await setImg(bg, mediaSrc(sc.media, u)); bg.style.transform = `scale(${(side ? 1.3 : 1.02) + .05 * ease.inOut(seg(u, 0, dur + .2))})`; }
@@ -111,7 +113,7 @@
       m ? `<div class="a card md" style="left:70px;top:${mediaTop}px;width:940px;height:560px;padding:16px;transform-origin:50% 100%">
         <div class="frame" style="position:relative;width:908px;height:528px">
           <img class="mi" style="position:absolute;left:-16px;top:-6px;width:940px;height:540px;object-fit:cover">
-          ${sc.caption ? `<div class="cap" style="position:absolute;left:20px;bottom:20px;font-size:27px;font-weight:600;padding:10px 20px">${esc(sc.caption)}</div>` : ''}
+          ${sc.caption ? `<div class="cap" style="position:absolute;left:20px;bottom:20px;font-size:27px;font-weight:600;padding:10px 20px;white-space:nowrap">${esc(sc.caption)}</div>` : ''}
         </div></div>` : '') + blk('stat',
       st ? `<div class="a card stat st" style="left:70px;top:${statTop}px;width:940px;height:226px">
         <div class="badge bd" style="position:absolute;left:34px;top:33px;width:160px;height:160px;font-weight:900;font-size:84px;letter-spacing:-3px;text-align:center;line-height:156px;white-space:nowrap"><span>${esc(st.badge)}</span></div>
@@ -133,7 +135,7 @@
     const at = { label: .26, title: .36, media: .78, stat: m ? 1.78 : 1.0 };
     return {
       layout() {
-        fitTitle(tl, size, kind === 'wide' ? 860 : 900);
+        fitTitle(tl, size, kind === 'wide' ? 860 : 900); fitAll(el, { '.lb': 936, '.cap': 868 });
         if (stEl) { fit($(el, '.sh'), 680); fit($(el, '.ss'), 680); let b = 84; while (bd.firstElementChild.offsetWidth > 138 && b > 30) { b -= 4; bd.style.fontSize = b + 'px'; } }
       },
       cues: [...(md ? [{ t: at.media - .22, kind: 'swish' }, { t: at.media + .08, kind: 'pop' }] : []), ...(stEl ? [{ t: at.stat + .02, kind: 'pop' }, { t: at.stat + .25, kind: 'ding', gain: .85 }] : [])],
@@ -179,7 +181,7 @@
     const lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], rows = [...el.querySelectorAll('.row')];
     const dur = sc.end - sc.start, t0 = wait(sc), first = t0 + .7, gap = clamp((dur - first - 1.6) / Math.max(1, rows.length), .3, 1.5);   // long lines: rows keep pace with the voice
     return {
-      layout() { fitTitle(tl, size, kind === 'wide' ? 860 : 920); for (const r of rows) { fit($(r, '.rh'), 740); if ($(r, '.rs')) fit($(r, '.rs'), 740); } },
+      layout() { fitTitle(tl, size, kind === 'wide' ? 860 : 920); fitAll(el, { '.lb': 936, '.rh': 740, '.rs': 740 }); },
       cues: rows.map((_, i) => ({ t: first + i * gap + .02, kind: 'pop' })),
       async draw(u) {
         drift(el, u, dark);
@@ -194,6 +196,12 @@
     };
   };
 
+  // what a phone shows while it has no screenshots: the outline of an app, so that a draft does not look broken
+  const PLACEHOLDER = `<div class="ss0" data-placeholder="1">
+    <i style="left:8%;top:9%;width:34%;height:1.6%"></i><i style="left:8%;top:12%;width:56%;height:2.6%"></i>
+    <b style="left:8%;top:18%;width:84%;height:20%"></b>
+    ${[0, 1, 2, 3].map((r) => `<u style="left:8%;top:${43 + r * 10.5}%;width:84%;height:8.6%"><em></em><i style="left:22%;top:26%;width:44%;height:18%"></i><i style="left:22%;top:58%;width:30%;height:14%"></i></u>`).join('')}
+    <s style="left:8%;top:88.5%;width:84%;height:6%"></s></div>`;
   // phone: a headline over a phone that rises into frame, showing one or more app screens with callouts
   SB.scenes.phone = (el, sc) => {
     const { W: FW, H: FH, kind } = SB.frame, light = sc.tone === 'light', dark = !light, screens = lines(sc.screens), calls = sc.callouts || [], n = lines(sc.title).length, [size, step] = type(112, 132);
@@ -201,7 +209,7 @@
     el.classList.add(dark ? 'night' : 'paper');
     el.innerHTML = backdrop(dark) + blk('head', heading(sc, dark, size, step)) + blk('device', `
       <div class="a ph" style="left:${X}px;top:${Y}px;width:${W}px;height:${H}px;transform-origin:50% 0">
-        <div class="phone${light ? ' light' : ''}"><div class="scr">${screens.map((s) => `<img class="ss" src="${s}">`).join('')}<div class="island"></div></div></div>
+        <div class="phone${light ? ' light' : ''}"><div class="scr">${screens.length ? screens.map((s) => `<img class="ss" src="${s}">`).join('') : PLACEHOLDER}<div class="island"></div></div></div>
         ${calls.map((c, i) => `<div class="a pill callout co" style="${(c.side || (i % 2 ? 'left' : 'right')) === 'left' ? `left:${40 - X}px;transform-origin:0 50%` : `right:${40 - X}px;transform-origin:100% 50%`};top:${Math.round((c.y ?? .2 + .2 * i) * H)}px;white-space:nowrap;font-size:38px;font-weight:700;padding:20px 34px 20px 28px"><i style="display:inline-block;width:18px;height:18px;border-radius:50%;margin-right:14px;vertical-align:2px"></i>${esc(c.text)}</div>`).join('')}
       </div>`);
     const hy = headTop(sc), hh = headHeight(sc, step);
@@ -221,7 +229,7 @@
     const swap = ss.map((_, i) => (i === 0 ? -9 : rise + .9 + (i - 1) * Math.max(1.1, (dur - rise - 1.4) / ss.length) + (dur - rise - .9) / ss.length * .5));
     const callAt = co.map((_, i) => rise + .95 + i * .45);
     return {
-      layout() { fitTitle(tl, size, kind === 'wide' ? 860 : 920); },
+      layout() { fitTitle(tl, size, kind === 'wide' ? 860 : 920); fitAll(el, { '.lb': 936, '.co': 640 }); },
       cues: [{ t: rise - .12, kind: 'swish' }, ...swap.slice(1).map((t) => ({ t: t - .05, kind: 'swish', gain: .8 })), ...callAt.map((t) => ({ t: t + .02, kind: 'pop' }))],
       async draw(u) {
         drift(el, u, dark);
@@ -244,12 +252,12 @@
     const c = sc.contact, f = sc.footer || {}, logo = plan.brand.logo || {}, [size, step] = type(112, 132), down = (lines(sc.title).length - 1) * step + (step - 132);
     el.classList.add('night');
     el.innerHTML = backdrop(true) + blk('head', heading(sc, true, size, step)) + blk('talk', `
-      ${them ? `<div class="bubble them b1" style="right:70px;top:${486 + down}px;transform-origin:100% 100%"><span class="b1t"></span></div>` : ''}
-      ${us ? `<div class="bubble us b2" style="left:70px;top:${640 + down}px;max-width:720px;transform-origin:0 100%">${esc(us.text)}</div>
+      ${them ? `<div class="bubble them b1" style="right:70px;top:${486 + down}px;max-width:760px;transform-origin:100% 100%"><span class="b1t"></span></div>` : ''}
+      ${us ? `<div class="bubble us b2" style="left:70px;top:${640 + down}px;max-width:720px;transform-origin:0 100%"><span class="b2t">${esc(us.text)}</span></div>
         <div class="bubble us dt" style="left:70px;top:${640 + down}px;padding:30px 34px;transform-origin:0 100%">${[0, 1, 2].map((i) => `<i class="d${i}" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#9AA8BC;margin-right:${i < 2 ? 10 : 0}px"></i>`).join('')}</div>` : ''}`) + blk('reach',
       c ? `<div class="a card contact ct" style="left:70px;top:${900 + down}px;width:940px;height:372px;transform-origin:50% 100%">
-        <div class="kicker" style="position:absolute;left:48px;top:40px;font-size:36px;font-weight:700;letter-spacing:3px;text-transform:uppercase">${esc(c.kicker || '')}</div>
-        ${c.button ? `<div class="pill ghost" style="position:absolute;right:48px;top:36px;font-size:30px;font-weight:600;padding:8px 22px">${esc(c.button)}</div>` : ''}
+        <div class="kicker kk" style="position:absolute;left:48px;top:40px;font-size:36px;font-weight:700;letter-spacing:3px;text-transform:uppercase;white-space:nowrap">${esc(c.kicker || '')}</div>
+        ${c.button ? `<div class="pill ghost gb" style="position:absolute;right:48px;top:36px;font-size:30px;font-weight:600;padding:8px 22px;white-space:nowrap">${esc(c.button)}</div>` : ''}
         <div class="num" style="position:absolute;left:46px;top:124px;font-size:120px;font-weight:900;color:var(--ink);letter-spacing:-3px;white-space:nowrap">
           ${lines(c.number).map((g, i) => `<span class="mask" style="position:relative;display:inline-block;vertical-align:top;margin-left:${i ? 26 : 0}px"><span class="ng">${esc(g)}</span></span>`).join('')}</div>
         <div class="cs" style="position:absolute;left:48px;top:292px;font-size:34px;font-weight:500;color:var(--muted);white-space:nowrap">${esc(c.sub || '')}</div></div>` : '') + blk('sign', `
@@ -257,21 +265,31 @@
         ${logo.mark ? `<img src="${logo.mark}" style="position:absolute;left:0;top:6px;height:96px">` : ''}
         ${logo.word ? `<img class="lw" src="${logo.word}" style="position:absolute;left:100px;top:26px;height:58px">` : ''}
         <div class="fx" style="position:absolute;left:${logo.word ? 420 : logo.mark ? 120 : 0}px;top:12px">
-          <div style="font-size:36px;font-weight:800;color:#fff;white-space:nowrap">${esc(f.name || plan.brand.name || '')}</div>
-          <div style="font-size:26px;font-weight:500;color:rgba(255,255,255,.7);white-space:nowrap;margin-top:4px">${esc(f.line || '')}</div></div>
+          <div class="fn" style="font-size:36px;font-weight:800;color:#fff;white-space:nowrap">${esc(f.name || plan.brand.name || '')}</div>
+          <div class="fl" style="font-size:26px;font-weight:500;color:rgba(255,255,255,.7);white-space:nowrap;margin-top:4px">${esc(f.line || '')}</div></div>
       </div>`);
     const hy = headTop(sc), hh = headHeight(sc, step);
-    if (kind === 'tall') squeeze(el, 900 + down, 1352 + down + 110, { reach: 900 + down, sign: 1352 + down });
-    if (kind === 'square') {            // heading, the chat at full size, then a contact card and footer as large as the height allows
-      const kh = .58, hb = 56 + hh * kh, cy = hb + 20 + 310 + 24, kc = Math.min(.74, (SB.frame.floor - cy - 20) / ((c ? 372 : 0) + 110)), x = (W - 940 * kc) / 2;
-      put(el, 'head', 68, hy, 64, 56, kh); put(el, 'talk', 70, 486 + down, 70, hb + 20, 1);
-      put(el, 'reach', 70, 900 + down, x, cy, kc); put(el, 'sign', 70, 1352 + down, x, (c ? cy + 372 * kc + 20 : cy), kc);
-    }
-    if (kind === 'wide') {              // heading and chat on the left, contact card and footer on the right
-      const kh = .9, kt = .8, kc = .84, leftH = hh * kh + 40 + 310 * kt, y0 = (H - leftH) / 2, rx = W - 110 - 940 * kc, ry = (H - (c ? 372 * kc + 30 : 0) - 110 * kc) / 2;
-      put(el, 'head', 68, hy, 110, y0, kh); put(el, 'talk', 70, 486 + down, 110, y0 + hh * kh + 40, kt);
-      put(el, 'reach', 70, 900 + down, rx, ry, kc); put(el, 'sign', 70, 1352 + down, rx, ry + (c ? 372 * kc + 30 : 0), kc);
-    }
+    // Where the blocks go. `grow` is how much taller the chat came out than its two one-line bubbles (known once fonts have loaded):
+    // everything below it moves down by that much, and is then scaled to stay above the floor as before.
+    const place = (grow) => {
+      const talk = 310 + grow;
+      if (kind === 'tall') {
+        const top = 900 + down + grow, bottom = top + 452 + 110, k = bottom <= SB.frame.floor ? 1 : Math.max(.6, (SB.frame.floor - top) / (bottom - top));
+        if (!grow && k === 1) for (const n of ['reach', 'sign']) { const b = $(el, '.' + n); if (b) b.style.transform = ''; }      // as designed: left untouched
+        else { put(el, 'reach', 540, 900 + down, 540, top, k); put(el, 'sign', 540, 1352 + down, 540, top + 452 * k, k); }
+      }
+      if (kind === 'square') {            // heading, the chat at full size, then a contact card and footer as large as the height allows
+        const kh = .58, hb = 56 + hh * kh, cy = hb + 20 + talk + 24, kc = Math.max(.4, Math.min(.74, (SB.frame.floor - cy - 20) / ((c ? 372 : 0) + 110))), x = (W - 940 * kc) / 2;
+        put(el, 'head', 68, hy, 64, 56, kh); put(el, 'talk', 70, 486 + down, 70, hb + 20, 1);
+        put(el, 'reach', 70, 900 + down, x, cy, kc); put(el, 'sign', 70, 1352 + down, x, (c ? cy + 372 * kc + 20 : cy), kc);
+      }
+      if (kind === 'wide') {              // heading and chat on the left, contact card and footer on the right
+        const kh = .9, kt = .8, kc = .84, leftH = hh * kh + 40 + talk * kt, y0 = (H - leftH) / 2, rx = W - 110 - 940 * kc, ry = (H - (c ? 372 * kc + 30 : 0) - 110 * kc) / 2;
+        put(el, 'head', 68, hy, 110, y0, kh); put(el, 'talk', 70, 486 + down, 110, y0 + hh * kh + 40, kt);
+        put(el, 'reach', 70, 900 + down, rx, ry, kc); put(el, 'sign', 70, 1352 + down, rx, ry + (c ? 372 * kc + 30 : 0), kc);
+      }
+    };
+    place(0);
     const lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], b1 = $(el, '.b1'), b1t = $(el, '.b1t'), b2 = $(el, '.b2'), dt = $(el, '.dt'), ct = $(el, '.ct'), ng = [...el.querySelectorAll('.ng')], ft = $(el, '.ft');
     // the contact card rises just before the sentence that reads the number out; its groups appear as they are spoken
     const say = sc.say || [], last = say.length > 1 ? say[say.length - 1] : null;
@@ -283,9 +301,20 @@
     const text = them ? them.text : '', taps = Math.min(9, Math.max(3, Math.round(text.length / 3)));
     return {
       layout() {
-        fitTitle(tl, size, kind === 'wide' ? 860 : 920);
-        if (ct) { fit($(el, '.num'), 852); fit($(el, '.cs'), 852); }
+        fitTitle(tl, size, kind === 'wide' ? 860 : 920); fitAll(el, { '.lb': 936 });
+        if (ct) {      // the kicker and the button share one line of the card: the button first, the kicker with what is left
+          fit($(el, '.num'), 852); fit($(el, '.cs'), 852);
+          const gb = $(el, '.gb'); if (gb) fit(gb, 420); fit($(el, '.kk'), Math.max(240, 844 - (gb ? gb.offsetWidth + 28 : 0)));
+        }
         if ($(el, '.lw')) $(el, '.fx').style.left = $(el, '.lw').offsetWidth + 134 + 'px';
+        const beside = 940 - parseFloat($(el, '.fx').style.left); fit($(el, '.fn'), beside); fit($(el, '.fl'), beside);
+        // the bubbles as tall as their whole text makes them: the reply sits under the question, the rest under both
+        // (measured against a one-line bubble of the same look, so that a look with borders or other padding needs no numbers here)
+        const tall = (b, t, words) => { const keep = t.textContent; t.textContent = words; const h = b.offsetHeight; t.textContent = keep; return h; };
+        const one = b1 ? tall(b1, b1t, 'x') : b2 ? tall(b2, $(el, '.b2t'), 'x') : 0, more1 = b1 ? tall(b1, b1t, text) - one : 0, more2 = b2 ? b2.offsetHeight - one : 0;
+        if (b2) b2.style.top = dt.style.top = 640 + down + more1 + 'px';
+        // one extra line fits in the gap the design leaves under the chat (wider in a tall frame); anything beyond pushes the card down
+        place(Math.max(0, more1 + more2 - (kind === 'tall' ? 86 : 52)));
       },
       cues: [
         ...(b1 ? [{ t: at.b1, kind: 'pop' }, ...Array.from({ length: taps }, (_, i) => ({ t: at.type0 + .02 + i * (at.type1 - at.type0) / taps, kind: 'tap', gain: .7 }))] : []),
@@ -335,9 +364,14 @@
     }
     const lg = $(el, '.lg'), nm = $(el, '.nm'), tg = $(el, '.tg'), ca = $(el, '.ca'), bd = [...el.querySelectorAll('.bdg')], ur = $(el, '.ur');
     const t0 = wait(sc), at = { logo: t0 + .1, name: t0 + .38, tag: t0 + .62, cta: t0 + 1.0, badge: t0 + 1.35, url: t0 + 1.7 };
-    const shrink = (m, max) => { let z = parseFloat(getComputedStyle(m).fontSize); while (m.firstElementChild.offsetWidth > max && z > 28) { z -= 2; m.style.fontSize = z + 'px'; } };
+    const shrink = (m, max) => { let z = parseFloat(getComputedStyle(m).fontSize); m.dataset.designed ??= z; while (m.firstElementChild.offsetWidth > max && z > 28) { z -= 2; m.style.fontSize = z + 'px'; } };
     return {
-      layout() { shrink(nm, 940); if (tg) shrink(tg, 940); if (ca) { let z = 54; while (ca.scrollWidth > 760 && z > 30) { z -= 2; ca.style.fontSize = z + 'px'; } } },
+      layout() {
+        shrink(nm, 940); if (tg) shrink(tg, 940);
+        if (ca) fit(ca, 760);
+        if (bd.length) { let z = 36; const all = () => bd.reduce((w, b) => w + b.offsetWidth + 20, 0); for (const b of bd) b.dataset.designed ??= z; while (all() > 980 && z > 20) { z -= 2; for (const b of bd) b.style.fontSize = z + 'px'; } }
+        if (ur) { ur.style.width = 'auto'; ur.style.whiteSpace = 'nowrap'; fit(ur, 980); ur.style.width = '1080px'; }      // measured at its own width, then centred again
+      },
       cues: [{ t: at.logo, kind: 'pop' }, { t: at.logo + .12, kind: 'ding', gain: .8 }, ...(ca ? [{ t: at.cta, kind: 'pop' }] : []), ...bd.map((_, i) => ({ t: at.badge + i * .12, kind: 'tap' }))],
       async draw(u) {
         drift(el, u, dark);

@@ -20,7 +20,7 @@
   "phone.callouts.text": { "soft": 22, "bold": 22 },
   "chat.label": { "soft": 30, "bold": 30 },
   "chat.title": { "soft": 14, "bold": 12 },
-  "chat.messages.text": { "soft": 40, "bold": 56 },
+  "chat.messages.text": { "soft": 80, "bold": 80 },
   "chat.contact.kicker": { "soft": 16, "bold": 16 },
   "chat.contact.button": { "soft": 14, "bold": 14 },
   "chat.contact.sub": { "soft": 40, "bold": 40 },

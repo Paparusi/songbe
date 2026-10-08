@@ -70,6 +70,14 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .phone.light { box-shadow: 0 50px 90px rgba(10,27,49,.26), inset 0 0 0 3px #2A2F3A; }
 .phone .scr { position: relative; width: 100%; height: 100%; border-radius: 74px; overflow: hidden; background: #fff; }
 .phone .scr img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+/* the outline of an app, for a phone that has no screenshot yet */
+.phone .ss0 { position: absolute; inset: 0; background: var(--paper); }
+.phone .ss0 > * { position: absolute; display: block; border-radius: 14px; background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.phone .ss0 > b { border-radius: 30px; background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 62%, var(--accent))); }
+.phone .ss0 > u { border-radius: 24px; background: #fff; box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 8%, transparent); text-decoration: none; }
+.phone .ss0 > u > * { position: absolute; display: block; border-radius: 8px; background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.phone .ss0 > u > em { left: 4%; top: 18%; width: 13%; height: 64%; border-radius: 16px; background: color-mix(in srgb, var(--primary) 18%, transparent); }
+.phone .ss0 > s { border-radius: 999px; background: var(--ink); text-decoration: none; }
 .phone .island { position: absolute; left: 50%; top: 24px; width: 150px; height: 42px; margin-left: -75px; border-radius: 21px; background: #000; z-index: 5; }
 
 #wipe { position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: 50; }
