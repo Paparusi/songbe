@@ -38,8 +38,9 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
 ## Writing rules
 
 - Few words on screen. Sentence case, not capitals. A small `label`, a strong `title`, at most one supporting line.
-- One or two short sentences per scene in `say`. Spell numbers and odd names the way they should be pronounced
-  ("Vi Síp hai" rather than "VSIP 2") and keep the proper spelling in the on-screen text.
+- One or two short sentences per scene in `say`. Where the pronunciation differs from the spelling, give both as `{spoken|shown}`:
+  `{Vi Síp hai|VSIP 2}`, `{zero nine hundred|0900}`. The first is read aloud, the second appears in captions.
+- Turn on `"captions": true` for anything meant for a feed: most people watch with the sound off.
 - Pick the look with `"style"`: `soft` (rounded, friendly: apps, services) or `bold` (condensed capitals, flat colour: promotions, recruitment, retail).
   Compare both cheaply with `songbe frames <dir> --style=bold` before deciding.
 - The frame is `"format"`: `tall` (TikTok, Reels, Shorts), `square` (feeds) or `wide` (YouTube, screens). Write the spec once and

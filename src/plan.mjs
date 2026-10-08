@@ -11,6 +11,56 @@ const GAP = 0.35;          // pause between sentences
 const LEAD = 0.25;         // silence before the first word
 const VIDEO = /\.(mp4|mov|webm|mkv)$/i;
 const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+// In a "say" line, {spoken|shown} gives two forms of the same words: the first is read aloud, the second appears in captions
+// ("{Vi Síp hai|VSIP 2}", "{zero nine hundred|0900}").
+const ALT = /\{([^|{}]*)\|([^{}]*)\}/g;
+const spokenOf = (raw) => raw.replace(ALT, '$1');
+const shownOf = (raw) => raw.replace(ALT, '$2');
+
+// Words of one sentence with estimated times. No speech recognition: the time between start and end is shared out by word length,
+// with a little extra after commas, which is close enough for a voice that reads at an even pace.
+function timedWords(raw, start, end) {
+  const segs = []; let at = 0, m; ALT.lastIndex = 0;
+  while ((m = ALT.exec(raw))) { if (m.index > at) segs.push({ speak: raw.slice(at, m.index) }); segs.push({ speak: m[1], show: m[2] }); at = ALT.lastIndex; }
+  if (at < raw.length) segs.push({ speak: raw.slice(at) });
+  const letters = (x) => x.replace(/[^\p{L}\p{N}]/gu, '').length, weigh = (x) => letters(x) + 1.5 + (/[,;:]$/.test(x) ? 2.5 : 0) + (/[.!?…]$/.test(x) ? 3 : 0);
+  const units = [];
+  for (const sg of segs) {
+    const spoken = sg.speak.split(/\s+/).filter(Boolean);
+    if (sg.show !== undefined) {                          // the shown words share the time of the spoken ones
+      const total = spoken.reduce((a, x) => a + weigh(x), 0) || 1, shown = sg.show.split(/\s+/).filter(Boolean), size = shown.reduce((a, x) => a + x.length + 1, 0) || 1;
+      for (const x of shown) units.push({ text: x, w: total * (x.length + 1) / size });
+    } else for (const x of spoken) {
+      if (!letters(x) && units.length) { const u = units[units.length - 1]; u.text += x; u.w += /[,;:]/.test(x) ? 2.5 : 3; }   // stray punctuation joins the word before it
+      else units.push({ text: x, w: weigh(x) });
+    }
+  }
+  if (units.length) { const u = units[units.length - 1]; if (/[.!?…,;:]$/.test(u.text)) u.w = Math.max(1.5, u.w - 3); }      // no pause is kept after the last word
+  const sum = units.reduce((a, u) => a + u.w, 0) || 1, a = start + .02, span = Math.max(.1, end - start - .04); let acc = 0;
+  return units.map((u) => { const t0 = a + span * acc / sum; acc += u.w; return { text: u.text, t0: +t0.toFixed(3), t1: +(a + span * acc / sum).toFixed(3) }; });
+}
+// Group timed words into short lines. Clauses (text up to a comma or full stop) stay together when they fit; short neighbours are
+// joined; a clause that is too long is split into lines of even length rather than filled greedily, so no word is left alone.
+function captionLines(words, limit) {
+  const size = (l) => l.reduce((a, w) => a + w.text.length + 1, -1);
+  const clauses = []; let cur = [];
+  for (const w of words) { cur.push(w); if (/[,;:.!?…]$/.test(w.text)) { clauses.push(cur); cur = []; } }
+  if (cur.length) clauses.push(cur);
+  const joined = [];
+  for (const c of clauses) { const last = joined[joined.length - 1]; if (last && size(last) + 1 + size(c) <= limit) last.push(...c); else joined.push([...c]); }
+  const lines = [];
+  for (const c of joined) {
+    if (size(c) <= limit * 1.3) { lines.push(c); continue; }           // slightly long is fine: the page shrinks the type to fit
+    const n = Math.ceil(size(c) / limit), target = size(c) / n; let part = [], len = 0;
+    for (const w of c) {
+      if (part.length && lines.length < Infinity && len + 1 + w.text.length / 2 > target && part.length) { lines.push(part); part = []; len = 0; }
+      part.push(w); len += (len ? 1 : 0) + w.text.length;
+    }
+    if (part.length) lines.push(part);
+  }
+  return lines.map((l) => ({ start: l[0].t0, end: l[l.length - 1].t1, words: l }));
+}
+
 // pixel size of a video or image as it is displayed (phone clips carry a rotation flag), or null when it cannot be read
 function sizeOf(file) {
   try {
@@ -39,7 +89,8 @@ export async function makePlan(dir, opts = {}) {
   const scenes = [];
   for (const sc of spec.scenes) {
     const say = [];
-    for (const text of list(sc.say)) {
+    for (const raw of list(sc.say)) {
+      const text = spokenOf(raw);
       let file = null, dur = Math.max(1.6, text.length / 15);
       if (wantVoice) {
         const v = spec.voice || {}, id = sha(['vo', text, v]);
@@ -53,7 +104,7 @@ export async function makePlan(dir, opts = {}) {
           file = wav; dur = duration(wav);
         } else pending++;
       }
-      say.push({ text, file, dur });
+      say.push({ text, raw, show: shownOf(raw), file, dur });
     }
     scenes.push({ ...sc, say });
   }
@@ -107,12 +158,16 @@ export async function makePlan(dir, opts = {}) {
   }
 
   for (const sc of scenes) if (sc.screens) sc.screens = list(sc.screens).map((p) => url(path.resolve(dir, p)));
+  // ---- captions: short lines that follow the voice, the word being spoken highlighted ----
+  const wantCaptions = opts.captions ?? spec.captions ?? false, frame = size[0] / size[1];
+  const captions = wantCaptions ? scenes.flatMap((sc) => sc.say.flatMap((line) => captionLines(timedWords(line.raw, line.start, line.end), frame > 1.3 ? 40 : frame < .7 ? 24 : 27))) : [];
+
   const brand = { ...spec.brand };
   if (brand.logo) brand.logo = Object.fromEntries(Object.entries(brand.logo).map(([k, v]) => [k, url(path.resolve(dir, v))]));
   const plan = {
     size, fps, duration: total, brand, style: opts.style || spec.style || 'soft', tag: opts.format ? '-' + opts.format : '', motionBlur: spec.motionBlur !== false, music: spec.music || null,
-    cuts: scenes.slice(1).map((s) => s.start),
-    scenes: scenes.map(({ minDuration, mediaOffset, ...sc }) => sc),
+    cuts: scenes.slice(1).map((s) => s.start), captions,
+    scenes: scenes.map(({ minDuration, mediaOffset, ...sc }) => ({ ...sc, say: sc.say.map(({ raw, ...line }) => line) })),
     previewAudio: url(path.join(dir, 'out', 'audio.wav')), notes,
   };
   fs.writeFileSync(path.join(work, 'plan.json'), JSON.stringify(plan, null, 1));

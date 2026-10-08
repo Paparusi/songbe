@@ -91,6 +91,16 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 [data-format="square"] #notice { left: auto; top: auto; right: 48px; bottom: 48px; }
 [data-format="wide"] #notice { left: auto; top: auto; right: 128px; bottom: 88px; }      /* inside the side frame when there is one */
 
+/* captions: one short line that follows the voice */
+#captions { position: absolute; left: 0; right: 0; top: 1496px; text-align: center; z-index: 56; pointer-events: none; visibility: hidden; }
+.cline { display: inline-block; white-space: nowrap; font-size: 54px; font-weight: 800; letter-spacing: -.5px; line-height: 1.2; padding: 14px 34px 18px; border-radius: 26px;
+  background: color-mix(in srgb, var(--ink) 86%, transparent); color: #fff; transform-origin: 50% 50%; }
+.cw { color: rgba(255,255,255,.74); } .cw.said { color: #fff; } .cw.now { color: var(--accent); }
+[data-format="square"] #captions { top: auto; bottom: 46px; }
+[data-format="wide"] #captions { top: auto; bottom: 40px; }
+[data-captions="on"][data-format="square"] #notice { top: 44px; bottom: auto; }
+[data-captions="on"][data-format="wide"] #notice { top: 88px; bottom: auto; }
+
 /* preview player (never present while rendering) */
 #player { position: fixed; left: 0; right: 0; bottom: 0; height: 56px; display: flex; gap: 12px; align-items: center; padding: 0 16px; background: #111; color: #ddd; font: 14px system-ui, sans-serif; z-index: 99; }
 #player button { background: #fff; color: #111; border: 0; border-radius: 6px; padding: 6px 14px; font-weight: 700; cursor: pointer; }

@@ -62,3 +62,9 @@
 [data-style="bold"] #w1 { background: var(--ink); }
 [data-style="bold"] #w2 { background: var(--accent); }
 [data-style="bold"] #w3 { background: #fff; }
+
+/* captions: an ink block, the spoken word on an accent plate */
+[data-style="bold"] .cline { font-family: var(--font-title); font-weight: 400; font-size: 70px; letter-spacing: .5px; line-height: 1.1; text-transform: uppercase; border-radius: 0;
+  background: var(--ink); padding: .26em 28px .1em; box-shadow: 9px 9px 0 var(--accent); }
+[data-style="bold"] .cw, [data-style="bold"] .cw.said { color: #fff; }
+[data-style="bold"] .cw.now { color: var(--ink); background: var(--accent); box-shadow: 0 0 0 6px var(--accent); }

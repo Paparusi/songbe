@@ -33,7 +33,7 @@
     },
     {
       "type": "chat",
-      "say": ["Muốn biết lương và ca làm? Nhắn Zalo cho chúng tôi nhé.", "Không chín không không, không không không, không không không."],
+      "say": ["Muốn biết lương và ca làm? Nhắn Zalo cho chúng tôi nhé.", "{Không chín không không, không không không, không không không|0900 000 000}."],
       "label": "Nhắn Zalo để biết",
       "title": "Lương và ca làm",
       "messages": [

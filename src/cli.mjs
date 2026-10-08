@@ -17,7 +17,8 @@ const HELP = `Songbe — short ads from a single video.json
   songbe frames <dir> [t1,t2,…]   render a few stills to out/frames (default: two per scene) — review before a full build
   songbe build <dir> [--force]    voice → timeline → footage → picture → sound → out/video.mp4, then self-check
                                   frames and build accept --style=soft|bold and --format=tall|square|wide to try
-                                  another look or frame without editing the spec; build --formats=tall,square,wide makes several
+                                  another look or frame without editing the spec; build --formats=tall,square,wide makes several;
+                                  --captions / --no-captions turn the spoken-word captions on or off
   songbe check <dir>              re-run the self-check on out/video.mp4
   songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
   songbe studio <dir> [--port=N]  edit in the browser with a live preview and a Build button (http://127.0.0.1:4173)
@@ -71,15 +72,16 @@ export async function main(argv) {
 
   const style = rest.find((x) => x.startsWith('--style='))?.split('=')[1];          // try another look without editing the spec
   if (style && !STYLES.includes(style)) throw new Error(`unknown style "${style}" — choose one of: ${STYLES.join(', ')}`);
+  const captions = flags.has('--captions') ? true : flags.has('--no-captions') ? false : undefined;   // override "captions" in the spec
   // --format=wide builds another frame from the same spec (out/video-wide.mp4); --formats=tall,square,wide builds several
   const one = rest.find((x) => x.startsWith('--format='))?.split('=')[1], many = rest.find((x) => x.startsWith('--formats='))?.split('=')[1]?.split(',');
   for (const f of [one, ...(many || [])].filter(Boolean)) if (!FORMATS[f]) throw new Error(`unknown format "${f}" — choose from: ${Object.keys(FORMATS).join(', ')}`);
   if (cmd === 'build' && many) {
     let bad = false;
-    for (const format of many) { log(`\n== ${format} ==`); const r = await buildOne(dir, { force: flags.has('--force'), style, format }); bad ||= !r.ok; }
+    for (const format of many) { log(`\n== ${format} ==`); const r = await buildOne(dir, { force: flags.has('--force'), style, format, captions }); bad ||= !r.ok; }
     if (bad) process.exitCode = 2; return;
   }
-  log('plan…'); const plan = await makePlan(dir, { force: flags.has('--force'), style, format: one });
+  log('plan…'); const plan = await makePlan(dir, { force: flags.has('--force'), style, format: one, captions });
   log(`  ${plan.size.join('×')}, ${plan.duration} s, ${plan.scenes.length} scenes: ` + plan.scenes.map((s) => `${s.type} ${s.start}–${s.end}`).join(' | '));
   if (cmd === 'preview') return log('open: file://' + writePage(dir, plan));
   if (cmd === 'frames') {

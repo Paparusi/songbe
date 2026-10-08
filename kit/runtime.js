@@ -66,13 +66,15 @@
     SB.style = STYLES[plan.style] || STYLES.soft;
     document.documentElement.dataset.style = STYLES[plan.style] ? plan.style : 'soft';
     // the frame: its size and which family of layouts applies (tall 9:16, square 1:1 or 4:5, wide 16:9)
-    const [W, H] = plan.size, ratio = W / H;
-    SB.frame = { W, H, kind: ratio < .7 ? 'tall' : ratio > 1.3 ? 'wide' : 'square' };
-    document.documentElement.dataset.format = SB.frame.kind;
+    // H is the height scenes lay themselves out in: square and wide frames give up a band at the bottom when captions are on
+    const [W, FH] = plan.size, ratio = W / FH, kind = ratio < .7 ? 'tall' : ratio > 1.3 ? 'wide' : 'square', caps = (plan.captions || []).length > 0;
+    const H = FH - (caps && kind !== 'tall' ? 110 : 0);
+    SB.frame = { W, H, FH, kind };
+    document.documentElement.dataset.format = kind; document.documentElement.dataset.captions = caps ? 'on' : 'off';
     const root = document.documentElement.style, b = plan.brand;
     for (const [k, v] of Object.entries({ ink: b.ink, primary: b.primary, accent: b.accent, paper: b.paper, muted: b.muted })) if (v) root.setProperty('--' + k, v);
     const stage = document.getElementById('stage');
-    stage.style.width = W + 'px'; stage.style.height = H + 'px';
+    stage.style.width = W + 'px'; stage.style.height = FH + 'px';
     plan.scenes.forEach((sc, i) => {
       const el = document.createElement('div'); el.className = 'scene'; el.id = 's' + i; stage.appendChild(el);
       const inst = SB.scenes[sc.type](el, sc, plan, i);
@@ -80,11 +82,11 @@
     });
     stage.insertAdjacentHTML('beforeend',
       `<div id="wipe"><div id="w1"></div><div id="w2"></div><div id="w3"></div></div>
-       <div id="notice"></div><div id="vignette"></div><canvas id="grain" width="${Math.round(W / 2)}" height="${Math.round(H / 2)}"></canvas>`);
+       <div id="notice"></div>${caps ? '<div id="captions"><div class="cline"></div></div>' : ''}<div id="vignette"></div><canvas id="grain" width="${Math.round(W / 2)}" height="${Math.round(FH / 2)}"></canvas>`);
     // the cut cover and the grain are sized from the frame (the numbers are the 1080×1920 design, scaled)
-    const sx = W / 1080, sy = H / 1920, band = (i) => document.getElementById('w' + i).style;
+    const sx = W / 1080, sy = FH / 1920, band = (i) => document.getElementById('w' + i).style;
     if (SB.style.wipe === 'curtain') [2600, 160, 40].forEach((h, i) => Object.assign(band(i + 1), { left: '0', top: '0', width: W + 'px', height: h * sy + 'px' }));
-    else [1900, 130, 30].forEach((w, i) => Object.assign(band(i + 1), { top: '-400px', height: H + 800 + 'px', width: w * sx + 'px' }));
+    else [1900, 130, 30].forEach((w, i) => Object.assign(band(i + 1), { top: '-400px', height: FH + 800 + 'px', width: w * sx + 'px' }));
     Object.assign(document.getElementById('grain').style, { width: Math.round(1200 * sx) + 'px', height: Math.round(2134 * sy) + 'px' });
     await document.fonts.ready;
     await Promise.all([...document.images].map((im) => im.decode().catch(() => 0)));
@@ -111,7 +113,7 @@
       const k = seg(t, c - .30, c + .34);
       if (k > 0 && k < 1) {
         sweeping = true; const e = ease.inOut(k), w = (i) => document.getElementById('w' + i).style;
-        const sx = SB.frame.W / 1080, sy = SB.frame.H / 1920;
+        const sx = SB.frame.W / 1080, sy = SB.frame.FH / 1920;
         if (SB.style.wipe === 'curtain') {          // a flat band drops through the frame
           const y = lerp(-2760, 1960, e) * sy; w(1).transform = `translateY(${y}px)`; w(2).transform = `translateY(${y + 2600 * sy}px)`; w(3).transform = `translateY(${y + 2760 * sy}px)`;
         } else {                                    // a slanted slab of brand colour sweeps across
@@ -122,6 +124,22 @@
     document.getElementById('wipe').style.visibility = sweeping ? 'visible' : 'hidden';
     const cur = SB.live.find((s) => t >= s.sc.start && t < s.sc.end), n = document.getElementById('notice');
     n.style.visibility = cur && cur.sc.notice ? 'visible' : 'hidden'; if (cur && cur.sc.notice) n.textContent = cur.sc.notice;
+    // captions: the line being spoken, its current word highlighted
+    if (plan.captions && plan.captions.length) {
+      const box = document.getElementById('captions'), line = box.firstElementChild, i = plan.captions.findIndex((c, k) => t >= c.start - .04 && t < Math.min(c.end + .35, (plan.captions[k + 1] || { start: 1e9 }).start - .04));
+      if (i < 0) { box.style.visibility = 'hidden'; SB.capShown = -1; }
+      else {
+        const c = plan.captions[i];
+        if (SB.capShown !== i) {
+          SB.capShown = i; line.style.fontSize = ''; line.innerHTML = c.words.map((w) => `<span class="cw">${esc(w.text)}</span>`).join(' ');
+          let z = parseFloat(getComputedStyle(line).fontSize); const max = SB.frame.W - (SB.frame.kind === 'wide' ? 520 : 150);
+          while (line.scrollWidth > max && z > 26) { z -= 2; line.style.fontSize = z + 'px'; }
+        }
+        box.style.visibility = 'visible';
+        const k = ease.outCubic(seg(t, c.start - .04, c.start + .1)); line.style.transform = `scale(${lerp(.9, 1, k)})`; line.style.opacity = clamp(k * 1.6);
+        [...line.children].forEach((sp, j) => { const w = c.words[j]; sp.className = 'cw' + (t >= w.t1 ? ' said' : t >= w.t0 - .02 ? ' now' : ''); });
+      }
+    }
     // light film grain, reseeded per output frame
     const cv = document.getElementById('grain'), cx = cv.getContext('2d'), im = cx.createImageData(cv.width, cv.height);
     let sd = (Math.floor(t * plan.fps) * 9301 + 49297) % 233280;

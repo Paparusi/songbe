@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.5): six scene types, two looks, three frames (9:16, 1:1, 16:9), a local studio. Tested on Linux / WSL only.
+> Early version (0.6): six scene types, two looks, three frames (9:16, 1:1, 16:9), captions, a local studio. Tested on Linux / WSL only.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -85,6 +85,20 @@ Every scene is designed once, for the tall frame, as a few blocks (heading, medi
 moved and scaled as wholes: in a wide frame the heading goes left and the rest right; in a square one the same stack is tightened.
 Footage is cropped to cover the frame, leaning upward in a square; a portrait clip in a wide frame is not cropped but shown whole at
 the side, over a blurred copy of itself. Voice, music and timing are identical across frames, so extra frames cost nothing to generate.
+
+## Captions
+
+`"captions": true` (or `--captions` on the command line) adds one short line at the bottom that follows the voice, with the word being
+spoken highlighted. Lines keep clauses together and are balanced rather than filled, so no word is left on its own.
+
+Where the voice should say one thing and the caption show another, write both: `{spoken|shown}`.
+
+```json
+"say": "Looking for work in {Vee Sip two|VSIP 2}? Call {zero nine hundred, zero zero zero|0900 000}."
+```
+
+Word times are estimated from the length of each word within its sentence — no speech recognition, no extra key. In square and wide
+frames the scenes give up a band at the bottom so that captions do not sit on top of the content.
 
 ## Looks
 
