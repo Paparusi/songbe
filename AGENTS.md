@@ -17,5 +17,6 @@ Songbe has no interactive steps. A build is: write `video.json`, look at stills,
 Rules
 
 - Scenes that show generated people or places must set `notice`.
-- Never write keys into `video.json`; they belong in the environment or `<dir>/.env`.
+- Never write keys into `video.json`; they belong in the environment, in `<dir>/.env`, or in the app's settings.
+- If `songbe doctor` reports ffmpeg missing, tell the person how to get it (the message says how); do not download programs on your own.
 - Generation costs money. Reuse the cache (do not pass `--force` without a reason) and change one thing at a time.

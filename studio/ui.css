@@ -1,0 +1,26 @@
+/* What Songbe's own pages (the home screen and the editor) share. The look of the videos lives elsewhere, in kit/. */
+:root { --bg: #0D1117; --panel: #151B23; --raise: #1C2430; --line: #2A3441; --text: #E7ECF2; --soft: #9AA7B6; --accent: #4FE0D6; --blue: #3B82F6; --bad: #FF6B6B; --warn: #F2C14E; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: inherit; }
+/* slim, dark scrollbars: the default ones on Windows are wide and light */
+* { scrollbar-width: thin; scrollbar-color: #364252 transparent; }
+header.bar { height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; letter-spacing: -.3px; text-decoration: none; flex: none; }
+.logo img { width: 26px; height: 26px; display: block; } .logo b { font-weight: 800; } .logo span { color: var(--accent); }
+.gap { flex: 1; }
+.tag { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--raise); color: var(--soft); border: 1px solid var(--line); text-decoration: none; white-space: nowrap; }
+.tag.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+a.tag:hover, button.tag:hover { border-color: var(--soft); cursor: pointer; }
+.btn { border: 1px solid var(--line); background: var(--raise); border-radius: 10px; padding: 8px 14px; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.btn:hover { border-color: var(--soft); } .btn.small { padding: 4px 9px; font-size: 12px; border-radius: 8px; }
+.btn.go { background: var(--accent); color: #06221F; border-color: var(--accent); font-weight: 800; } .btn.go:hover { filter: brightness(1.07); }
+.btn.stop { background: transparent; color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, transparent); font-weight: 700; }
+.btn[disabled] { opacity: .5; cursor: default; filter: none; }
+.btn.quiet { background: transparent; }
+input[type=text], input[type=password], input[type=number], textarea, select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; outline: none; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+.msg { font-size: 13px; padding: 3px 0; } .msg.bad { color: var(--bad); } .msg.note { color: var(--soft); }

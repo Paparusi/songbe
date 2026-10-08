@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Songbe</title>
+<link rel="icon" href="/studio/icon.svg"><link rel="stylesheet" href="/kit/fonts/fonts.css"><link rel="stylesheet" href="/studio/ui.css">
+<style>
+body { overflow-y: auto; }
+main { max-width: 1280px; margin: 0 auto; padding: 30px 28px 80px; }
+.top { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
+h1 { font-size: 26px; font-weight: 800; letter-spacing: -.6px; line-height: 1.2; }
+.where { color: var(--soft); font-size: 13px; margin-top: 4px; } .where a, .lnk { color: var(--soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; background: none; border: 0; padding: 0; } .where a:hover, .lnk:hover { color: var(--text); }
+.acts { margin-left: auto; display: flex; gap: 8px; }
+
+/* a project: its frame on a small stage, then what it is and how fresh its video is */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(214px, 1fr)); gap: 16px; }
+.proj { position: relative; display: block; text-decoration: none; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; transition: border-color .15s, transform .15s; }
+.proj:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); transform: translateY(-2px); }
+.stage { aspect-ratio: 1; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 0%, #1A2331 0%, #0B0F15 78%); border-bottom: 1px solid var(--line); }
+.frame { position: relative; overflow: hidden; border-radius: 9px; background: #0A1B31; box-shadow: 0 14px 34px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+.frame.tall { height: 84%; } .frame.flat { width: 84%; }
+.frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 12%; gap: 7%; }
+.ph b { font-weight: 800; font-size: 13px; line-height: 1.15; letter-spacing: -.2px; color: #fff; overflow-wrap: anywhere; } .ph i { display: block; width: 34%; height: 5px; border-radius: 3px; }
+.meta { padding: 12px 14px 13px; }
+.meta .nm { font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta .sub { color: var(--soft); font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta .st { display: flex; align-items: center; gap: 7px; font-size: 12.5px; margin-top: 8px; color: var(--soft); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex: none; } .dot.ok { background: var(--accent); } .dot.old { background: var(--warn); } .dot.run { background: var(--blue); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; opacity: 0; transition: opacity .15s; } .proj:hover .tools, .tools:focus-within { opacity: 1; }
+.tools button { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(6px); cursor: pointer; display: grid; place-items: center; }
+.tools button:hover { border-color: var(--soft); } .tools svg { width: 15px; height: 15px; }
+
+/* nothing yet: the starters are the first screen */
+#empty { border: 1px dashed var(--line); border-radius: 18px; padding: 34px 28px 30px; text-align: center; }
+#empty h2 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; } #empty p { color: var(--soft); margin: 6px 0 22px; }
+.starts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 200px)); gap: 14px; justify-content: center; }
+.start { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; text-align: left; padding: 0; transition: border-color .15s; }
+.start:hover, .start.on { border-color: var(--accent); } .start.on { box-shadow: 0 0 0 1px var(--accent); }
+.start .stage { aspect-ratio: 1.05; width: 100%; flex: none; } .start .t { padding: 10px 12px 12px; } .start .t b { display: block; font-weight: 700; } .start .t span { display: block; color: var(--soft); font-size: 12.5px; margin-top: 2px; line-height: 1.4; }
+
+/* the one thing that may be missing */
+#need { border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 6%, var(--panel)); border-radius: 16px; padding: 18px 20px; margin-bottom: 26px; display: flex; gap: 18px; align-items: center; }
+#need h2 { font-size: 16px; font-weight: 800; } #need p { color: var(--soft); margin-top: 3px; max-width: 760px; } #need .fine { font-size: 12.5px; margin-top: 8px; }
+#need .do { margin-left: auto; flex: none; text-align: right; }
+code { font: 12.5px/1.5 ui-monospace, Consolas, Menlo, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 2px 7px; user-select: all; }
+.bar2 { height: 6px; border-radius: 3px; background: var(--raise); overflow: hidden; margin-top: 10px; width: 260px; } .bar2 i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+
+dialog { margin: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); padding: 0; width: min(720px, calc(100vw - 40px)); max-height: calc(100vh - 60px); box-shadow: 0 40px 120px rgba(0,0,0,.6); }
+dialog::backdrop { background: rgba(4,7,11,.66); backdrop-filter: blur(3px); }
+dialog form, dialog .in { padding: 22px 24px 20px; }
+dialog h2 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; margin-bottom: 4px; } dialog .lead { color: var(--soft); margin-bottom: 16px; }
+dialog .starts { justify-content: start; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+dialog label { display: block; font-size: 12px; font-weight: 600; color: var(--soft); margin: 16px 0 5px; }
+dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 20px; } dialog .end .msg { margin-right: auto; }
+.sec { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 18px; } .sec:first-of-type { border-top: 0; padding-top: 0; margin-top: 12px; }
+.sec h3 { font-size: 12px; font-weight: 700; color: var(--soft); text-transform: uppercase; letter-spacing: .7px; margin-bottom: 10px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 7px 0; } .row .k { font-weight: 600; } .row .d { color: var(--soft); font-size: 12.5px; grid-column: 1; overflow-wrap: anywhere; } .row .v { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 6px; align-items: center; }
+.keyrow { display: flex; gap: 8px; margin-top: 8px; } .keyrow input { flex: 1; min-width: 0; }
+</style></head>
+<body>
+<header class="bar">
+  <a class="logo" href="/home"><img src="/studio/icon.svg" alt=""><b>Song<span>be</span></b></a><div class="gap"></div>
+  <button class="tag" id="ktools" hidden></button><button class="tag" id="kkeys">…</button>
+  <button class="btn quiet" id="bset">Settings</button>
+</header>
+<main>
+  <section id="need" hidden></section>
+  <div class="top">
+    <div><h1>Your videos</h1><div class="where"><span id="home"></span> · <a id="ohome">open folder</a></div></div>
+    <div class="acts"><button class="btn" id="bopen">Open a folder…</button><button class="btn go" id="bnew">New video</button></div>
+  </div>
+  <div id="grid" class="grid"></div>
+  <div id="empty" hidden><h2>Start your first video</h2><p>Pick something close to what you need. Every word, colour and scene can be changed afterwards.</p><div class="starts" id="first"></div></div>
+</main>
+
+<dialog id="dnew"><form method="dialog" id="fnew">
+  <h2>New video</h2><div class="lead">Start from one of these. Every word, colour and scene can be changed afterwards.</div>
+  <div class="starts" id="picks"></div>
+  <label for="nname">Name</label><input type="text" id="nname" maxlength="60" autocomplete="off" spellcheck="false">
+  <div class="end"><span class="msg bad" id="nerr"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" id="ngo" type="submit">Create</button></div>
+</form></dialog>
+
+<dialog id="dopen"><form method="dialog" id="fopen">
+  <h2>Open a folder</h2><div class="lead">Any folder with a <code>video.json</code> in it: one you made by hand, with the command line, or that an AI agent wrote for you.</div>
+  <label for="odir">Folder</label><input type="text" id="odir" autocomplete="off" spellcheck="false" placeholder="">
+  <div class="end"><span class="msg bad" id="oerr"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" type="submit">Open</button></div>
+</form></dialog>
+
+<dialog id="dset"><div class="in">
+  <h2>Settings</h2>
+  <div class="sec"><h3>Keys</h3>
+    <div class="lead" style="margin-bottom:6px">Voice, music and generated footage are made by services you pay yourself. Songbe adds nothing on top. Without a key a video still builds: silent, with motion graphics and sound effects.</div>
+    <div class="row"><div class="k">fal.ai <span class="tag" id="sfal"></span></div><div class="d">Voice-over, music, generated footage.</div><div class="v"><button class="btn small" data-open="fal">Get a key</button></div></div>
+    <div class="keyrow"><input type="password" id="kfal" autocomplete="off" spellcheck="false"><button class="btn small" id="xfal" hidden>Remove</button></div>
+    <div class="row" style="margin-top:10px"><div class="k">Groq <span class="tag" id="sgroq"></span></div><div class="d">Optional. After a build, listens to the video and writes down what is actually audible.</div><div class="v"><button class="btn small" data-open="groq">Get a key</button></div></div>
+    <div class="keyrow"><input type="password" id="kgroq" autocomplete="off" spellcheck="false"><button class="btn small" id="xgroq" hidden>Remove</button></div>
+    <div class="end" style="margin-top:12px"><span class="msg note" id="kmsg">Keys stay on this computer and are sent only to the service they belong to.</span><button class="btn go" id="ksave">Save keys</button></div>
+  </div>
+  <div class="sec"><h3>Tools</h3>
+    <div class="row"><div class="k">ffmpeg</div><div class="d" id="tff"></div><div class="v" id="tffdo"></div></div>
+    <div class="row"><div class="k">Browser that draws the frames</div><div class="d" id="tbr"></div></div>
+  </div>
+  <div class="sec"><h3>Folders</h3>
+    <div class="row"><div class="k">Videos</div><div class="d" id="fhome"></div><div class="v"><button class="btn small" data-open="home">Open</button></div></div>
+    <div class="row"><div class="k">Songbe's own files</div><div class="d" id="fdata"></div><div class="v"><button class="btn small" data-open="data">Open</button></div></div>
+  </div>
+  <div class="end"><span class="msg note" id="ver"></span><button class="btn" data-close autofocus>Close</button></div>
+</div></dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); for (const k of kids) e.append(k); return e; };
+// the header marks a request as coming from Songbe's own pages (the server refuses changes without it)
+const api = (where, o = {}) => fetch(where, { ...o, headers: { 'X-Songbe': '1', ...(o.headers || {}) } });
+const post = (where, data) => api(where, { method: 'POST', body: JSON.stringify(data || {}) }).then(async (r) => ({ ok: r.ok, ...(await r.json()) }));
+const ICON = { folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' };
+
+let H = null, seen = '', pick = null, tries = 0, timer = null;
+const shape = ([w, h]) => (w === 1080 && h === 1920 ? 'Tall 9:16' : w === h ? 'Square 1:1' : w === 1920 && h === 1080 ? 'Wide 16:9' : `${w}×${h}`);
+function ago(ms) {
+  const s = (Date.now() - ms) / 1000;
+  if (s < 90) return 'just now'; if (s < 3600) return Math.round(s / 60) + ' min ago'; if (s < 86400) return Math.round(s / 3600) + ' h ago';
+  if (s < 86400 * 14) return Math.round(s / 86400) + ' days ago';
+  return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+// the frame of a video on its little stage: the poster when there is one, otherwise its brand colours and name
+function stage(it, name) {
+  const [w, h] = it.size, f = el('div', { className: 'frame ' + (h > w ? 'tall' : 'flat') }); f.style.aspectRatio = `${w} / ${h}`;
+  const url = it.poster && (it.poster.url || (typeof it.poster === 'string' ? it.poster : null));
+  if (url) f.append(el('img', { src: url, alt: '', loading: 'lazy' }));
+  else { const c = it.colours || {}, ph = el('div', { className: 'ph' }), bar = el('i'); bar.style.background = c.accent || '#4FE0D6';
+    f.style.background = `linear-gradient(160deg, color-mix(in srgb, ${c.ink || '#0A1B31'} 72%, ${c.primary || '#004DFC'}) 0%, ${c.ink || '#0A1B31'} 62%)`; ph.append(el('b', { textContent: name }), bar); f.append(ph); }
+  return el('div', { className: 'stage' }, f);
+}
+function status(p) {
+  if (p.building) return ['run', 'Building…'];
+  if (p.broken) return ['old', 'video.json needs fixing'];
+  if (!p.built) return ['', 'Not built yet'];
+  return p.edited > p.built + 1500 ? ['old', 'Changed since the last build'] : ['ok', 'Built ' + ago(p.built)];
+}
+function card(p) {
+  const a = el('a', { className: 'proj', href: `/p/${p.id}/` }), [dot, text] = status(p), tools = el('div', { className: 'tools' });
+  const btn = (icon, title, fn) => { const b = el('button', { title, innerHTML: ICON[icon] }); b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); fn(); }; return b; };
+  tools.append(btn('folder', 'Show the folder', () => api(`/p/${p.id}/api/reveal`, { method: 'POST', body: '{"what":"folder"}' })));
+  if (p.elsewhere && p.id !== H.pinned) tools.append(btn('off', 'Take off this list (the folder stays where it is)', async () => { await post('/api/projects/forget', { id: p.id }); load(); }));
+  a.append(stage(p, p.brand || p.name), tools, el('div', { className: 'meta' }, el('div', { className: 'nm', textContent: p.name, title: p.dir }),
+    el('div', { className: 'sub', textContent: `${shape(p.size)} · ${p.scenes} scene${p.scenes === 1 ? '' : 's'}`, title: 'Edited ' + ago(p.edited) }), el('div', { className: 'st' }, el('span', { className: 'dot ' + dot }), text)));
+  return a;
+}
+function starter(s, onPick) {
+  const b = el('button', { type: 'button', className: 'start' }); b.dataset.id = s.id;
+  b.append(stage(s, s.name), el('div', { className: 't' }, el('b', { textContent: s.name }), el('span', { textContent: s.about })));
+  b.onclick = () => onPick(s); return b;
+}
+
+function need() {      // the setup card: shown only while something is missing
+  const box = $('#need'), t = H.tools, s = H.setup;
+  if (t.ready && !s.running) { box.hidden = true; return; }
+  box.hidden = false; box.replaceChildren();
+  const left = el('div'), right = el('div', { className: 'do' });
+  if (!t.ffmpeg || !t.ffprobe || s.running) {
+    left.append(el('h2', { textContent: 'One thing to set up: ffmpeg' }), el('p', { textContent: 'Songbe uses ffmpeg, a free program, to turn drawn frames, voice and music into a video file. It is not on this computer yet.' }));
+    if (s.canFetch) {
+      left.append(el('p', { className: 'fine', textContent: `ffmpeg ${s.pick.version} from ${s.pick.from} · ${s.pick.megabytes} MB · ${s.pick.licence} · checked against a known checksum, kept in Songbe's own folder.` }));
+      if (s.running) { const pc = s.total ? Math.round(s.done / s.total * 100) : 0, bar = el('div', { className: 'bar2' }, el('i')); bar.firstChild.style.width = (s.step === 'download' ? pc : 100) + '%';
+        right.append(el('div', { textContent: s.step === 'download' ? `Downloading… ${pc}%` : s.step === 'check' ? 'Checking…' : 'Unpacking…' }), bar); }
+      else { const b = el('button', { className: 'btn go', textContent: 'Get ffmpeg' }); b.onclick = async () => { b.disabled = true; await post('/api/setup/ffmpeg'); load(); }; right.append(b); }
+      if (s.error && !s.running) left.append(el('p', { className: 'msg bad', textContent: 'It did not work: ' + s.error }));
+    } else { left.append(el('p', { className: 'fine' }, 'Install it with  ', el('code', { textContent: s.advice }), '  and then check again.')); right.append(again()); }
+  } else { left.append(el('h2', { textContent: 'One thing to set up: a browser' }), el('p', { textContent: 'Songbe draws every frame with Chrome or Edge. Install either one, then check again.' })); right.append(again()); }
+  box.append(left, right);
+}
+const again = () => { const b = el('button', { className: 'btn', textContent: 'Check again' }); b.onclick = load; return b; };
+
+function settings() {
+  const k = H.keys, from = { environment: 'set in the environment', project: 'set', saved: 'saved' };
+  for (const n of ['fal', 'groq']) {
+    const tag = $('#s' + n); tag.textContent = k[n] ? from[k[n + 'From']] || 'set' : 'not set'; tag.classList.toggle('on', !!k[n]);
+    $('#k' + n).placeholder = k[n + 'From'] === 'saved' ? 'A key is saved. Paste another one to replace it.' : 'Paste a key'; $('#x' + n).hidden = k[n + 'From'] !== 'saved';
+  }
+  const t = H.tools; $('#tff').textContent = t.ffmpeg || 'Not found'; $('#tbr').textContent = t.browser || 'No Chrome or Edge found';
+  $('#tffdo').replaceChildren(...(!t.ffmpeg ? [el('span', { className: 'tag warn', textContent: 'see the Videos page' })] : []));
+  $('#fhome').textContent = H.home; $('#fdata').textContent = H.data; $('#ver').textContent = 'Songbe ' + H.version;
+}
+
+function paint() {
+  $('#home').textContent = H.home; need(); settings();
+  const kt = $('#ktools'); kt.hidden = H.tools.ready; kt.textContent = 'setup needed'; kt.className = 'tag warn';
+  const kk = $('#kkeys'); kk.textContent = H.keys.fal ? 'voice · music ready' : 'no key: silent builds'; kk.classList.toggle('on', H.keys.fal);
+  const now = JSON.stringify(H.projects);
+  if (now === seen) return; seen = now;
+  $('#grid').replaceChildren(...H.projects.map(card)); $('#empty').hidden = H.projects.length > 0; $('#grid').hidden = !H.projects.length;
+  if (!H.projects.length) $('#first').replaceChildren(...H.starters.map((s) => starter(s, (x) => openNew(x.id))));
+}
+async function load() {
+  clearTimeout(timer);
+  try { H = await (await fetch('/api/home')).json(); } catch { timer = setTimeout(load, 2000); return; }
+  paint();
+  // keep looking while something is on its way: posters being drawn, ffmpeg being fetched, a video being built
+  const waiting = H.projects.some((p) => p.poster.state === 'pending'), busy = H.setup.running || H.projects.some((p) => p.building);
+  tries = waiting ? tries + 1 : 0;
+  if (busy || (waiting && tries < 60)) timer = setTimeout(load, busy ? 700 : 1500); else timer = setTimeout(load, 30000);
+}
+
+function openNew(id) {
+  pick = id || H.starters[0].id; $('#nerr').textContent = '';
+  const mark = () => { for (const b of $('#picks').children) b.classList.toggle('on', b.dataset.id === pick); };
+  $('#picks').replaceChildren(...H.starters.map((s) => starter(s, (x) => { pick = x.id; mark(); $('#nname').focus(); }))); mark();
+  $('#nname').value = ''; $('#nname').placeholder = 'My video'; $('#dnew').showModal(); $('#nname').focus();
+}
+$('#bnew').onclick = () => openNew();
+$('#fnew').onsubmit = async (e) => {
+  e.preventDefault(); $('#ngo').disabled = true;
+  const r = await post('/api/projects', { name: $('#nname').value.trim() || 'My video', starter: pick }); $('#ngo').disabled = false;
+  if (r.id) location.href = `/p/${r.id}/`; else $('#nerr').textContent = r.error || 'That did not work.';
+};
+$('#bopen').onclick = () => { $('#oerr').textContent = ''; $('#odir').value = ''; $('#odir').placeholder = H.home; $('#dopen').showModal(); $('#odir').focus(); };
+$('#fopen').onsubmit = async (e) => {
+  e.preventDefault();
+  const r = await post('/api/projects/open', { dir: $('#odir').value }); if (r.id) location.href = `/p/${r.id}/`; else $('#oerr').textContent = r.error || 'That did not work.';
+};
+const showSettings = () => { settings(); $('#kmsg').textContent = 'Keys stay on this computer and are sent only to the service they belong to.'; $('#kmsg').className = 'msg note'; $('#dset').showModal(); };
+$('#bset').onclick = $('#kkeys').onclick = showSettings; $('#ktools').onclick = () => $('#need').scrollIntoView({ behavior: 'smooth' });
+$('#ohome').onclick = () => post('/api/open', { what: 'home' });
+for (const b of document.querySelectorAll('[data-open]')) b.onclick = () => post('/api/open', { what: b.dataset.open });
+for (const b of document.querySelectorAll('[data-close]')) b.onclick = () => b.closest('dialog').close();
+for (const d of document.querySelectorAll('dialog')) d.addEventListener('click', (e) => { if (e.target === d) d.close(); });      // a click on the dimmed part closes it
+async function putKeys(data, done) {
+  const r = await api('/api/keys', { method: 'PUT', body: JSON.stringify(data) }), j = await r.json();
+  if (!r.ok) { $('#kmsg').textContent = j.error; $('#kmsg').className = 'msg bad'; return; }
+  H.keys = j; $('#kfal').value = $('#kgroq').value = ''; paint(); $('#kmsg').textContent = done; $('#kmsg').className = 'msg note';
+}
+$('#ksave').onclick = () => { const d = {}; if ($('#kfal').value.trim()) d.FAL_KEY = $('#kfal').value.trim(); if ($('#kgroq').value.trim()) d.GROQ_API_KEY = $('#kgroq').value.trim();
+  if (!Object.keys(d).length) { $('#kmsg').textContent = 'Paste a key first.'; return; } putKeys(d, 'Saved.'); };
+$('#xfal').onclick = () => putKeys({ FAL_KEY: '' }, 'Removed.'); $('#xgroq').onclick = () => putKeys({ GROQ_API_KEY: '' }, 'Removed.');
+
+load().then(() => { if (location.hash === '#settings') showSettings(); });
+addEventListener('focus', load);      // back from the editor or the file manager: show what changed
+</script>
+</body></html>

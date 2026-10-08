@@ -6,11 +6,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { makePlan } from '../src/plan.mjs';
-import { lintLayout, stills } from '../src/render.mjs';
+import { lintLayout, stills, openPage, writePage, pageHtml } from '../src/render.mjs';
 import { FORMATS, STYLES } from '../src/spec.mjs';
-import { tools, run } from '../src/util.mjs';
+import { tools, run, ROOT } from '../src/util.mjs';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const root = ROOT;
 let ready = true; try { tools.chrome; tools.ffmpeg; tools.ffprobe; } catch { ready = false; }
 const copies = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-draw-'));
 const copy = (name) => { const to = path.join(copies, name); if (!fs.existsSync(to)) fs.cpSync(path.join(root, 'examples', name), to, { recursive: true, filter: (f) => !/[\\/](\.songbe|out)([\\/]|$)/.test(f) }); return to; };
@@ -53,4 +53,25 @@ test('a still has the size of its frame', { skip: !ready && 'Chrome or ffmpeg no
     const size = run(tools.ffprobe, ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', files[0]]).trim();
     assert.equal(size, `${w},${h}`, format);
   }
+});
+
+// A project can come from anywhere: a shared folder, a download, an agent. Its words must stay words.
+test('text from a spec never becomes markup', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
+  const X = '"><img src=x onerror="window.__pwned=1"></title></script><script>window.__pwned=2</script>';
+  const dir = path.join(copies, 'hostile'); fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'video.json'), JSON.stringify({ captions: true, brand: { name: 'B' + X }, scenes: [
+    { type: 'footage', say: 'One ' + X, label: X, labelStyle: 'pill', title: ['T' + X, '[[' + X + ']] **' + X + '**'], sub: X, chip: X, notice: X },
+    { type: 'card', say: 'Two', label: X, title: X, caption: X, stat: { badge: X, heading: X, sub: X } },
+    { type: 'list', say: 'Three', label: X, title: X, items: [{ text: X, sub: X, icon: 'check' + X }, { text: 'second', icon: 'number' }] },
+    { type: 'phone', say: 'Four', label: X, title: X, callouts: [{ text: X, side: 'left', y: 0.3 }] },
+    { type: 'chat', say: 'Five', label: X, title: X, messages: [{ from: 'them', text: X }, { from: 'us', text: X }], contact: { kicker: X, button: X, number: [X, '00'], sub: X }, footer: { name: X, line: X } },
+    { type: 'end', say: 'Six', name: X, tagline: X, cta: X, badges: [X], url: X }] }));
+  const plan = await makePlan(dir, { offline: true }), html = pageHtml(plan, (f) => 'file://' + f);
+  assert.ok(!html.includes('<script>window.__pwned') && !html.includes('<img src=x'), 'the page itself carries the text only as data');
+  const page = await openPage(writePage(dir, plan), plan.size);
+  try {
+    for (const sc of plan.scenes) await page.evaluate(`SB.draw(${(sc.start + (sc.end - sc.start) * .8).toFixed(2)})`);
+    const seen = JSON.parse(await page.evaluate(`JSON.stringify({ ran: window.__pwned ?? null, images: document.querySelectorAll('img[src=x]').length, handlers: document.querySelectorAll('[onerror]').length, scripts: document.querySelectorAll('#stage script').length })`));
+    assert.deepEqual(seen, { ran: null, images: 0, handlers: 0, scripts: 0 });
+  } finally { await page.close(); }
 });

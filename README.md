@@ -1,12 +1,14 @@
 # Songbe
 
-> Early version (0.8): six scene types, two looks, any frame size, captions, cuts on the beat, built-in checks, a local studio. Tested on Linux / WSL only.
+> Early version (0.9): six scene types, two looks, any frame size, captions, cuts on the beat, built-in checks, and an app with a
+> visual editor (in the browser, or installed on Windows). Tested on Linux / WSL and on Windows 11; macOS has not been tried.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
 Short vertical ads from a single `video.json`. Songbe turns a script and a few scene descriptions into a finished MP4 —
 voice-over, footage, motion graphics, music, sound effects — and then checks its own output. It is a command-line tool with no
-interactive steps, so an AI coding agent can drive it from start to finish.
+interactive steps, so an AI coding agent can drive it from start to finish; and the same engine sits behind an app for people who
+would rather click than type (see *The app*).
 
 ```
 songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.mp4  (+ sheet.jpg, check.json)
@@ -23,7 +25,7 @@ Two examples are included: `examples/app-launch-en` (an app launch, English, gra
 - **The timeline follows the voice, the cuts follow the music.** Each scene opens just before its line is spoken, and every cut is
   moved onto a beat of the music; change a sentence and everything re-times itself.
 - **Bring your own keys — or none.** With `FAL_KEY` you get voice, music and generated footage. Without it the build still completes (no voice or music, plain backgrounds).
-- **No npm dependencies.** Node 22+, ffmpeg and a Chrome/Chromium binary. Chrome is driven directly over the DevTools protocol.
+- **No npm dependencies.** Node 22+, ffmpeg and Chrome, Chromium or Edge. The browser is driven directly over the DevTools protocol.
 - **It checks its own work.** Before drawing: nothing may leave the frame, overlap, or be covered by captions. After building: no black
   frames, no flashes, sound present and not clipping, the right length, a contact sheet, and — with `GROQ_API_KEY` — a transcript of
   what is actually audible.
@@ -31,7 +33,8 @@ Two examples are included: `examples/app-launch-en` (an app launch, English, gra
 ## Quick start
 
 ```bash
-node bin/songbe.mjs doctor                        # are ffmpeg, ffprobe and Chrome found? which keys are set?
+node bin/songbe.mjs doctor                        # are ffmpeg, ffprobe and a browser found? which keys are set?
+node bin/songbe.mjs app                           # the app: projects, visual editor, Build button (see below)
 node bin/songbe.mjs frames examples/recruitment-vi # a few stills in out/frames — look before you render
 node bin/songbe.mjs build  examples/recruitment-vi # full build
 node bin/songbe.mjs preview examples/recruitment-vi # prints a file:// address: scrub and play in any browser
@@ -40,8 +43,12 @@ node bin/songbe.mjs validate my-ad                 # every problem in video.json
 node bin/songbe.mjs schema                         # JSON Schema of video.json
 ```
 
-Keys go in the environment or in `<project>/.env` (git-ignored): `FAL_KEY`, optionally `GROQ_API_KEY`.
-Tool paths can be overridden with `SONGBE_FFMPEG`, `SONGBE_FFPROBE`, `SONGBE_CHROME`.
+Keys (`FAL_KEY`, optionally `GROQ_API_KEY`) are read from the environment, then from `<project>/.env` (git-ignored), then from the
+keys saved in the app. Tool paths can be overridden with `SONGBE_FFMPEG`, `SONGBE_FFPROBE`, `SONGBE_CHROME`.
+
+**ffmpeg.** macOS: `brew install ffmpeg`. Linux: your package manager. Windows has no package manager to point at, so
+`songbe setup ffmpeg` (or the button in the app) fetches the build that ffmpeg.org links to, checks it against a checksum pinned
+in `src/setup.mjs`, and keeps it in Songbe's own folder. Nothing is downloaded unless you ask.
 
 ## The spec
 
@@ -136,22 +143,44 @@ leading, how lines arrive, how cuts are covered). Scenes set geometry only, so a
 
 Generated assets are cached in `.songbe/cache` by a hash of their inputs: editing one sentence regenerates one voice clip, nothing else.
 
-## Studio
+## The app
 
 ```bash
-node bin/songbe.mjs studio my-ad        # then open http://127.0.0.1:4173
+node bin/songbe.mjs app                 # opens a window of its own when Chrome or Edge is installed; otherwise prints the address
+node bin/songbe.mjs studio my-ad        # the editor for one project: http://127.0.0.1:4173
 ```
 
-A local page for people who would rather not edit JSON: scenes and their fields on the left, the video on the right, updating as
-you type. The preview is free — it reuses voice clips that already exist and estimates the timing of new sentences — and the
-**Build video** button runs the full build and shows the result with its self-check. Images and clips can be uploaded into the
-project's `media/` folder from the form. The server listens on 127.0.0.1 only and serves nothing outside the project and the kit.
+For people who would rather not edit JSON. The **home screen** lists your videos, each with a poster of its opening scene and
+whether its video is up to date; *New video* starts one from an example or from blank; *Settings* holds your keys and shows what
+is installed. The **editor** has scenes and their fields on the left and the video on the right, updating as you type. The preview
+is free — it reuses voice clips that already exist and estimates the timing of new sentences — and **Build video** runs the full
+build and shows the result with its self-check. Images and clips are added to the project's `media/` folder from the form.
+
+Projects are ordinary folders (`video.json` plus `media/`) in your system's video folder, under `Songbe/`; a folder made by hand, by
+the command line or by an agent joins the list with *Open a folder*. `songbe doctor` prints both that folder and the data folder,
+where saved keys (`.env`, readable by you only), a fetched ffmpeg and the list of recent projects live.
+
+The pages are served to this computer only, and the server treats every request as untrusted until shown otherwise: it listens on
+127.0.0.1, answers only when the `Host` is that address (a name that merely resolves there is refused), refuses a foreign `Origin`,
+requires a header that forms and image tags cannot set on anything that changes something, serves no file outside the project and
+the kit, never serves an `.env`, and never sends a key back to the page.
+
+### Installed on Windows
+
+`app/` wraps the same engine in a native window (Tauri): an installer, a Start-menu entry, no terminal. The window shows exactly
+the pages above; the shell only starts the engine — Node, shipped next to it — and goes to the address the engine prints.
+
+```bash
+node app/build.mjs          # → Songbe_<version>_x64-setup.exe (the path is printed at the end)
+```
+
+Needs Rust and `cargo install tauri-cli`; see `app/README.md`. The installer is not code-signed yet, so Windows asks before running it.
 
 ## Checks
 
 ```bash
 node bin/songbe.mjs lint my-ad      # layout only, a few seconds: what leaves the frame, overlaps, or would be covered
-npm test                            # the test suite (about ten seconds; drawing tests need Chrome and ffmpeg)
+npm test                            # the test suite (about fifteen seconds; drawing tests need a browser and ffmpeg)
 ```
 
 **Layout check** (`songbe lint`, and automatically with `frames` and `build`). Each scene is drawn near its end and its content is
@@ -175,8 +204,10 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 - Six scene types and two looks. Scene types live in `kit/scenes.js`, looks in `kit/styles/`.
 - One provider (fal.ai) for voice, images, image-to-video and music.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
-- The studio edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
+- The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
+- The installed app exists for Windows only so far, unsigned; *Open a folder* takes a typed path rather than a system dialog.
 
 ## License
 
-Apache-2.0. The bundled fonts are Be Vietnam Pro and Anton (both SIL OFL 1.1). See `NOTICE`.
+Apache-2.0. The bundled fonts are Be Vietnam Pro and Anton (both SIL OFL 1.1). The installed app ships Node.js next to the engine,
+under Node's own licence. ffmpeg is never part of a Songbe package. See `NOTICE`.

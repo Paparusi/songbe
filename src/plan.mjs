@@ -142,6 +142,6 @@ export async function makePlan(dir, opts = {}) {
     scenes: scenes.map(({ minDuration, mediaOffset, ...sc }) => ({ ...sc, say: sc.say.map(({ raw, ...line }) => line) })),
     previewAudio: url(path.join(dir, 'out', 'audio.wav')), notes,
   };
-  fs.writeFileSync(path.join(work, 'plan.json'), JSON.stringify(plan, null, 1));
+  if (!opts.offline) fs.writeFileSync(path.join(work, 'plan.json'), JSON.stringify(plan, null, 1));      // previews do not replace the record of the last build
   return plan;
 }

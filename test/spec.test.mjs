@@ -3,9 +3,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ROOT } from '../src/util.mjs';
 import { validate, jsonSchema, SCENES, TEMPLATES, FORMATS, STYLES } from '../src/spec.mjs';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const root = ROOT;
 const example = (name) => [JSON.parse(fs.readFileSync(path.join(root, 'examples', name, 'video.json'), 'utf8')), path.join(root, 'examples', name)];
 
 test('the bundled examples are valid', () => {
@@ -49,4 +50,10 @@ test('the JSON Schema lists every scene type and the top-level fields', () => {
   const schema = jsonSchema();
   assert.deepEqual(schema.properties.scenes.items.oneOf.map((s) => s.properties.type.const).sort(), Object.keys(SCENES).sort());
   for (const k of ['brand', 'voice', 'music', 'style', 'format', 'captions']) assert.ok(schema.properties[k], k);
+});
+
+test('a brand colour must be a colour', () => {
+  const spec = (colour) => ({ brand: { name: 'x', ink: colour }, scenes: [{ type: 'end', duration: 3 }] });
+  for (const ok of ['#0A1B31', '#fff', '#0a1b31cc', 'navy', 'rgb(10, 27, 49)', 'hsl(215 66% 12%)', 'oklch(0.3 0.1 250 / 80%)']) assert.deepEqual(validate(spec(ok)), [], ok);
+  for (const bad of ['0A1B31', '#12', 'red; background: url(https://example.com/x)', 'url(https://example.com/x)', 'var(--x)', '#0A1B31"}</style>']) assert.equal(validate(spec(bad)).length, 1, bad);
 });

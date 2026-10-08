@@ -1,19 +1,10 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Songbe Studio</title>
+<title>Songbe</title>
+<link rel="icon" href="/studio/icon.svg"><link rel="stylesheet" href="/kit/fonts/fonts.css"><link rel="stylesheet" href="/studio/ui.css">
 <style>
-:root { --bg: #0D1117; --panel: #151B23; --raise: #1C2430; --line: #2A3441; --text: #E7ECF2; --soft: #9AA7B6; --accent: #4FE0D6; --blue: #3B82F6; --bad: #FF6B6B; }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-button, input, select, textarea { font: inherit; color: inherit; }
-header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
-header .logo { font-weight: 800; font-size: 17px; letter-spacing: -.3px; } header .logo span { color: var(--accent); }
-header .proj { color: var(--soft); font-weight: 500; } header .gap { flex: 1; }
-.tag { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--raise); color: var(--soft); border: 1px solid var(--line); }
-.tag.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-.btn { border: 1px solid var(--line); background: var(--raise); border-radius: 10px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
-.btn:hover { border-color: var(--soft); } .btn.small { padding: 4px 9px; font-size: 12px; border-radius: 8px; }
-.btn.go { background: var(--accent); color: #06221F; border-color: var(--accent); font-weight: 800; } .btn.go[disabled] { opacity: .5; cursor: default; }
+.crumb { color: var(--soft); font-weight: 600; text-decoration: none; padding: 5px 8px; margin: 0 -6px 0 2px; border-radius: 8px; } .crumb:hover { color: var(--text); background: var(--raise); }
+.sep { color: var(--line); } .proj { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 main { display: grid; grid-template-columns: minmax(380px, 460px) 1fr; height: calc(100% - 56px); }
 #left { border-right: 1px solid var(--line); overflow: auto; padding: 14px 14px 80px; }
 #right { display: grid; grid-template-rows: 1fr auto auto; min-height: 0; }
@@ -26,8 +17,6 @@ main { display: grid; grid-template-columns: minmax(380px, 460px) 1fr; height: c
 .card > .head .ty { font-weight: 700; } .card > .head .pv { color: var(--soft); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card > .body { padding: 4px 12px 12px; display: none; } .card.open > .body { display: block; }
 .f { margin-top: 10px; } .f > label { display: block; font-size: 12px; font-weight: 600; color: var(--soft); margin-bottom: 4px; } .f > label b { color: var(--accent); font-weight: 600; }
-input[type=text], input[type=number], textarea, select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; outline: none; }
-input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 textarea { resize: vertical; min-height: 38px; } input[type=color] { width: 38px; height: 36px; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; flex: none; }
 .rowf { display: flex; gap: 8px; align-items: center; } .rowf > * { min-width: 0; }
 .group { border: 1px solid var(--line); border-radius: 11px; padding: 2px 10px 10px; margin-top: 10px; background: color-mix(in srgb, var(--raise) 55%, transparent); }
@@ -40,16 +29,18 @@ textarea { resize: vertical; min-height: 38px; } input[type=color] { width: 38px
 #strip div.on { border-color: var(--accent); color: var(--accent); }
 #foot { max-height: 34vh; overflow: auto; border-top: 1px solid var(--line); background: var(--panel); padding: 10px 14px; }
 #foot:empty { display: none; }
-.msg { font-size: 13px; padding: 3px 0; } .msg.bad { color: var(--bad); } .msg.note { color: var(--soft); }
-#build { display: grid; grid-template-columns: 200px 1fr; gap: 14px; margin-top: 6px; } #build video { width: 200px; border-radius: 10px; background: #000; }
+#build { display: grid; grid-template-columns: auto 1fr; gap: 14px; margin-top: 6px; }
+#build video { display: block; height: min(320px, calc(34vh - 84px)); min-height: 150px; max-width: 380px; border-radius: 10px; background: #000; }      /* the whole picture without scrolling, whatever its shape */
 #log { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--soft); white-space: pre-wrap; max-height: 150px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
 .sum { font-weight: 600; margin-bottom: 6px; } .sum.ok { color: var(--accent); } .sum.bad { color: var(--bad); }
 #json { min-height: 60vh; font: 12.5px/1.5 ui-monospace, Menlo, monospace; white-space: pre; }
 </style></head>
 <body>
-<header>
-  <div class="logo">Song<span>be</span> Studio</div><div class="proj" id="proj"></div><div class="gap"></div>
-  <span class="tag" id="saved">loading…</span><span class="tag" id="kfal">voice · music</span>
+<header class="bar">
+  <a class="logo" href="/home" title="All your videos"><img src="/studio/icon.svg" alt=""><b>Song<span>be</span></b></a>
+  <a class="crumb" href="/home">Videos</a><span class="sep">/</span><div class="proj" id="proj"></div><div class="gap"></div>
+  <span class="tag" id="saved">loading…</span><a class="tag" id="kfal" href="/home#settings" title="Keys are set on the Videos page">voice · music</a>
+  <button class="btn quiet" id="folder" title="Show this project's folder">Folder</button>
   <button class="btn go" id="go">Build video</button>
 </header>
 <main>
@@ -65,6 +56,8 @@ textarea { resize: vertical; min-height: 38px; } input[type=color] { width: 38px
 </main>
 <script>
 const $ = (s) => document.querySelector(s);
+// every address is relative to this project's own (/p/<id>/); the header marks a request as coming from Songbe's pages
+const api = (where, o = {}) => fetch(where, { ...o, headers: { 'X-Songbe': '1', ...(o.headers || {}) } });
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); for (const k of kids) e.append(k); return e; };
 const LABEL = { captions: 'Captions that follow the voice', format: 'Frame <b>· tall 9:16 · square 1:1 · wide 16:9</b>', style: 'Look <b>· soft: rounded and glowing · bold: condensed capitals, flat colour</b>', say: 'Voice-over <b>· one sentence per line · {spoken|shown} when captions should read differently</b>', title: 'Headline <b>· one row per line</b>', sub: 'Supporting line', label: 'Small label', labelStyle: 'Label style', pin: 'Location pin before the label',
   chip: 'Bottom chip', notice: 'Notice <b>· e.g. AI disclosure</b>', media: 'Footage or image', mediaOffset: 'Start footage at (seconds)', caption: 'Caption on the media', stat: 'Stat card', badge: 'Badge <b>· 2–4 characters</b>',
@@ -82,7 +75,7 @@ let S = null, spec = null, tab = 'scenes', open = 0, timer = null, lastT = 0, pl
 
 function changed() { clearTimeout(timer); $('#saved').textContent = 'editing…'; timer = setTimeout(save, 450); }
 async function save() {
-  const r = await (await fetch('/api/spec', { method: 'PUT', body: JSON.stringify(spec) })).json();
+  const r = await (await api('api/spec', { method: 'PUT', body: JSON.stringify(spec) })).json();
   $('#saved').textContent = r.saved ? 'saved' : 'not saved'; $('#saved').classList.toggle('on', !!r.saved);
   show(r);
 }
@@ -90,7 +83,7 @@ function show(r) {
   plan = r.plan || plan;
   const msgs = [...(r.errors || []).map((m) => ['bad', m]), ...((r.plan && r.plan.notes) || []).map((m) => ['note', m])];
   const keep = $('#build'); $('#foot').replaceChildren(...msgs.map(([c, m]) => el('div', { className: 'msg ' + c, textContent: (c === 'bad' ? '✕ ' : '· ') + m })), ...(keep ? [keep] : []));
-  if (r.plan) { $('#pv').src = '/preview?v=' + Date.now() + '#t=' + lastT.toFixed(2); strip(); }
+  if (r.plan) { $('#pv').src = 'preview?v=' + Date.now() + '#t=' + lastT.toFixed(2); strip(); }
 }
 function strip() {
   if (!plan) return;
@@ -160,7 +153,7 @@ const order = (keys) => [...keys.filter((k) => !LAST.includes(clean(k)) && !HIDE
 const fields = (shape, obj) => order(Object.keys(shape)).map((key) => field(key, shape[key], () => obj[clean(key)], (v) => { if (v === undefined) delete obj[clean(key)]; else obj[clean(key)] = v; }));
 function upload(done, text = 'Upload') {
   const b = el('button', { className: 'btn small', textContent: text }), i = el('input', { type: 'file', hidden: true });
-  b.onclick = () => i.click(); i.onchange = async () => { const f = i.files[0]; if (!f) return; b.textContent = '…'; const r = await (await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })).json(); b.textContent = text; if (r.path) done(r.path); else alertBox(r.error); };
+  b.onclick = () => i.click(); i.onchange = async () => { const f = i.files[0]; if (!f) return; b.textContent = '…'; const r = await (await api('api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })).json(); b.textContent = text; if (r.path) done(r.path); else alertBox(r.error); };
   const s = el('span', { style: 'flex:none' }); s.append(b, i); return s;
 }
 const alertBox = (m) => $('#foot').prepend(el('div', { className: 'msg bad', textContent: '✕ ' + m }));
@@ -170,7 +163,7 @@ function draw() {
   const pane = $('#pane'); pane.replaceChildren();
   if (tab === 'json') { const t = el('textarea', { id: 'json', spellcheck: false, value: JSON.stringify(spec, null, 2) }); t.oninput = () => { try { spec = JSON.parse(t.value); changed(); } catch { $('#saved').textContent = 'JSON not valid yet'; } }; pane.append(t); return; }
   if (tab === 'brand') { const { scenes, ...top } = spec; pane.append(...order(Object.keys(S.table.TOP)).map((key) => field(key, S.table.TOP[key], () => spec[clean(key)], (v) => { if (v === undefined) delete spec[clean(key)]; else spec[clean(key)] = v; })));
-    pane.append(el('div', { className: 'hint', textContent: 'Voice, music and generated footage are created when you press Build, with your own FAL_KEY.' })); return; }
+    pane.append(el('div', { className: 'hint', textContent: 'Voice, music and generated footage are created when you press Build, with your own key (set on the Videos page).' })); return; }
   spec.scenes.forEach((sc, i) => {
     const card = el('div', { className: 'card' + (i === open ? ' open sel' : '') }), head = el('div', { className: 'head' });
     const btn = (t, fn) => { const b = el('button', { className: 'btn small', textContent: t }); b.onclick = (e) => { e.stopPropagation(); fn(); draw(); changed(); }; return b; };
@@ -188,33 +181,47 @@ function draw() {
 for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { tab = b.dataset.tab; draw(); };
 
 // ---- build ----
+let building = false;
+function setBuilding(on) { building = on; const b = $('#go'); b.textContent = on ? 'Stop' : 'Build video'; b.className = on ? 'btn stop' : 'btn go'; b.disabled = false; }
 $('#go').onclick = async () => {
+  if (building) { $('#go').disabled = true; return api('api/build/stop', { method: 'POST' }); }
+  if (!S.tools.ready) return missing();
   clearTimeout(timer); await save();
-  const r = await fetch('/api/build', { method: 'POST' }); if (!r.ok) return alertBox((await r.json()).error);
-  $('#go').disabled = true; $('#go').textContent = 'Building…'; watch();
+  const r = await api('api/build', { method: 'POST' }); if (!r.ok) return alertBox((await r.json()).error);
+  setBuilding(true); watch();
 };
+$('#folder').onclick = () => api('api/reveal', { method: 'POST', body: JSON.stringify({ what: 'folder' }) });
 function watch() {
   $('#build')?.remove(); const box = el('div', { id: 'build' }), side = el('div'), log = el('div', { id: 'log' }), vid = el('div');
   side.append(el('div', { className: 'sum', textContent: 'Building…', id: 'sum' }), log); box.append(vid, side); $('#foot').append(box); $('#foot').scrollTop = 1e6;
-  const es = new EventSource('/api/build/events');
+  const es = new EventSource('api/build/events');
   es.addEventListener('line', (e) => { log.textContent += JSON.parse(e.data) + '\n'; log.scrollTop = 1e6; });
-  es.addEventListener('done', (e) => { es.close(); $('#go').disabled = false; $('#go').textContent = 'Build video'; const r = JSON.parse(e.data), c = r.check, sum = $('#sum');
+  es.addEventListener('done', (e) => { es.close(); setBuilding(false); const r = JSON.parse(e.data), c = r.check, sum = $('#sum');
+    if (r.stopped) { sum.textContent = 'Stopped'; sum.className = 'sum'; return; }
     if (!c) { sum.textContent = 'Build failed — see the log'; sum.className = 'sum bad'; return; }
     sum.className = 'sum ' + (c.ok ? 'ok' : 'bad'); sum.textContent = `${c.ok ? 'Done' : 'Built with problems'} · ${c.duration.toFixed(1)} s · ${c.audio ? 'sound ' + (c.loudness ? c.loudness.mean + ' dB' : '') : 'NO SOUND'} · ${c.sizeMB} MB`;
     for (const p of c.problems) side.insertBefore(el('div', { className: 'msg bad', textContent: '✕ ' + p }), log);
     if (c.heard) side.insertBefore(el('div', { className: 'msg note', textContent: 'Heard: ' + c.heard }), log);
-    const v = el('video', { src: c.video, controls: true, playsInline: true }); vid.append(v, el('a', { href: c.video, download: 'video.mp4', className: 'btn small', textContent: 'Download', style: 'display:inline-block;margin-top:8px;text-decoration:none' }));
+    const v = el('video', { src: c.video, controls: true, playsInline: true }), where = el('button', { className: 'btn small', textContent: 'Show in folder' });
+    where.onclick = () => api('api/reveal', { method: 'POST', body: JSON.stringify({ what: 'video' }) });
+    vid.append(v, el('div', { style: 'display:flex;gap:6px;margin-top:8px' }, where, el('a', { href: c.video, download: S.name + '.mp4', className: 'btn small', textContent: 'Save a copy' })));
     $('#foot').scrollTop = 1e6; });
 }
 
 (async () => {
-  S = await (await fetch('/api/state')).json(); spec = S.spec; $('#proj').textContent = S.name;
-  document.head.append(el('link', { rel: 'stylesheet', href: S.fonts }));
-  $('#kfal').textContent = S.keys.fal ? 'voice · music ready' : 'no FAL_KEY: silent builds'; $('#kfal').classList.toggle('on', S.keys.fal);
+  S = await (await fetch('api/state')).json(); spec = S.spec; $('#proj').textContent = S.name; document.title = S.name + ' — Songbe';
+  $('#kfal').textContent = S.keys.fal ? 'voice · music ready' : 'no key: silent builds'; $('#kfal').classList.toggle('on', S.keys.fal);
   $('#saved').textContent = 'saved'; $('#saved').classList.add('on');
   if (!spec) { $('#pane').append(el('div', { className: 'msg bad', textContent: S.errors[0] })); return; }
   if (S.plan) { const sc = S.plan.scenes[0]; lastT = sc.start + (sc.end - sc.start) * .6; }
-  draw(); show(S); if (S.building) { $('#go').disabled = true; $('#go').textContent = 'Building…'; watch(); }
+  draw(); show(S); if (S.building) { setBuilding(true); watch(); }
+  if (!S.tools.ready) missing();
 })();
+// building needs ffmpeg and a browser; say so before anything is attempted, with the way to the fix
+function missing() {
+  $('#need')?.remove(); const need = el('div', { className: 'msg bad', id: 'need' });
+  need.append(`✕ ${!S.tools.ffmpeg || !S.tools.ffprobe ? 'ffmpeg is not installed yet, and building a video needs it.' : 'No Chrome or Edge was found, and drawing the frames needs one.'} `, el('a', { href: '/home', textContent: 'Set it up on the Videos page', style: 'color:var(--accent)' }));
+  $('#foot').prepend(need); $('#foot').scrollTop = 0;
+}
 </script>
 </body></html>

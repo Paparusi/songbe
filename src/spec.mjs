@@ -89,6 +89,9 @@ export function validate(spec, dir) {
   for (const k of ['voice', 'music']) if (top[k] === false) delete top[k];      // false switches the voice or the music off
   walk(top, TOP, 'video', errs, dir);
   if (top.size && (top.size.length !== 2)) errs.push('video.size: expected [width, height]');
+  // a colour is a colour and nothing more (it is handed to the style sheet as written)
+  for (const k of ['ink', 'primary', 'accent', 'paper', 'muted']) { const v = top.brand?.[k];
+    if (typeof v === 'string' && !/^(#[0-9a-f]{3,8}|[a-z]+|(rgb|hsl|hwb|lab|lch|oklab|oklch)a?\([-0-9a-z.,%/\s]+\))$/i.test(v.trim())) errs.push(`video.brand.${k}: expected a colour such as "#0A1B31"`); }
   for (const f of ['mark', 'word']) { const v = top.brand?.logo?.[f]; if (typeof v === 'string' && dir && !fs.existsSync(path.resolve(dir, v))) errs.push(`video.brand.logo.${f}: file not found: ${v}`); }
   if (top.music?.file && dir && !fs.existsSync(path.resolve(dir, top.music.file))) errs.push(`video.music.file: file not found: ${top.music.file}`);
   if (!Array.isArray(scenes) || !scenes.length) { errs.push('video.scenes: at least one scene is required'); return errs; }

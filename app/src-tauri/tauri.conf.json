@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Songbe",
+  "version": "../../package.json",
+  "identifier": "app.songbe.studio",
+  "build": { "frontendDist": "../splash" },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:" }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "resources": { "resources/core/": "core/", "resources/licenses/": "licenses/" },
+    "externalBin": ["binaries/node"],
+    "publisher": "Songbe",
+    "category": "Video",
+    "shortDescription": "Short ads from a single video.json",
+    "longDescription": "Songbe turns one description file into a finished short ad: voice, footage, motion graphics, music and a self-check.",
+    "copyright": "Apache-2.0",
+    "windows": {
+      "nsis": { "installMode": "currentUser" },
+      "webviewInstallMode": { "type": "downloadBootstrapper" }
+    }
+  }
+}

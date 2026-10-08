@@ -2,15 +2,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { makePlan } from './plan.mjs';
-import { renderVideo, stills, writePage, lintLayout } from './render.mjs';
+import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { renderVideo, stills, writePage, lintLayout, poster } from './render.mjs';
 import { makeAudio, mux } from './audio.mjs';
 import { check } from './check.mjs';
-import { tools, loadDotEnv, exists, log } from './util.mjs';
+import { tools, loadDotEnv, exists, log, mkdir, dataDir, projectsHome, ROOT, WIN } from './util.mjs';
 import { validate, jsonSchema, STYLES, FORMATS } from './spec.mjs';
 
 const HELP = `Songbe — short ads from a single video.json
 
-  songbe doctor                   check that ffmpeg, ffprobe and Chrome are found and which keys are set
+  songbe app [--port=N]           the app: your projects, a visual editor with live preview, and a Build button
+  songbe studio <dir> [--port=N]  the same editor, opened straight on one project (http://127.0.0.1:4173)
+
+  songbe doctor                   check that ffmpeg, ffprobe and a browser are found and which keys are set
+  songbe setup ffmpeg             Windows: fetch ffmpeg into Songbe's own folder (elsewhere: says which package to install)
   songbe init <dir>               start a project from the example
   songbe validate <dir>           check video.json and list every problem
   songbe schema                   print the JSON Schema of video.json
@@ -23,12 +29,12 @@ const HELP = `Songbe — short ads from a single video.json
                                   --no-sync leaves cuts where the voice puts them instead of moving them onto the music's beat
   songbe check <dir>              re-run the self-check on out/video.mp4
   songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
-  songbe studio <dir> [--port=N]  edit in the browser with a live preview and a Build button (http://127.0.0.1:4173)
+  songbe poster <dir>             one small still of the opening scene (.songbe/poster.jpg; --out=FILE --width=480)
 
-Keys are read from the environment or <dir>/.env: FAL_KEY (voice, music, generated footage), GROQ_API_KEY (optional transcript check).
-Without keys the build still works: no voice, no music, plain backgrounds where footage would be generated.`;
+Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage),
+GROQ_API_KEY (optional transcript check). Without keys the build still works: no voice, no music, plain backgrounds where
+footage would be generated.`;
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
 function report(r) {
   log(`\n${r.ok ? 'OK' : 'PROBLEMS'}  ${r.video}`);
@@ -43,12 +49,39 @@ export async function main(argv) {
   const [cmd, target, ...rest] = argv, flags = new Set(rest.filter((x) => x.startsWith('--')));
   if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') return log(HELP);
   if (cmd === 'doctor') {
-    for (const [label, name] of [['ffmpeg', 'ffmpeg'], ['ffprobe', 'ffprobe'], ['Chrome', 'chrome']]) {
+    for (const [label, name] of [['ffmpeg', 'ffmpeg'], ['ffprobe', 'ffprobe'], ['browser', 'chrome']]) {
       try { log(`ok   ${label}: ${tools[name]}`); } catch (e) { log(`MISSING ${label}: ${e.message}`); process.exitCode = 1; }
     }
-    if (target) loadDotEnv(path.resolve(target));
+    if (target && !target.startsWith('--')) loadDotEnv(path.resolve(target));
+    loadDotEnv(dataDir());
     for (const k of ['FAL_KEY', 'GROQ_API_KEY']) log(`${process.env[k] ? 'set  ' : 'unset'} ${k}`);
-    return log(`node ${process.version}`);
+    log(`projects: ${projectsHome()}\ndata:     ${dataDir()}`);
+    return log(`node ${process.version} on ${process.platform}`);
+  }
+  if (cmd === 'app') {
+    const args = argv.slice(1), shell = args.includes('--shell'), p = args.find((x) => x.startsWith('--port='));
+    const { serve } = await import('./studio.mjs'), s = await serve({ port: p ? +p.split('=')[1] : shell ? 0 : 4173 });
+    if (shell) {      // started by the desktop app: say where the pages are, and leave when it does
+      console.log('SONGBE_READY ' + JSON.stringify({ url: s.url + 'home', port: s.port }));
+      const leave = () => { s.close(); process.exit(0); };
+      process.stdin.on('end', leave).on('error', leave).resume();
+      return;
+    }
+    log(`Songbe is running at ${s.url}\n  projects: ${s.home}\n  Ctrl-C to stop`);
+    if (!args.includes('--no-open') && tools.window) {      // a window of its own, without tabs or an address bar
+      const win = spawn(tools.window, [`--app=${s.url}`, `--user-data-dir=${path.join(mkdir(dataDir()), 'window')}`, '--window-size=1440,900', '--no-first-run', '--no-default-browser-check'], { detached: true, stdio: 'ignore' });
+      win.on('error', () => {}); win.unref();
+    }
+    return;
+  }
+  if (cmd === 'setup') {
+    if (target !== 'ffmpeg') throw new Error('what should be set up? Try: songbe setup ffmpeg');
+    const { installFfmpeg, ffmpegAdvice, FFMPEG_WINDOWS: pick } = await import('./setup.mjs');
+    if (!WIN) return log(`On this system ffmpeg comes from the package manager:\n  ${ffmpegAdvice()}`);
+    log(`ffmpeg ${pick.version} from ${pick.from} (${Math.round(pick.bytes / 1e6)} MB, ${pick.licence})`);
+    let shown = -1;
+    const r = await installFfmpeg((p) => { if (p.step === 'download') { const pc = Math.floor(p.done / p.total * 10) * 10; if (pc !== shown) { shown = pc; log(`  downloading… ${pc}%`); } } else if (p.step !== 'done') log(`  ${p.step}…`); });
+    return log(`installed: ${r.ffmpeg}\n  ${r.version}`);
   }
   if (cmd === 'schema') return log(JSON.stringify(jsonSchema(), null, 2));
   if (!target) throw new Error('which project directory?\n\n' + HELP);
@@ -59,7 +92,7 @@ export async function main(argv) {
     return log(`created ${dir}\nnext: songbe frames ${target}   then   songbe build ${target}`);
   }
   if (!exists(path.join(dir, 'video.json'))) throw new Error(`no video.json in ${dir}`);
-  loadDotEnv(dir);
+  loadDotEnv(dir); loadDotEnv(dataDir());      // the project's own keys first, then the ones saved on this computer
   if (cmd === 'studio') {
     const { studio } = await import('./studio.mjs'), p = rest.find((x) => x.startsWith('--port='));
     await studio(dir, p ? +p.split('=')[1] : 4173); return;
@@ -69,6 +102,10 @@ export async function main(argv) {
     const errs = validate(spec, dir);
     if (!errs.length) return log('video.json is valid');
     process.exitCode = 2; return log(`${errs.length} problem${errs.length > 1 ? 's' : ''}:\n  - ` + errs.join('\n  - '));
+  }
+  if (cmd === 'poster') {
+    const out = rest.find((x) => x.startsWith('--out='))?.slice(6), width = +(rest.find((x) => x.startsWith('--width='))?.slice(8) || 480);
+    return log(await poster(dir, await makePlan(dir, { offline: true }), out ? path.resolve(out) : path.join(mkdir(path.join(dir, '.songbe')), 'poster.jpg'), width));
   }
   if (cmd === 'check') return report(await check(dir, JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'plan.json'), 'utf8'))));
 
@@ -87,7 +124,7 @@ export async function main(argv) {
   log('plan…'); const plan = await makePlan(dir, { force: flags.has('--force'), style, format: one, captions, sync });
   if (plan.beats) log(`  cuts on the beat: ${plan.beats.bpm} BPM`);
   log(`  ${plan.size.join('×')}, ${plan.duration} s, ${plan.scenes.length} scenes: ` + plan.scenes.map((s) => `${s.type} ${s.start}–${s.end}`).join(' | '));
-  if (cmd === 'preview') return log('open: file://' + writePage(dir, plan));
+  if (cmd === 'preview') return log('open: ' + pathToFileURL(writePage(dir, plan)).href);
   if (cmd === 'frames') {
     const arg = rest.find((x) => !x.startsWith('--'));
     const times = arg ? arg.split(',').map(Number) : plan.scenes.flatMap((s) => [s.start + (s.end - s.start) * .35, s.start + (s.end - s.start) * .85]);

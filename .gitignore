@@ -3,3 +3,9 @@ out/
 .env
 node_modules/
 *.log
+
+# desktop app: build products and staged copies
+app/src-tauri/target/
+app/src-tauri/resources/
+app/src-tauri/binaries/
+app/src-tauri/gen/

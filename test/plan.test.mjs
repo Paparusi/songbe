@@ -4,17 +4,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { ROOT, tools } from '../src/util.mjs';
 import { makePlan } from '../src/plan.mjs';
 import { FORMATS } from '../src/spec.mjs';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const root = ROOT;
 const copies = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-test-'));
 const copy = (name) => { const to = path.join(copies, name); if (!fs.existsSync(to)) fs.cpSync(path.join(root, 'examples', name), to, { recursive: true, filter: (f) => !/[\\/](\.songbe|out)([\\/]|$)/.test(f) }); return to; };
 test.after(() => fs.rmSync(copies, { recursive: true, force: true }));
 delete process.env.FAL_KEY;                      // these tests must never spend anything
+// the example with footage needs ffmpeg to cut its frames; the one without runs anywhere
+let ffmpeg = true; try { tools.ffmpeg; tools.ffprobe; } catch { ffmpeg = false; }
+const needs = (name) => ({ skip: name === 'recruitment-vi' && !ffmpeg && 'ffmpeg not found' });
 
 for (const name of ['app-launch-en', 'recruitment-vi']) {
-  test(`${name}: scenes follow one another without gaps`, async () => {
+  test(`${name}: scenes follow one another without gaps`, needs(name), async () => {
     const plan = await makePlan(copy(name), { offline: true });
     assert.equal(plan.scenes[0].start, 0);
     for (let i = 1; i < plan.scenes.length; i++) assert.equal(plan.scenes[i].start, plan.scenes[i - 1].end, `scene ${i + 1}`);
@@ -24,7 +28,7 @@ for (const name of ['app-launch-en', 'recruitment-vi']) {
     assert.ok(plan.notes.some((n) => n.includes('not generated yet')), 'says that the timing is an estimate');
   });
 
-  test(`${name}: the same timeline in every frame`, async () => {
+  test(`${name}: the same timeline in every frame`, needs(name), async () => {
     const tall = await makePlan(copy(name), { offline: true });
     for (const format of Object.keys(FORMATS)) {
       const plan = await makePlan(copy(name), { offline: true, format });
@@ -35,7 +39,7 @@ for (const name of ['app-launch-en', 'recruitment-vi']) {
     }
   });
 
-  test(`${name}: captions cover the speech and nothing else`, async () => {
+  test(`${name}: captions cover the speech and nothing else`, needs(name), async () => {
     const off = await makePlan(copy(name), { offline: true }), on = await makePlan(copy(name), { offline: true, captions: true });
     assert.equal(off.captions.length, 0);
     assert.ok(on.captions.length >= on.scenes.length);
@@ -49,7 +53,7 @@ for (const name of ['app-launch-en', 'recruitment-vi']) {
   });
 }
 
-test('a portrait clip in a wide frame is kept whole at the side; in a square one the crop leans upward', async () => {
+test('a portrait clip in a wide frame is kept whole at the side; in a square one the crop leans upward', needs('recruitment-vi'), async () => {
   const dir = copy('recruitment-vi');
   const wide = await makePlan(dir, { offline: true, format: 'wide' }), square = await makePlan(dir, { offline: true, format: 'square' }), tall = await makePlan(dir, { offline: true });
   assert.equal(wide.scenes[0].media.fit, 'side');
