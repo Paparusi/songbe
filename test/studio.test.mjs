@@ -205,6 +205,18 @@ test('rewriting a scene and generating footage answer plainly when there is no k
   assert.equal(f.done, true); assert.match(f.error, /does not describe footage to generate/, 'the scene has no footage description: said so, nothing spent');
 });
 
+test('Linux: a menu entry that starts Songbe with this Node, and leaves when the window closes', { skip: process.platform !== 'linux' && 'Linux only' }, async () => {
+  const { launcher } = await import('../src/launcher.mjs'), was = { ...process.env };
+  process.env.XDG_DATA_HOME = path.join(scratch, 'share'); process.env.SONGBE_CHROME = '/bin/sh';      // stands in for a browser that can show a window
+  try {
+    assert.match(launcher(true), /added Songbe to the applications menu/);
+    const entry = fs.readFileSync(path.join(scratch, 'share', 'applications', 'songbe.desktop'), 'utf8');
+    assert.ok(entry.includes(`Exec="${process.execPath}" "${path.join(ROOT, 'bin', 'songbe.mjs')}" app --exit-with-window`) && entry.includes('Icon=songbe') && entry.includes('Terminal=false'));
+    assert.ok(fs.existsSync(path.join(scratch, 'share', 'icons', 'hicolor', 'scalable', 'apps', 'songbe.svg')));
+    assert.match(launcher(false), /removed/); assert.ok(!fs.existsSync(path.join(scratch, 'share', 'applications', 'songbe.desktop')));
+  } finally { process.env.XDG_DATA_HOME = was.XDG_DATA_HOME; if (was.SONGBE_CHROME === undefined) delete process.env.SONGBE_CHROME; else process.env.SONGBE_CHROME = was.SONGBE_CHROME; if (was.XDG_DATA_HOME === undefined) delete process.env.XDG_DATA_HOME; tools.reset(); }
+});
+
 let ready = true; try { tools.chrome; tools.ffmpeg; tools.ffprobe; } catch { ready = false; }
 test('every project gets a poster of its opening scene', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
   let h;

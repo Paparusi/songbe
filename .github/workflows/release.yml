@@ -1,0 +1,43 @@
+# Installers for a tagged release: a setup program for Windows, an AppImage and a .deb for Linux, a disk image for macOS, attached
+# to the GitHub release of that tag. Skipped while the repository is private (macOS minutes cost ten times the others); run it by
+# hand from the Actions tab to try it earlier. Not run yet: expect to adjust it on its first real run. Nothing is code-signed.
+name: release
+on:
+  push: { tags: ['v*'] }
+  workflow_dispatch:
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.repository.private }}
+    permissions: { contents: write }
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-22.04, windows-latest, macos-latest] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Libraries the window needs (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+      - run: cargo install tauri-cli --version '^2' --locked
+      - run: node app/build.mjs
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/src-tauri/target/*/release/bundle/nsis/*.exe
+            app/src-tauri/target/*/release/bundle/appimage/*.AppImage
+            app/src-tauri/target/*/release/bundle/deb/*.deb
+            app/src-tauri/target/*/release/bundle/dmg/*.dmg
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: songbe-${{ runner.os }}
+          path: |
+            app/src-tauri/target/*/release/bundle/nsis/*.exe
+            app/src-tauri/target/*/release/bundle/appimage/*.AppImage
+            app/src-tauri/target/*/release/bundle/deb/*.deb
+            app/src-tauri/target/*/release/bundle/dmg/*.dmg

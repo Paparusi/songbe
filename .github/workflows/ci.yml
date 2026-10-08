@@ -1,0 +1,27 @@
+# Tests on every push and pull request. While the repository is private these jobs are skipped (they would spend paid minutes);
+# they start running by themselves the day it is made public. Not run yet: expect to adjust it on its first real run.
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    if: ${{ !github.event.repository.private }}
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-latest, windows-latest, macos-latest] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # the drawing tests need ffmpeg and a browser; the runners have Chrome (and Edge on Windows) already
+      - name: ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: node bin/songbe.mjs setup ffmpeg
+      - run: node bin/songbe.mjs doctor
+      - run: npm test

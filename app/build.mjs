@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const APP = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.dirname(APP), TAURI = path.join(APP, 'src-tauri');
 const say = (...a) => console.log(...a);
-const out = (cmd, args, cwd = ROOT) => { const r = spawnSync(cmd, args, { encoding: 'utf8', cwd }); if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')}: ${(r.stderr || r.error?.message || '').trim()}`); return r.stdout; };
+const out = (cmd, args, cwd = ROOT) => { const r = spawnSync(cmd, args, { encoding: 'utf8', cwd, maxBuffer: 1 << 28 }); if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')}: ${(r.stderr || r.error?.message || '').trim()}`); return r.stdout; };
 if (+process.versions.node.split('.')[0] < 22) throw new Error(`the engine needs Node 22 or newer; this is ${process.version}`);
 
 // ---- the core: exactly what the repository tracks, never a project's caches or renders ----
@@ -49,12 +49,22 @@ if (!/Node\.js is licensed for use as follows/.test(text)) throw new Error('that
 fs.writeFileSync(path.join(lic, 'NODE-LICENSE.txt'), text);
 fs.writeFileSync(path.join(lic, 'README.txt'), `Songbe is licensed under the Apache License 2.0 (see core/LICENSE and core/NOTICE).\n\nThis folder holds the licences of programs shipped next to it:\n  NODE-LICENSE.txt   Node.js ${process.version}, the runtime of the Songbe engine (node${process.platform === 'win32' ? '.exe' : ''})\n\nffmpeg is not part of this package. When you ask Songbe to fetch it, it is downloaded from its publisher under its own licence (GPL).\n`);
 
+// ---- and of the Rust crates compiled into the window's program: who wrote each, under which licence ----
+try {
+  const meta = JSON.parse(out('cargo', ['metadata', '--format-version', '1', '--filter-platform', host], TAURI)), own = new Set(meta.workspace_members);
+  const rows = meta.packages.filter((p) => !own.has(p.id)).sort((a, b) => a.name.localeCompare(b.name)).map((p) => `${p.name} ${p.version} — ${p.license || 'see its repository'}${p.authors?.length ? ' — ' + p.authors.join(', ') : ''}${p.repository ? ' — ' + p.repository : ''}`);
+  fs.writeFileSync(path.join(lic, 'RUST-CRATES.txt'), `The program that shows Songbe's window (songbe${process.platform === 'win32' ? '.exe' : ''}) is built with Tauri and contains the following Rust crates.\nEach is used unmodified under the licence named beside it; the texts of those licences are at https://spdx.org/licenses/ and in each crate's repository.\n\n${rows.join('\n')}\n`);
+  say(`notices: ${rows.length} crates`);
+} catch (e) { say('note: could not list the Rust crates for the notices (' + e.message.split('\n')[0] + ')'); }
+
 // ---- the bundler ----
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version, crate = /^version = "([^"]+)"/m.exec(fs.readFileSync(path.join(TAURI, 'Cargo.toml'), 'utf8'))[1];
 if (pkg !== crate) say(`note: package.json says ${pkg} but app/src-tauri/Cargo.toml says ${crate}`);
 // The target is named outright: left to itself the bundler assumes the system its own program was compiled for, which need not be
 // the toolchain in use (a GNU-built cargo-tauri next to an MSVC build), and then looks for the runtime under the wrong name.
-const rest = process.argv.slice(2), args = ['tauri', 'build', ...(rest.includes('--target') ? [] : ['--target', host]), ...rest];
+// One kind of installer per system unless asked otherwise: a setup program on Windows, an AppImage and a .deb on Linux, a disk image on macOS.
+const KINDS = { win32: 'nsis', linux: 'appimage,deb', darwin: 'dmg' }, rest = process.argv.slice(2), plain = rest.includes('--no-bundle') || rest.includes('--bundles');
+const args = ['tauri', 'build', ...(rest.includes('--target') ? [] : ['--target', host]), ...(plain || !KINDS[process.platform] ? [] : ['--bundles', KINDS[process.platform]]), ...rest];
 say('cargo ' + args.join(' '));
 const r = spawnSync('cargo', args, { cwd: APP, stdio: 'inherit' });
 if (r.status !== 0) process.exit(r.status ?? 1);

@@ -13,6 +13,7 @@ import { validate, jsonSchema, STYLES, FORMATS } from './spec.mjs';
 const HELP = `Songbe — short ads from a single video.json
 
   songbe app [--port=N]           the app: your projects, a visual editor with live preview, and a Build button
+                                  (Linux: "songbe app --add-launcher" puts Songbe in the applications menu, "--remove-launcher" takes it out)
   songbe studio <dir> [--port=N]  the same editor, opened straight on one project (http://127.0.0.1:4173)
 
   songbe doctor                   check that ffmpeg, ffprobe and a browser are found and which keys are set
@@ -64,6 +65,15 @@ export async function main(argv) {
   }
   if (cmd === 'app') {
     const args = argv.slice(1), shell = args.includes('--shell'), p = args.find((x) => x.startsWith('--port='));
+    if (args.includes('--add-launcher') || args.includes('--remove-launcher')) { const { launcher } = await import('./launcher.mjs'); return log(launcher(args.includes('--add-launcher'))); }
+    // one Songbe per computer: a second start opens a window on the one that is running
+    const lock = path.join(mkdir(dataDir()), 'app.lock'), window = (url) => { if (!tools.window) return null;
+      const w = spawn(tools.window, [`--app=${url}`, `--user-data-dir=${path.join(dataDir(), 'window')}`, '--window-size=1440,900', '--no-first-run', '--no-default-browser-check'], { detached: true, stdio: 'ignore' }); w.on('error', () => {}); return w; };
+    if (!shell && !p) {
+      let was = null; try { was = JSON.parse(fs.readFileSync(lock, 'utf8')); } catch {}
+      const alive = was && await fetch(`http://127.0.0.1:${was.port}/api/home`, { signal: AbortSignal.timeout(1500) }).then((r) => r.ok, () => false);
+      if (alive) { log(`Songbe is already running at http://127.0.0.1:${was.port}/`); const w = args.includes('--no-open') ? null : window(`http://127.0.0.1:${was.port}/`); if (w) w.unref(); return; }
+    }
     const { serve } = await import('./studio.mjs'), s = await serve({ port: p ? +p.split('=')[1] : shell ? 0 : 4173 });
     if (shell) {      // started by the desktop app: say where the pages are, and leave when it does
       console.log('SONGBE_READY ' + JSON.stringify({ url: s.url + 'home', port: s.port }));
@@ -72,10 +82,10 @@ export async function main(argv) {
       return;
     }
     log(`Songbe is running at ${s.url}\n  projects: ${s.home}\n  Ctrl-C to stop`);
-    if (!args.includes('--no-open') && tools.window) {      // a window of its own, without tabs or an address bar
-      const win = spawn(tools.window, [`--app=${s.url}`, `--user-data-dir=${path.join(mkdir(dataDir()), 'window')}`, '--window-size=1440,900', '--no-first-run', '--no-default-browser-check'], { detached: true, stdio: 'ignore' });
-      win.on('error', () => {}); win.unref();
-    }
+    if (!p) { fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, port: s.port })); const gone = () => { try { fs.rmSync(lock, { force: true }); } catch {} }; process.on('exit', gone); for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { s.close(); process.exit(0); }); }
+    // a window of its own, without tabs or an address bar; started from the applications menu, Songbe leaves when that window is closed
+    const win = args.includes('--no-open') ? null : window(s.url);
+    if (win && args.includes('--exit-with-window')) win.on('exit', () => { s.close(); process.exit(0); }); else if (win) win.unref();
     return;
   }
   if (cmd === 'setup') {

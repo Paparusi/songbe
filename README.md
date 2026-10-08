@@ -1,14 +1,19 @@
 # Songbe
 
-> Early version (0.14): nine scene types, three looks, packs for more, any frame size, captions, cuts on the beat, built-in checks, a writer that
-> drafts the whole video from a description, and an app with a visual editor (in the browser, or installed on Windows). Tested on Linux / WSL and on Windows 11; macOS has not been tried.
->
-> Songbe is named after the Sông Bé, a river in southern Vietnam.
+<p align="center">
+  <img src="docs/img/promotion.webp" width="232" alt="A promotion built by Songbe, playing">
+  &nbsp;
+  <img src="docs/img/looks.jpg" width="620" alt="Three looks: soft, bold, classic">
+</p>
 
-Short vertical ads from a single `video.json`. Songbe turns a script and a few scene descriptions into a finished MP4 —
-voice-over, footage, motion graphics, music, sound effects — and then checks its own output. It is a command-line tool with no
-interactive steps, so an AI coding agent can drive it from start to finish; and the same engine sits behind an app for people who
-would rather click than type (see *The app*).
+**A description in, a finished short ad out.** Songbe turns a few sentences — or one `video.json` — into an MP4 with voice-over,
+motion graphics, captions, music and sound effects, and then checks its own work before handing it over. It runs from the command
+line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
+people who would rather click than type.
+
+> Version 0.15. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux / WSL and Windows 11; macOS
+> has not been tried. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 
 ```
 songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.mp4  (+ sheet.jpg, check.json)
@@ -16,6 +21,8 @@ songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.
 
 Three examples are included: `examples/app-launch-en` (an app launch, English, with phone screens), `examples/recruitment-vi`
 (a recruitment ad, Vietnamese, with footage) and `examples/sale-vi` (a promotion, Vietnamese, no footage at all).
+
+<p align="center"><img src="docs/img/app-home.jpg" width="49%" alt="The app: your videos"> <img src="docs/img/app-editor.jpg" width="49%" alt="The editor: fields on the left, the video on the right"></p>
 
 ## Why
 
@@ -220,6 +227,8 @@ node bin/songbe.mjs app                 # opens a window of its own when Chrome 
 node bin/songbe.mjs studio my-ad        # the editor for one project: http://127.0.0.1:4173
 ```
 
+<p align="center"><img src="docs/img/app-write.jpg" width="70%" alt="New video: Write it for me"></p>
+
 For people who would rather not edit JSON. The **home screen** lists your videos, each with a poster of its opening scene and
 whether its video is up to date; *New video* writes one from your description, or starts from an example or from blank;
 *Settings* holds your keys and shows what is installed. The **editor** has scenes and their fields on the left and the video on the right, updating as you type. The preview
@@ -280,7 +289,16 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 - One provider (fal.ai) for voice, images, image-to-video and music; the writer also takes an Anthropic key.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
-- The installed app exists for Windows only so far, unsigned; *Open a folder* takes a typed path rather than a system dialog.
+- The installed app exists for Windows only so far, unsigned; on Linux `songbe app --add-launcher` puts the app in the
+  applications menu from a checkout. *Open a folder* takes a typed path rather than a system dialog.
+
+## More to read
+
+- `docs/packs.md` — making a pack: looks and starters outside the core.
+- `docs/comparison.md` — how Songbe relates to ArtCraft, plainly.
+- `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
+- `app/README.md` — the desktop shell and how installers are built; `.github/workflows/` builds them for Windows, Linux and macOS
+  on a tagged release once the repository is public (the workflows have not run yet).
 
 ## License
 

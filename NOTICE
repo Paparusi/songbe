@@ -9,5 +9,6 @@ Example media under examples/*/media was generated with AI image and video model
 
 The desktop app (app/) is built with Tauri (MIT or Apache-2.0); the exact versions of everything compiled into it are listed in
 app/src-tauri/Cargo.lock. Its installer places an unmodified Node.js runtime next to the engine, under the Node.js licence
-(shipped as licenses/NODE-LICENSE.txt). ffmpeg is not distributed with Songbe: on Windows it is fetched from its publisher at
+(shipped as licenses/NODE-LICENSE.txt), and lists every Rust crate compiled into the window's program with its authors and
+licence (licenses/RUST-CRATES.txt). ffmpeg is not distributed with Songbe: on Windows it is fetched from its publisher at
 the user's request, under its own licence (GPL).
