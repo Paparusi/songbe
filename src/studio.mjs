@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { makePlan } from './plan.mjs';
 import { pageHtml } from './render.mjs';
 import { FFMPEG_WINDOWS, ffmpegAdvice, installFfmpeg } from './setup.mjs';
-import { validate, TOP, SCENES, TEMPLATES, FORMATS } from './spec.mjs';
+import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES } from './spec.mjs';
+import { writeSpec, writerFor } from './write.mjs';
 import { KIT, ROOT, WIN, dataDir, exists, killTree, log, mkdir, openOutside, projectsHome, readDotEnv, sha, tools } from './util.mjs';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
@@ -19,9 +20,9 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 const MEDIA = /\.(png|jpe?g|svg|webp|gif|mp4|mov|webm|wav|mp3)$/i;
 const PAGES = path.join(ROOT, 'studio'), STARTERS = path.join(ROOT, 'examples');
-const KEYS = { FAL_KEY: 'fal', GROQ_API_KEY: 'groq' };
+const KEYS = { FAL_KEY: 'fal', GROQ_API_KEY: 'groq', ANTHROPIC_API_KEY: 'anthropic' };
 // the only places outside this computer the app ever sends a person to
-const LINKS = { fal: 'https://fal.ai/dashboard/keys', groq: 'https://console.groq.com/keys', ffmpeg: 'https://ffmpeg.org/download.html' };
+const LINKS = { fal: 'https://fal.ai/dashboard/keys', groq: 'https://console.groq.com/keys', anthropic: 'https://console.anthropic.com/settings/keys', ffmpeg: 'https://ffmpeg.org/download.html' };
 const NOT_COPIED = /[\\/](\.songbe|out|starter\.json|poster\.jpg)([\\/]|$)/;      // what a new project does not take from its starter
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
@@ -48,10 +49,10 @@ export function trusted(req) {
 // The plan carries file:// addresses for the renderer; a page served over http gets the same files through `link`.
 export const forBrowser = (plan, link) => JSON.parse(JSON.stringify(plan), (k, v) => (typeof v === 'string' && v.startsWith('file://') ? link(fileURLToPath(v)) : v));
 
-export async function serve({ port: wantPort = 4173, project = null, home = projectsHome() } = {}) {
+export async function serve({ port: wantPort = 4173, project = null, home = projectsHome(), ask = null } = {}) {      // `ask` stands in for the language model in tests
   const pinned = project ? path.resolve(project) : null;      // `songbe studio <dir>`: this project is the front door
   const registry = path.join(dataDir(), 'projects.json');
-  const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() };
+  const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map();
   let setup = { running: false, step: null, done: 0, total: 0, error: null, version: null }, toolsSeen = null, toolsAt = 0;
 
   const send = (res, code, body, type = 'application/json; charset=utf-8', more = {}) => { res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', ...more }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
@@ -82,6 +83,8 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     for (const [k, short] of Object.entries(KEYS)) { out[short] = !!(process.env[k] || own[k] || saved[k]); out[short + 'From'] = process.env[k] ? 'environment' : own[k] ? 'project' : saved[k] ? 'saved' : null; }
     return out;
   }
+  // the environment a build or the writer would see: what is set for real, then the keys saved on this computer
+  const keyEnv = () => ({ ...readDotEnv(path.join(dataDir(), '.env')), ...process.env });
   function saveKeys(input) {
     const file = path.join(mkdir(dataDir()), '.env'), now = readDotEnv(file);
     for (const k of Object.keys(KEYS)) {
@@ -132,7 +135,26 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
     return [...list, { id: 'blank', name: 'Blank', about: 'Three plain scenes to write over.', size: FORMATS.tall, poster: null, colours: {} }];
   }
-  function create({ name, starter }) {
+  // "Write it for me": the folder is made at once, the writing goes on in the background, and the page asks how it is getting on.
+  function createWritten({ name, brief, style, format }) {
+    const clean = tidyName(name);
+    if (!clean) throw new Error('Give the video a name.');
+    if (!String(brief || '').trim()) throw new Error('Describe the ad first.');
+    if (style && !STYLES.includes(style)) throw new Error('Unknown look.');
+    if (format && !FORMATS[format]) throw new Error('Unknown frame.');
+    if (!ask && !writerFor(keyEnv())) throw new Error('Writing needs a key: add your fal.ai key in Settings.');
+    mkdir(home);
+    let dir = path.join(home, clean); for (let n = 2; exists(dir); n++) dir = path.join(home, `${clean} ${n}`);
+    const id = idOf(dir), job = { id, step: 'write', round: 1, found: 0, done: false, error: null, left: [], note: null };
+    writing.set(id, job);
+    writeSpec(dir, String(brief), { style: style || undefined, format: format || 'tall', ask, env: keyEnv(), onStep: (st) => Object.assign(job, st) })
+      .then((r) => { job.left = r.left; job.note = r.note; job.model = r.model; })
+      .catch((e) => { job.error = e.message; try { if (!exists(path.join(dir, 'video.json')) && fs.readdirSync(dir).every((n) => n === '.songbe')) fs.rmSync(dir, { recursive: true, force: true }); } catch {} })      // leave no empty folder behind
+      .finally(() => { job.done = true; });
+    return id;
+  }
+  function create({ name, starter, brief, style, format }) {
+    if (starter === 'write') return createWritten({ name, brief, style, format });
     const clean = tidyName(name);
     if (!clean) throw new Error('Give the video a name.');
     if (starter !== 'blank' && (!/^[\w-]+$/.test(starter || '') || !exists(path.join(STARTERS, starter, 'video.json')))) throw new Error('Pick something to start from.');
@@ -266,10 +288,12 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
 
       if (route === 'GET /api/home') {
         return send(res, 200, { version: VERSION, home, data: dataDir(), shell: process.env.SONGBE_SHELL || null, pinned: pinned ? idOf(pinned) : null,
-          projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null),
+          projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
           setup: { ...setup, canFetch: WIN, advice: ffmpegAdvice(), pick: { version: FFMPEG_WINDOWS.version, megabytes: Math.round(FFMPEG_WINDOWS.bytes / 1e6), from: FFMPEG_WINDOWS.from, licence: FFMPEG_WINDOWS.licence } } });
       }
-      if (route === 'POST /api/projects') { try { return send(res, 200, { id: create(await json(req)) }); } catch (e) { return send(res, 400, { error: e.message }); } }
+      if (route === 'POST /api/projects') { try { const q = await json(req), id = create(q); return send(res, 200, { id, writing: q.starter === 'write' }); } catch (e) { return send(res, 400, { error: e.message }); } }
+      const wr = /^\/api\/writing\/([0-9a-f]{16})$/.exec(u.pathname);
+      if (req.method === 'GET' && wr) { const job = writing.get(wr[1]); return job ? send(res, 200, job) : send(res, 404, { error: 'not found' }); }
       if (route === 'POST /api/projects/open') { try { return send(res, 200, { id: adopt((await json(req)).dir) }); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (route === 'POST /api/projects/forget') { const id = (await json(req)).id, dir = dirOf(id); if (dir) { remember(dir, false); known.delete(id); } return send(res, 200, { ok: true }); }      // only leaves the list; the folder stays
       if (route === 'PUT /api/keys') { try { saveKeys(await json(req)); return send(res, 200, keysFor(null)); } catch (e) { return send(res, 400, { error: e.message }); } }

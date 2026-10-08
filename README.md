@@ -1,7 +1,7 @@
 # Songbe
 
-> Early version (0.9): six scene types, two looks, any frame size, captions, cuts on the beat, built-in checks, and an app with a
-> visual editor (in the browser, or installed on Windows). Tested on Linux / WSL and on Windows 11; macOS has not been tried.
+> Early version (0.10): six scene types, two looks, any frame size, captions, cuts on the beat, built-in checks, a writer that
+> drafts the whole video from a description, and an app with a visual editor (in the browser, or installed on Windows). Tested on Linux / WSL and on Windows 11; macOS has not been tried.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -38,7 +38,8 @@ node bin/songbe.mjs app                           # the app: projects, visual ed
 node bin/songbe.mjs frames examples/recruitment-vi # a few stills in out/frames — look before you render
 node bin/songbe.mjs build  examples/recruitment-vi # full build
 node bin/songbe.mjs preview examples/recruitment-vi # prints a file:// address: scrub and play in any browser
-node bin/songbe.mjs init my-ad                     # start your own project from the example
+node bin/songbe.mjs write my-ad "What the ad is for, for whom, and what people should do"   # let Songbe draft video.json
+node bin/songbe.mjs init my-ad                     # or start your own project from the example
 node bin/songbe.mjs validate my-ad                 # every problem in video.json, with suggestions for typos
 node bin/songbe.mjs schema                         # JSON Schema of video.json
 ```
@@ -80,6 +81,54 @@ The table above is a summary; `songbe schema` prints the exact shape and `songbe
 
 `media` is a path to a video or image, or `{ "generate": { "image": "prompt", "motion": "prompt" } }` to create footage with the configured provider.
 Set `notice` (for example "Illustration generated with AI") on scenes that use generated people or places.
+
+## Writing it for you
+
+```bash
+node bin/songbe.mjs write my-ad "FitLoop, a gym in Austin open 24 hours. $29 a month, no contract. Book a free first visit at fitloop.example."
+node bin/songbe.mjs write my-ad --brief=brief.txt --style=bold --format=square
+```
+
+A language model drafts `video.json` from the description, and Songbe checks the draft the way it checks any spec, then hands every
+finding back for another pass (three at most):
+
+- the shape, by the validator;
+- how much text fits each place, from a table measured on the kit itself (see *How much fits*);
+- the layout as actually drawn, when a browser is installed;
+- **numbers and web addresses that are not in the description** — a draft may not show "24h", "4,000 customers" or a phone number
+  that the brief never gave;
+- colour pairs that could not be read (white on a pale brand colour), and a voice-over far from 15–25 seconds.
+
+What is still open after the last pass is listed, not hidden, and a draft that is not valid is never saved. What no check can see
+is a claim made in words ("the best in town"): read every line before publishing. The voice is set from Songbe's own table by
+language; frame, look and captions are yours to choose (`--format`, `--style`, `--no-captions`). Pictures and clips already in
+`<dir>/media` are offered to the writer; `--footage` lets it ask for generated footage, which costs more.
+
+It runs on your own key: the `FAL_KEY` that already makes voice and music (through fal.ai's language-model endpoint, Claude
+Sonnet 4.5 by default), or `ANTHROPIC_API_KEY` for Claude directly (`SONGBE_WRITER_MODEL` picks another model). A draft is two or
+three requests of about five thousand tokens each. In the app it is the first choice under *New video*: **Write it for me**.
+
+The fal.ai route is the one this release was tested on; the Anthropic route follows the published API but was not run against
+the live service.
+
+## How much fits
+
+`kit/fit.json` records, for every text field of every scene type, the longest text that still looks as designed in all three
+frames: the layout check finds nothing, the type is no more than a tenth smaller than with a few words, nothing wraps, is cut
+off or touches the edge. It is measured, not guessed — `node tools/fit.mjs` draws about nine hundred trial scenes per look and
+frame — and `node tools/fit.mjs --check` tells when the kit has drifted from it.
+
+| | soft | bold |
+| --- | --- | --- |
+| Headline, per line (up to 3 lines) | 14 | 12 |
+| Small label | 30 | 30 |
+| List row / its second line (up to 4 rows) | 30 / 40 | 30 / 40 |
+| Callout on the phone | 22 | 22 |
+| Chat message | 40 | 56 |
+| Tagline / button on the end card | 40 / 26 | 40 / 26 |
+
+`songbe validate` lists every text longer than its place. Longer text is still drawn — the kit shrinks type to fit — it just
+rarely looks its best.
 
 ## Frames
 
@@ -151,8 +200,8 @@ node bin/songbe.mjs studio my-ad        # the editor for one project: http://127
 ```
 
 For people who would rather not edit JSON. The **home screen** lists your videos, each with a poster of its opening scene and
-whether its video is up to date; *New video* starts one from an example or from blank; *Settings* holds your keys and shows what
-is installed. The **editor** has scenes and their fields on the left and the video on the right, updating as you type. The preview
+whether its video is up to date; *New video* writes one from your description, or starts from an example or from blank;
+*Settings* holds your keys and shows what is installed. The **editor** has scenes and their fields on the left and the video on the right, updating as you type. The preview
 is free — it reuses voice clips that already exist and estimates the timing of new sentences — and **Build video** runs the full
 build and shows the result with its self-check. Images and clips are added to the project's `media/` folder from the form.
 
@@ -180,7 +229,7 @@ Needs Rust and `cargo install tauri-cli`; see `app/README.md`. The installer is 
 
 ```bash
 node bin/songbe.mjs lint my-ad      # layout only, a few seconds: what leaves the frame, overlaps, or would be covered
-npm test                            # the test suite (about fifteen seconds; drawing tests need a browser and ffmpeg)
+npm test                            # the test suite (about half a minute; drawing tests need a browser and ffmpeg)
 ```
 
 **Layout check** (`songbe lint`, and automatically with `frames` and `build`). Each scene is drawn near its end and its content is
@@ -202,7 +251,7 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 ## Limits today
 
 - Six scene types and two looks. Scene types live in `kit/scenes.js`, looks in `kit/styles/`.
-- One provider (fal.ai) for voice, images, image-to-video and music.
+- One provider (fal.ai) for voice, images, image-to-video and music; the writer also takes an Anthropic key.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
 - The installed app exists for Windows only so far, unsigned; *Open a folder* takes a typed path rather than a system dialog.

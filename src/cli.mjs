@@ -17,8 +17,10 @@ const HELP = `Songbe — short ads from a single video.json
 
   songbe doctor                   check that ffmpeg, ffprobe and a browser are found and which keys are set
   songbe setup ffmpeg             Windows: fetch ffmpeg into Songbe's own folder (elsewhere: says which package to install)
+  songbe write <dir> "<brief>"    draft video.json from a description of the ad, check the draft and fix what the checks find
+                                  (--style= --format= --no-captions --footage --brief=FILE --force; needs a key, see below)
   songbe init <dir>               start a project from the example
-  songbe validate <dir>           check video.json and list every problem
+  songbe validate <dir>           check video.json and list every problem, and every text longer than its place
   songbe schema                   print the JSON Schema of video.json
   songbe frames <dir> [t1,t2,…]   render a few stills to out/frames (default: two per scene) — review before a full build
   songbe lint <dir>               layout check only: content that leaves the frame, overlaps, or would be covered
@@ -31,9 +33,9 @@ const HELP = `Songbe — short ads from a single video.json
   songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
   songbe poster <dir>             one small still of the opening scene (.songbe/poster.jpg; --out=FILE --width=480)
 
-Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage),
-GROQ_API_KEY (optional transcript check). Without keys the build still works: no voice, no music, plain backgrounds where
-footage would be generated.`;
+Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage, and
+the writer), ANTHROPIC_API_KEY (optional: the writer then uses Claude directly), GROQ_API_KEY (optional transcript check).
+Without keys the build still works: no voice, no music, plain backgrounds where footage would be generated.`;
 
 
 function report(r) {
@@ -86,6 +88,18 @@ export async function main(argv) {
   if (cmd === 'schema') return log(JSON.stringify(jsonSchema(), null, 2));
   if (!target) throw new Error('which project directory?\n\n' + HELP);
   const dir = path.resolve(target);
+  if (cmd === 'write') {
+    const opt = (name) => rest.find((x) => x.startsWith(`--${name}=`))?.slice(name.length + 3), from = opt('brief');
+    const brief = from ? fs.readFileSync(path.resolve(from), 'utf8') : rest.filter((x) => !x.startsWith('--')).join(' ');
+    loadDotEnv(dir); loadDotEnv(dataDir());
+    const { writeSpec } = await import('./write.mjs');
+    const r = await writeSpec(dir, brief, { style: opt('style'), format: opt('format') || 'tall', captions: !flags.has('--no-captions'), footage: flags.has('--footage'), force: flags.has('--force'),
+      onStep: (s) => log(s.step === 'write' ? 'writing…' : s.step === 'check' ? '  checking the draft…' : `fixing ${s.found} thing${s.found === 1 ? '' : 's'} the checks found…`) });
+    log(`wrote ${r.file}\n  ${r.spec.scenes.length} scenes (${r.spec.scenes.map((s) => s.type).join(', ')}), about ${Math.round(r.seconds ?? 0)} s, look "${r.spec.style}", ${r.rounds} pass${r.rounds === 1 ? '' : 'es'} with ${r.model || r.provider}`);
+    if (r.note) log('  note: ' + r.note);
+    for (const x of r.left) log('  · still to look at: ' + x);
+    return log(`next: songbe frames ${target}   then   songbe build ${target}`);
+  }
   if (cmd === 'init') {
     if (exists(path.join(dir, 'video.json'))) throw new Error(`${dir} already has a video.json`);
     fs.cpSync(path.join(ROOT, 'examples', 'app-launch-en'), dir, { recursive: true, filter: (f) => !/[\\/](\.songbe|out)([\\/]|$)/.test(f) });
@@ -100,7 +114,10 @@ export async function main(argv) {
   if (cmd === 'validate') {
     let spec; try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
     const errs = validate(spec, dir);
-    if (!errs.length) return log('video.json is valid');
+    if (!errs.length) {      // valid; say too where the words outgrow their place (the kit will shrink them, which rarely looks best)
+      const { tooLong, tooLongNote } = await import('./fit.mjs'), long = tooLong(spec);
+      return log('video.json is valid' + long.map((f) => '\n  · ' + tooLongNote(f)).join(''));
+    }
     process.exitCode = 2; return log(`${errs.length} problem${errs.length > 1 ? 's' : ''}:\n  - ` + errs.join('\n  - '));
   }
   if (cmd === 'poster') {

@@ -15,7 +15,8 @@ Run the CLI as `node <songbe repo>/bin/songbe.mjs <command>` (or `songbe <comman
 1. `songbe doctor` — confirm ffmpeg, ffprobe and Chrome are found and see which keys are set.
    Without `FAL_KEY` there is no voice, music or generated footage; tell the user before you build.
 2. `songbe init <dir>` then edit `<dir>/video.json`. `songbe schema` prints the full JSON Schema.
-3. `songbe validate <dir>` — fix every problem it lists.
+   (`songbe write <dir> "<brief>"` can draft the file from a description; you still own every word in it.)
+3. `songbe validate <dir>` — fix every problem it lists, and shorten the texts it says are longer than their place.
 4. `songbe frames <dir>` — two stills per scene in `<dir>/out/frames/`, plus the layout check: lines starting with `!` are problems
    (something leaves the frame, overlaps, or would be covered by captions) and must be fixed, usually by using fewer words; lines
    starting with `·` are notes. **Open the stills and look** as well: the check measures boxes, it cannot see text across a face.
@@ -33,13 +34,14 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
 | Hook over real or generated footage | `footage` | `title` of 2 short lines; `[[word]]` highlights it. Set `notice` when the footage is AI-generated. |
 | A claim backed by a picture and one number | `card` | `media` is the proof shot; `stat.badge` is 2–4 characters ("0đ", "24h", "4.8"). |
 | Three benefits | `list` | 3 rows is best, 5 at most. `icon`: check, star, bolt, heart, shield, drop, clock, bell, sun, pin, or `number`. |
-| An app or website in use | `phone` | `screens` are portrait screenshots (about 9:19.5). 1–2 `callouts`, each under 22 characters. |
+| An app or website in use | `phone` | `screens` are portrait screenshots (about 9:19.5), required. 1–2 `callouts`, each up to 22 characters. |
 | How to get in touch | `chat` | `contact.number` is a list of digit groups, read aloud by the last sentence of `say`. |
 | Sign-off | `end` | Logo, `tagline`, `cta`, optional `badges` and `url`. |
 
 ## Writing rules
 
 - Few words on screen. Sentence case, not capitals. A small `label`, a strong `title`, at most one supporting line.
+  A headline line holds about 14 characters (12 in the `bold` look), three lines at most; `kit/fit.json` lists every place.
 - One or two short sentences per scene in `say`. Where the pronunciation differs from the spelling, give both as `{spoken|shown}`:
   `{Vi Síp hai|VSIP 2}`, `{zero nine hundred|0900}`. The first is read aloud, the second appears in captions.
 - Turn on `"captions": true` for anything meant for a feed: most people watch with the sound off.

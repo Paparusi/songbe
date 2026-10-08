@@ -66,10 +66,11 @@
     const { H, kind } = SB.frame, pill = sc.labelStyle === 'pill', ts = lines(sc.title), top = pill ? 296 : 284, [size, step] = type(118, 144, true);
     // side: a portrait clip in a wide frame is shown whole on the right, over a blurred copy of itself
     const side = sc.media && sc.media.fit === 'side', { W } = SB.frame, sh = H - 140, sw = side ? Math.round(sh * sc.media.ratio) : 0;
-    el.classList.add('over-footage');
+    // without footage the scene is a dark page of its own (glows, or the flat fields of a look), not an empty picture with shades
+    el.classList.add(sc.media ? 'over-footage' : 'night');
     el.innerHTML = `
-      ${sc.media ? `<img class="fill bg${side ? ' blurred' : ''}" style="${side ? '' : 'filter:contrast(1.04) saturate(1.06);'}${sc.media.lean && sc.media.lean !== .5 ? `object-position:50% ${sc.media.lean * 100}%` : ''}">` : '<div class="fill night"></div>'}
-      <div class="shade-top"></div><div class="shade-bottom"></div>
+      ${sc.media ? `<img class="fill bg${side ? ' blurred' : ''}" style="${side ? '' : 'filter:contrast(1.04) saturate(1.06);'}${sc.media.lean && sc.media.lean !== .5 ? `object-position:50% ${sc.media.lean * 100}%` : ''}">` : backdrop(true)}
+      ${sc.media ? '<div class="shade-top"></div><div class="shade-bottom"></div>' : ''}
       ${side ? `<div class="a sideframe sf" style="left:${W - 110 - sw}px;top:70px;width:${sw}px;height:${sh}px"><img class="fill sd"></div>` : ''}` + blk('head', `
       ${sc.label ? (pill
         ? `<div class="a pill tag label lb" style="left:70px;top:206px;padding:14px 30px 14px 34px;font-size:28px;transform-origin:0 50%">${esc(sc.label)}</div>`
@@ -87,6 +88,7 @@
       cues: [...(lb && pill ? [{ t: at.label, kind: 'pop' }] : []), ...(ch ? [{ t: at.chip, kind: 'pop' }] : [])],
       async draw(u) {
         if (bg) { await setImg(bg, mediaSrc(sc.media, u)); bg.style.transform = `scale(${(side ? 1.3 : 1.02) + .05 * ease.inOut(seg(u, 0, dur + .2))})`; }
+        else drift(el, u, true);
         if (sf) {
           await setImg(sd, mediaSrc(sc.media, u)); sd.style.transform = `scale(${1 + .04 * ease.inOut(seg(u, 0, dur + .2))})`;
           const z = spring(u - t0 - .1, .72, 9); tf(sf, { x: lerp(260, 0, z), o: clamp((u - t0 - .1) * 7) });

@@ -52,6 +52,10 @@ dialog h2 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; margin-bot
 dialog .starts { justify-content: start; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 dialog label { display: block; font-size: 12px; font-weight: 600; color: var(--soft); margin: 16px 0 5px; }
 dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 20px; } dialog .end .msg { margin-right: auto; }
+.write { margin-top: 14px; } .write textarea { min-height: 132px; resize: vertical; line-height: 1.5; } .write .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.spark { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(90% 70% at 50% 30%, color-mix(in srgb, var(--accent) 34%, #0A1B31) 0%, #0A1B31 78%); } .spark svg { width: 44%; height: auto; }
+.busy { display: flex; align-items: center; gap: 10px; color: var(--text); } .busy i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .sec { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 18px; } .sec:first-of-type { border-top: 0; padding-top: 0; margin-top: 12px; }
 .sec h3 { font-size: 12px; font-weight: 700; color: var(--soft); text-transform: uppercase; letter-spacing: .7px; margin-bottom: 10px; }
 .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 7px 0; } .row .k { font-weight: 600; } .row .d { color: var(--soft); font-size: 12.5px; grid-column: 1; overflow-wrap: anywhere; } .row .v { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 6px; align-items: center; }
@@ -76,8 +80,13 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
 <dialog id="dnew"><form method="dialog" id="fnew">
   <h2>New video</h2><div class="lead">Start from one of these. Every word, colour and scene can be changed afterwards.</div>
   <div class="starts" id="picks"></div>
+  <div class="write" id="nwrite" hidden>
+    <label for="nbrief">What is the ad for?</label>
+    <textarea id="nbrief" spellcheck="false" placeholder="What you sell and to whom, what makes it worth choosing, and what people should do next. Put in every fact that should appear: names, prices, opening hours, phone number, address. Write in the language the ad should speak."></textarea>
+    <div class="two"><div><label for="nstyle">Look</label><select id="nstyle"></select></div><div><label for="nformat">Frame</label><select id="nformat"></select></div></div>
+  </div>
   <label for="nname">Name</label><input type="text" id="nname" maxlength="60" autocomplete="off" spellcheck="false">
-  <div class="end"><span class="msg bad" id="nerr"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" id="ngo" type="submit">Create</button></div>
+  <div class="end"><span class="msg bad" id="nerr"></span><span class="msg busy" id="nbusy" hidden><i></i><span></span></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" id="ngo" type="submit">Create</button></div>
 </form></dialog>
 
 <dialog id="dopen"><form method="dialog" id="fopen">
@@ -89,11 +98,8 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
 <dialog id="dset"><div class="in">
   <h2>Settings</h2>
   <div class="sec"><h3>Keys</h3>
-    <div class="lead" style="margin-bottom:6px">Voice, music and generated footage are made by services you pay yourself. Songbe adds nothing on top. Without a key a video still builds: silent, with motion graphics and sound effects.</div>
-    <div class="row"><div class="k">fal.ai <span class="tag" id="sfal"></span></div><div class="d">Voice-over, music, generated footage.</div><div class="v"><button class="btn small" data-open="fal">Get a key</button></div></div>
-    <div class="keyrow"><input type="password" id="kfal" autocomplete="off" spellcheck="false"><button class="btn small" id="xfal" hidden>Remove</button></div>
-    <div class="row" style="margin-top:10px"><div class="k">Groq <span class="tag" id="sgroq"></span></div><div class="d">Optional. After a build, listens to the video and writes down what is actually audible.</div><div class="v"><button class="btn small" data-open="groq">Get a key</button></div></div>
-    <div class="keyrow"><input type="password" id="kgroq" autocomplete="off" spellcheck="false"><button class="btn small" id="xgroq" hidden>Remove</button></div>
+    <div class="lead" style="margin-bottom:6px">Voice, music, generated footage and the script writer are services you pay yourself. Songbe adds nothing on top. Without a key a video still builds: silent, with motion graphics and sound effects.</div>
+    <div id="keys"></div>
     <div class="end" style="margin-top:12px"><span class="msg note" id="kmsg">Keys stay on this computer and are sent only to the service they belong to.</span><button class="btn go" id="ksave">Save keys</button></div>
   </div>
   <div class="sec"><h3>Tools</h3>
@@ -113,6 +119,9 @@ const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.crea
 // the header marks a request as coming from Songbe's own pages (the server refuses changes without it)
 const api = (where, o = {}) => fetch(where, { ...o, headers: { 'X-Songbe': '1', ...(o.headers || {}) } });
 const post = (where, data) => api(where, { method: 'POST', body: JSON.stringify(data || {}) }).then(async (r) => ({ ok: r.ok, ...(await r.json()) }));
+const KEYS = [['fal', 'FAL_KEY', 'fal.ai', 'Voice-over, music, generated footage, and the script writer.'], ['anthropic', 'ANTHROPIC_API_KEY', 'Anthropic', 'Optional. The script writer then uses Claude directly instead of going through fal.ai.'],
+  ['groq', 'GROQ_API_KEY', 'Groq', 'Optional. After a build, listens to the video and writes down what is actually audible.']];
+const SPARK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l1.8 4.7L16.5 9.5l-4.7 1.8L10 16l-1.8-4.7L3.5 9.5l4.7-1.8z"/><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z"/></svg>';
 const ICON = { folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
   off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' };
 
@@ -129,6 +138,7 @@ function stage(it, name) {
   const [w, h] = it.size, f = el('div', { className: 'frame ' + (h > w ? 'tall' : 'flat') }); f.style.aspectRatio = `${w} / ${h}`;
   const url = it.poster && (it.poster.url || (typeof it.poster === 'string' ? it.poster : null));
   if (url) f.append(el('img', { src: url, alt: '', loading: 'lazy' }));
+  else if (it.id === 'write') f.append(el('div', { className: 'spark', innerHTML: SPARK }));
   else { const c = it.colours || {}, ph = el('div', { className: 'ph' }), bar = el('i'); bar.style.background = c.accent || '#4FE0D6';
     f.style.background = `linear-gradient(160deg, color-mix(in srgb, ${c.ink || '#0A1B31'} 72%, ${c.primary || '#004DFC'}) 0%, ${c.ink || '#0A1B31'} 62%)`; ph.append(el('b', { textContent: name }), bar); f.append(ph); }
   return el('div', { className: 'stage' }, f);
@@ -175,7 +185,13 @@ const again = () => { const b = el('button', { className: 'btn', textContent: 'C
 
 function settings() {
   const k = H.keys, from = { environment: 'set in the environment', project: 'set', saved: 'saved' };
-  for (const n of ['fal', 'groq']) {
+  if (!$('#keys').children.length) for (const [n, , title, about] of KEYS) {      // drawn once, so a key being typed is not wiped by the next refresh
+    const get = el('button', { className: 'btn small', textContent: 'Get a key' }), off = el('button', { className: 'btn small', id: 'x' + n, textContent: 'Remove', hidden: true });
+    get.onclick = () => post('/api/open', { what: n }); off.onclick = () => putKeys({ [KEYS.find((r) => r[0] === n)[1]]: '' }, 'Removed.');
+    $('#keys').append(el('div', { className: 'row', style: 'margin-top:8px' }, el('div', { className: 'k' }, title + ' ', el('span', { className: 'tag', id: 's' + n })), el('div', { className: 'd', textContent: about }), el('div', { className: 'v' }, get)),
+      el('div', { className: 'keyrow' }, el('input', { type: 'password', id: 'k' + n, autocomplete: 'off', spellcheck: false }), off));
+  }
+  for (const [n] of KEYS) {
     const tag = $('#s' + n); tag.textContent = k[n] ? from[k[n + 'From']] || 'set' : 'not set'; tag.classList.toggle('on', !!k[n]);
     $('#k' + n).placeholder = k[n + 'From'] === 'saved' ? 'A key is saved. Paste another one to replace it.' : 'Paste a key'; $('#x' + n).hidden = k[n + 'From'] !== 'saved';
   }
@@ -191,7 +207,7 @@ function paint() {
   const now = JSON.stringify(H.projects);
   if (now === seen) return; seen = now;
   $('#grid').replaceChildren(...H.projects.map(card)); $('#empty').hidden = H.projects.length > 0; $('#grid').hidden = !H.projects.length;
-  if (!H.projects.length) $('#first').replaceChildren(...H.starters.map((s) => starter(s, (x) => openNew(x.id))));
+  if (!H.projects.length) $('#first').replaceChildren(...starts().map((s) => starter(s, (x) => openNew(x.id))));
 }
 async function load() {
   clearTimeout(timer);
@@ -203,17 +219,37 @@ async function load() {
   if (busy || (waiting && tries < 60)) timer = setTimeout(load, busy ? 700 : 1500); else timer = setTimeout(load, 30000);
 }
 
+// what a new video can start from: Songbe writing it from a description, then the ready-made ones
+const starts = () => [{ id: 'write', name: 'Write it for me', about: H.writer ? 'Describe the ad in a few sentences. Songbe drafts every scene and checks it.' : 'Describe the ad and Songbe drafts it. Needs your fal.ai key (Settings).', size: [1080, 1920] }, ...H.starters];
 function openNew(id) {
-  pick = id || H.starters[0].id; $('#nerr').textContent = '';
-  const mark = () => { for (const b of $('#picks').children) b.classList.toggle('on', b.dataset.id === pick); };
-  $('#picks').replaceChildren(...H.starters.map((s) => starter(s, (x) => { pick = x.id; mark(); $('#nname').focus(); }))); mark();
-  $('#nname').value = ''; $('#nname').placeholder = 'My video'; $('#dnew').showModal(); $('#nname').focus();
+  pick = id || (H.writer ? 'write' : H.starters[0].id); $('#nerr').textContent = ''; working(null);
+  const mark = () => { for (const b of $('#picks').children) b.classList.toggle('on', b.dataset.id === pick); $('#nwrite').hidden = pick !== 'write'; };
+  $('#picks').replaceChildren(...starts().map((s) => starter(s, (x) => { pick = x.id; mark(); (pick === 'write' ? $('#nbrief') : $('#nname')).focus(); }))); mark();
+  $('#nstyle').replaceChildren(el('option', { value: '', textContent: 'Let Songbe choose' }), ...H.styles.map((x) => el('option', { value: x, textContent: x[0].toUpperCase() + x.slice(1) })));
+  $('#nformat').replaceChildren(...H.formats.map((x) => el('option', { value: x, textContent: { tall: 'Tall 9:16 (TikTok, Reels, Shorts)', square: 'Square 1:1 (feeds)', wide: 'Wide 16:9 (YouTube)' }[x] || x })));
+  $('#nname').value = ''; $('#nname').placeholder = 'My video'; $('#dnew').showModal(); (pick === 'write' ? $('#nbrief') : $('#nname')).focus();
 }
+// while Songbe writes: the form waits and says what is happening
+function working(text) { $('#nbusy').hidden = !text; $('#nbusy').lastChild.textContent = text || ''; for (const x of $('#fnew').querySelectorAll('input, textarea, select, #ngo, .start')) x.disabled = !!text; }
 $('#bnew').onclick = () => openNew();
 $('#fnew').onsubmit = async (e) => {
-  e.preventDefault(); $('#ngo').disabled = true;
-  const r = await post('/api/projects', { name: $('#nname').value.trim() || 'My video', starter: pick }); $('#ngo').disabled = false;
-  if (r.id) location.href = `/p/${r.id}/`; else $('#nerr').textContent = r.error || 'That did not work.';
+  e.preventDefault(); $('#nerr').textContent = '';
+  if (pick === 'write' && !H.writer) { $('#nerr').textContent = 'Add your fal.ai key in Settings first: the writer runs on it.'; return; }
+  if (pick === 'write' && $('#nbrief').value.trim().length < 12) { $('#nerr').textContent = 'Describe the ad in a sentence or two first.'; $('#nbrief').focus(); return; }
+  $('#ngo').disabled = true;
+  const r = await post('/api/projects', { name: $('#nname').value.trim() || 'My video', starter: pick, brief: $('#nbrief').value, style: $('#nstyle').value, format: $('#nformat').value }); $('#ngo').disabled = false;
+  if (!r.id) { $('#nerr').textContent = r.error || 'That did not work.'; return; }
+  if (!r.writing) { location.href = `/p/${r.id}/`; return; }
+  working('Writing the script…');
+  for (;;) {
+    await new Promise((ok) => setTimeout(ok, 700));
+    let j; try { j = await (await fetch('/api/writing/' + r.id)).json(); } catch { continue; }
+    if (!j.done) { working(j.step === 'write' ? 'Writing the script…' : j.step === 'check' ? 'Checking the draft…' : `Fixing ${j.found} thing${j.found === 1 ? '' : 's'} the checks found…`); continue; }
+    working(null);
+    if (j.error) { $('#nerr').textContent = j.error.split('\n')[0]; return; }
+    try { sessionStorage.setItem('songbe-written-' + r.id, JSON.stringify({ left: j.left || [], note: j.note || null })); } catch {}
+    location.href = `/p/${r.id}/`; return;
+  }
 };
 $('#bopen').onclick = () => { $('#oerr').textContent = ''; $('#odir').value = ''; $('#odir').placeholder = H.home; $('#dopen').showModal(); $('#odir').focus(); };
 $('#fopen').onsubmit = async (e) => {
@@ -223,17 +259,16 @@ $('#fopen').onsubmit = async (e) => {
 const showSettings = () => { settings(); $('#kmsg').textContent = 'Keys stay on this computer and are sent only to the service they belong to.'; $('#kmsg').className = 'msg note'; $('#dset').showModal(); };
 $('#bset').onclick = $('#kkeys').onclick = showSettings; $('#ktools').onclick = () => $('#need').scrollIntoView({ behavior: 'smooth' });
 $('#ohome').onclick = () => post('/api/open', { what: 'home' });
-for (const b of document.querySelectorAll('[data-open]')) b.onclick = () => post('/api/open', { what: b.dataset.open });
+for (const b of document.querySelectorAll('[data-open]')) b.onclick = () => post('/api/open', { what: b.dataset.open });      // (the key rows wire their own)
 for (const b of document.querySelectorAll('[data-close]')) b.onclick = () => b.closest('dialog').close();
 for (const d of document.querySelectorAll('dialog')) d.addEventListener('click', (e) => { if (e.target === d) d.close(); });      // a click on the dimmed part closes it
 async function putKeys(data, done) {
   const r = await api('/api/keys', { method: 'PUT', body: JSON.stringify(data) }), j = await r.json();
   if (!r.ok) { $('#kmsg').textContent = j.error; $('#kmsg').className = 'msg bad'; return; }
-  H.keys = j; $('#kfal').value = $('#kgroq').value = ''; paint(); $('#kmsg').textContent = done; $('#kmsg').className = 'msg note';
+  H.keys = j; for (const [n] of KEYS) $('#k' + n).value = ''; load(); $('#kmsg').textContent = done; $('#kmsg').className = 'msg note';
 }
-$('#ksave').onclick = () => { const d = {}; if ($('#kfal').value.trim()) d.FAL_KEY = $('#kfal').value.trim(); if ($('#kgroq').value.trim()) d.GROQ_API_KEY = $('#kgroq').value.trim();
+$('#ksave').onclick = () => { const d = {}; for (const [n, name] of KEYS) if ($('#k' + n).value.trim()) d[name] = $('#k' + n).value.trim();
   if (!Object.keys(d).length) { $('#kmsg').textContent = 'Paste a key first.'; return; } putKeys(d, 'Saved.'); };
-$('#xfal').onclick = () => putKeys({ FAL_KEY: '' }, 'Removed.'); $('#xgroq').onclick = () => putKeys({ GROQ_API_KEY: '' }, 'Removed.');
 
 load().then(() => { if (location.hash === '#settings') showSettings(); });
 addEventListener('focus', load);      // back from the editor or the file manager: show what changed

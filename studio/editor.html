@@ -216,6 +216,10 @@ function watch() {
   if (S.plan) { const sc = S.plan.scenes[0]; lastT = sc.start + (sc.end - sc.start) * .6; }
   draw(); show(S); if (S.building) { setBuilding(true); watch(); }
   if (!S.tools.ready) missing();
+  // straight from "Write it for me": say what the checks still found, and that the claims are the person's to verify
+  let w = null; try { w = JSON.parse(sessionStorage.getItem('songbe-written-' + S.id)); sessionStorage.removeItem('songbe-written-' + S.id); } catch {}
+  if (w) { const rows = [el('div', { className: 'msg note', textContent: '· Songbe wrote this from your description. Read every line before you publish: it only knows what you told it.' }),
+    ...(w.note ? [el('div', { className: 'msg note', textContent: '· ' + w.note })] : []), ...w.left.map((x) => el('div', { className: 'msg note', textContent: '· Still to look at: ' + x }))]; $('#foot').prepend(...rows); }
 })();
 // building needs ffmpeg and a browser; say so before anything is attempted, with the way to the fix
 function missing() {

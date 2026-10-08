@@ -24,8 +24,8 @@ function sizeOf(file) {
 const url = (f) => pathToFileURL(f).href;
 
 export async function makePlan(dir, opts = {}) {
-  let spec;
-  try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
+  let spec = opts.spec;      // a draft that is not on disk yet can be planned too
+  if (!spec) try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
   const errs = validate(spec, dir);
   if (errs.length) throw new Error(`video.json has ${errs.length} problem${errs.length > 1 ? 's' : ''}:\n  - ` + errs.join('\n  - '));
   const work = mkdir(path.join(dir, '.songbe')), cache = mkdir(path.join(work, 'cache'));

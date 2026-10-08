@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-app-'));
 process.env.SONGBE_DATA = path.join(scratch, 'data'); process.env.SONGBE_HOME = path.join(scratch, 'videos');
-delete process.env.FAL_KEY; delete process.env.GROQ_API_KEY;
+delete process.env.FAL_KEY; delete process.env.GROQ_API_KEY; delete process.env.ANTHROPIC_API_KEY;
 const { serve, tidyName, trusted, forBrowser, idOf } = await import('../src/studio.mjs');
 const { ROOT, tools } = await import('../src/util.mjs');
 
@@ -52,9 +52,12 @@ test('the home screen starts empty, with starters to pick from', async () => {
   assert.equal(h.home, process.env.SONGBE_HOME);
   assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'blank']);
   for (const st of h.starters.filter((x) => x.id !== 'blank')) { assert.ok(st.poster, `${st.id} has a poster`); assert.equal((await fetch(u + st.poster)).headers.get('content-type'), 'image/jpeg'); }
-  assert.deepEqual(h.keys, { fal: false, falFrom: null, groq: false, groqFrom: null });
+  assert.deepEqual(h.keys, { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null });
   for (const page of ['/home', '/studio/ui.css', '/studio/icon.svg', '/kit/fonts/fonts.css']) assert.equal((await fetch(u + page)).status, 200, page);
   assert.equal((await fetch(u + '/', { redirect: 'manual' })).headers.get('location'), '/home');
+  assert.equal(h.writer, null);
+  const refused = await post('/api/projects', { name: 'x', starter: 'write', brief: 'A long enough description of an ad.' });
+  assert.equal(refused.status, 400); assert.match((await refused.json()).error, /needs a key/);
 });
 
 test('a new video is a copy of its starter, without the starter\'s own leftovers', async () => {
@@ -121,7 +124,7 @@ test('requests from anywhere else are refused before anything happens', async ()
 test('keys are saved on this computer and never sent back', async () => {
   const put = (data) => fetch(u + '/api/keys', { method: 'PUT', headers: mine, body: JSON.stringify(data) });
   const r = await put({ FAL_KEY: 'test-key-0123456789' }), text = await r.text();
-  assert.deepEqual(JSON.parse(text), { fal: true, falFrom: 'saved', groq: false, groqFrom: null });
+  assert.deepEqual(JSON.parse(text), { fal: true, falFrom: 'saved', groq: false, groqFrom: null, anthropic: false, anthropicFrom: null });
   assert.ok(!text.includes('0123456789') && !(await fetch(u + '/api/home').then((x) => x.text())).includes('0123456789'));
   const file = path.join(process.env.SONGBE_DATA, '.env');
   assert.equal(fs.readFileSync(file, 'utf8'), 'FAL_KEY=test-key-0123456789\n');
@@ -129,7 +132,7 @@ test('keys are saved on this computer and never sent back', async () => {
   assert.equal((await put({ FAL_KEY: 'two words' })).status, 400); assert.equal((await put({ FAL_KEY: 'a\nINJECTED=1' })).status, 400);
   assert.equal((await put({ GROQ_API_KEY: 'gsk_test_0123456789' }).then(J)).groq, true);
   assert.equal(fs.readFileSync(file, 'utf8'), 'FAL_KEY=test-key-0123456789\nGROQ_API_KEY=gsk_test_0123456789\n', 'saving one key keeps the other');
-  assert.deepEqual(await put({ FAL_KEY: '', GROQ_API_KEY: '' }).then(J), { fal: false, falFrom: null, groq: false, groqFrom: null });
+  assert.deepEqual(await put({ FAL_KEY: '', GROQ_API_KEY: '' }).then(J), { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null });
 });
 
 test('a folder from elsewhere can join the list and leave it again', async () => {
@@ -143,6 +146,39 @@ test('a folder from elsewhere can join the list and leave it again', async () =>
   await post('/api/projects/forget', { id });
   assert.ok(!(await fetch(u + '/api/home').then(J)).projects.some((p) => p.id === id));
   assert.ok(fs.existsSync(path.join(dir, 'video.json')), 'forgetting never deletes');
+});
+
+test('"Write it for me" makes the project in the background and says how it is getting on', async () => {
+  const BRIEF = 'Quán cà phê Mộc ở Thủ Dầu Một, rang hạt tại quán mỗi sáng, mở cửa từ 6 giờ. Đặt qua Zalo 0900 111 222.';
+  const draft = { style: 'soft', brand: { name: 'Mộc', ink: '#2A1A12', primary: '#8A4B2A', accent: '#F2C879', paper: '#FBF5EC', muted: '#7A6A5E' }, voice: { language: 'Vietnamese' }, music: { prompt: 'Warm acoustic instrumental, 100 BPM' },
+    scenes: [{ type: 'footage', say: 'Sáng nay bạn uống cà phê ở đâu?', label: 'Thủ Dầu Một', title: ['Cà phê', '[[rang mộc]]'] },
+      { type: 'list', say: 'Mộc rang hạt mỗi sáng và mở cửa từ sáu giờ.', title: ['Ngon từ', 'hạt mới'], items: [{ icon: 'sun', text: 'Rang mỗi sáng' }, { icon: 'clock', text: 'Mở cửa từ 6 giờ' }] },
+      { type: 'chat', say: ['Nhắn Zalo cho Mộc nhé.', '{Không chín trăm, một một một, hai hai hai|0900 111 222}.'], title: 'Nhắn Mộc', messages: [{ from: 'them', text: 'Cho mình 2 ly' }, { from: 'us', text: 'Có ngay!' }], contact: { kicker: 'Zalo', number: ['0900', '111', '222'] } },
+      { type: 'end', say: 'Mộc, cà phê rang mỗi sáng.', tagline: 'Cà phê rang mỗi sáng', cta: 'Nhắn Zalo đặt ngay' }] };
+  let answer = JSON.stringify(draft); const asked = [];
+  const w = await serve({ port: 0, ask: async (q) => { asked.push(q); return answer; } }), wu = w.url.slice(0, -1), send = (data) => fetch(wu + '/api/projects', { method: 'POST', headers: mine, body: JSON.stringify(data) });
+  const wait = async (id) => { for (let i = 0; i < 200; i++) { const j = await fetch(`${wu}/api/writing/${id}`).then(J); if (j.done) return j; await new Promise((r) => setTimeout(r, 100)); } throw new Error('the writing never finished'); };
+  try {
+    const h = await fetch(wu + '/api/home').then(J);
+    assert.equal(h.writer, 'custom'); assert.deepEqual(h.styles, ['soft', 'bold']); assert.deepEqual(h.formats, ['tall', 'square', 'wide']);
+    for (const bad of [{ name: 'x', starter: 'write' }, { name: '', starter: 'write', brief: BRIEF }, { name: 'x', starter: 'write', brief: BRIEF, style: 'neon' }, { name: 'x', starter: 'write', brief: BRIEF, format: 'round' }]) assert.equal((await send(bad)).status, 400, JSON.stringify(bad));
+    assert.equal(asked.length, 0, 'nothing is asked of the model for a request that is turned down');
+    const r = await send({ name: 'Quán Mộc viết hộ', starter: 'write', brief: BRIEF, format: 'square' }).then(J);
+    assert.equal(r.writing, true); assert.equal(r.id, idOf(path.join(process.env.SONGBE_HOME, 'Quán Mộc viết hộ')));
+    const done = await wait(r.id);
+    assert.equal(done.error, null); assert.deepEqual(done.left, []);
+    assert.ok(asked[0].prompt.includes(BRIEF) && asked[0].prompt.includes('square 1:1'));
+    const saved = JSON.parse(fs.readFileSync(path.join(process.env.SONGBE_HOME, 'Quán Mộc viết hộ', 'video.json'), 'utf8'));
+    assert.equal(saved.format, 'square'); assert.equal(saved.voice.language, 'Vietnamese'); assert.equal(saved.scenes.length, 4);
+    assert.ok((await fetch(wu + '/api/home').then(J)).projects.some((p) => p.id === r.id), 'and it is on the home screen');
+    assert.deepEqual((await fetch(`${wu}/p/${r.id}/api/state`).then(J)).errors, []);
+    // a model that never produces a video: the reason is reported and no empty folder is left behind
+    answer = 'I am sorry, I cannot help with that.';
+    const f = await send({ name: 'Không ra gì', starter: 'write', brief: BRIEF }).then(J), failed = await wait(f.id);
+    assert.match(failed.error, /could not produce a valid video/);
+    assert.ok(!fs.existsSync(path.join(process.env.SONGBE_HOME, 'Không ra gì')));
+    assert.equal((await fetch(`${wu}/api/writing/0123456789abcdef`)).status, 404);
+  } finally { w.close(); }
 });
 
 let ready = true; try { tools.chrome; tools.ffmpeg; tools.ffprobe; } catch { ready = false; }
