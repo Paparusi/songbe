@@ -8,6 +8,7 @@ import { run, sha, mkdir, exists, tools, duration, log } from './util.mjs';
 import { validate, FORMATS } from './spec.mjs';
 import { spokenOf, shownOf, pausesIn, timedWords, captionLines } from './captions.mjs';
 import { beatsOf, snapCuts } from './beats.mjs';
+import { packStyles } from './packs.mjs';
 
 const GAP = 0.35;          // pause between sentences
 const LEAD = 0.25;         // silence before the first word
@@ -136,8 +137,10 @@ export async function makePlan(dir, opts = {}) {
 
   const brand = { ...spec.brand };
   if (brand.logo) brand.logo = Object.fromEntries(Object.entries(brand.logo).map(([k, v]) => [k, url(path.resolve(dir, v))]));
+  // a look that comes from a pack brings its own style sheet and numbers
+  const look = packStyles().get(opts.style || spec.style);
   const plan = {
-    size, fps, duration: total, brand, style: opts.style || spec.style || 'soft', tag: opts.format ? '-' + opts.format : '', motionBlur: spec.motionBlur !== false, music: spec.music || null,
+    size, fps, duration: total, brand, style: opts.style || spec.style || 'soft', ...(look ? { styleCss: url(look.css), styleParams: look.params } : {}), tag: opts.format ? '-' + opts.format : '', motionBlur: spec.motionBlur !== false, music: spec.music || null,
     cuts: scenes.slice(1).map((s) => s.start), captions, musicFile, beats,
     scenes: scenes.map(({ minDuration, mediaOffset, ...sc }) => ({ ...sc, say: sc.say.map(({ raw, ...line }) => line) })),
     previewAudio: url(path.join(dir, 'out', 'audio.wav')), notes,

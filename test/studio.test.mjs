@@ -50,7 +50,7 @@ test('the home screen starts empty, with starters to pick from', async () => {
   const h = await fetch(u + '/api/home').then(J);
   assert.deepEqual(h.projects, []);
   assert.equal(h.home, process.env.SONGBE_HOME);
-  assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'blank']);
+  assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'classic/quan-ca-phe', 'blank']);
   for (const st of h.starters.filter((x) => x.id !== 'blank')) { assert.ok(st.poster, `${st.id} has a poster`); assert.equal((await fetch(u + st.poster)).headers.get('content-type'), 'image/jpeg'); }
   assert.deepEqual(h.keys, { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null });
   for (const page of ['/home', '/studio/ui.css', '/studio/icon.svg', '/kit/fonts/fonts.css']) assert.equal((await fetch(u + page)).status, 200, page);
@@ -160,7 +160,7 @@ test('"Write it for me" makes the project in the background and says how it is g
   const wait = async (id) => { for (let i = 0; i < 200; i++) { const j = await fetch(`${wu}/api/writing/${id}`).then(J); if (j.done) return j; await new Promise((r) => setTimeout(r, 100)); } throw new Error('the writing never finished'); };
   try {
     const h = await fetch(wu + '/api/home').then(J);
-    assert.equal(h.writer, 'custom'); assert.deepEqual(h.styles, ['soft', 'bold']); assert.deepEqual(h.formats, ['tall', 'square', 'wide']);
+    assert.equal(h.writer, 'custom'); assert.deepEqual(h.styles, ['soft', 'bold', 'classic']); assert.deepEqual(h.formats, ['tall', 'square', 'wide']);
     for (const bad of [{ name: 'x', starter: 'write' }, { name: '', starter: 'write', brief: BRIEF }, { name: 'x', starter: 'write', brief: BRIEF, style: 'neon' }, { name: 'x', starter: 'write', brief: BRIEF, format: 'round' }]) assert.equal((await send(bad)).status, 400, JSON.stringify(bad));
     assert.equal(asked.length, 0, 'nothing is asked of the model for a request that is turned down');
     const r = await send({ name: 'Quán Mộc viết hộ', starter: 'write', brief: BRIEF, format: 'square' }).then(J);

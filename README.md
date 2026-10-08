@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.10): six scene types, two looks, any frame size, captions, cuts on the beat, built-in checks, a writer that
+> Early version (0.12): six scene types, three looks, packs for more, any frame size, captions, cuts on the beat, built-in checks, a writer that
 > drafts the whole video from a description, and an app with a visual editor (in the browser, or installed on Windows). Tested on Linux / WSL and on Windows 11; macOS has not been tried.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
@@ -177,11 +177,29 @@ frames the scenes give up a band at the bottom so that captions do not sit on to
 | --- | --- |
 | `soft` (default) | Rounded cards, soft shadows and glows, lines that rise from behind a mask, a slanted colour sweep at each cut |
 | `bold` | Condensed capitals (Anton), flat colour fields, square corners with ink outlines and hard shadows, headlines on ink blocks over footage, a flat band dropping through each cut |
+| `classic` | Serif headlines (Playfair Display), hairline frames, flat paper and ink, a marker stroke for the highlight, the frame dipping through paper at each cut |
 
 Try a look without touching the spec: `songbe frames my-ad --style=bold`, `songbe build my-ad --style=bold`.
 
-A style is a style sheet of token overrides (`kit/styles/<name>.css`) plus a few numbers in `kit/runtime.js` (headline scale and
-leading, how lines arrive, how cuts are covered). Scenes set geometry only, so a new look does not touch scene code.
+A style is a style sheet of token overrides plus a few numbers (headline scale and leading, how lines arrive, how cuts are
+covered). Scenes set geometry only, so a new look does not touch scene code — and does not have to live in Songbe at all:
+
+## Packs
+
+`classic` is not part of the kit. It comes from a **pack**: a folder with looks (a style sheet, its fonts, a few numbers) and
+starters (ready projects to begin from), found in `packs/` here, in the data folder's `packs/` once installed, or wherever
+`SONGBE_PACKS` points while one is being built.
+
+```bash
+node bin/songbe.mjs pack list                       # what is found, and every starter's id
+node bin/songbe.mjs pack add ~/Downloads/night      # install a pack folder on this computer
+node bin/songbe.mjs init my-ad --from=classic/quan-ca-phe
+```
+
+A pack runs no code, carries its own licence, and can be measured and checked with the same tools as the kit
+(`node tools/fit.mjs --pack=<id>`). `docs/packs.md` describes the format; `packs/classic` is the worked example. The core is
+Apache-2.0 and stays so whatever is plugged in: packs are how more looks and industry-specific starters can be shared — or sold —
+without forking it.
 
 ## How a build runs
 
@@ -251,7 +269,7 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 
 ## Limits today
 
-- Six scene types and two looks. Scene types live in `kit/scenes.js`, looks in `kit/styles/`.
+- Six scene types; three looks (two in the kit, one bundled as a pack). Scene types live in `kit/scenes.js` and cannot come from packs.
 - One provider (fal.ai) for voice, images, image-to-video and music; the writer also takes an Anthropic key.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
@@ -259,5 +277,5 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 
 ## License
 
-Apache-2.0. The bundled fonts are Be Vietnam Pro and Anton (both SIL OFL 1.1). The installed app ships Node.js next to the engine,
+Apache-2.0. The bundled fonts are Be Vietnam Pro, Anton and Playfair Display (all SIL OFL 1.1). The installed app ships Node.js next to the engine,
 under Node's own licence. ffmpeg is never part of a Songbe package. See `NOTICE`.

@@ -106,6 +106,11 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
     <div class="row"><div class="k">ffmpeg</div><div class="d" id="tff"></div><div class="v" id="tffdo"></div></div>
     <div class="row"><div class="k">Browser that draws the frames</div><div class="d" id="tbr"></div></div>
   </div>
+  <div class="sec"><h3>Packs</h3>
+    <div class="lead" style="margin-bottom:6px">Looks and starters from outside Songbe itself. A pack is a folder; put it in the packs folder and it is here the next time this page opens.</div>
+    <div id="packs"></div>
+    <div class="row"><div class="k">Packs folder</div><div class="d" id="fpacks"></div><div class="v"><button class="btn small" data-open="packs">Open</button></div></div>
+  </div>
   <div class="sec"><h3>Folders</h3>
     <div class="row"><div class="k">Videos</div><div class="d" id="fhome"></div><div class="v"><button class="btn small" data-open="home">Open</button></div></div>
     <div class="row"><div class="k">Songbe's own files</div><div class="d" id="fdata"></div><div class="v"><button class="btn small" data-open="data">Open</button></div></div>
@@ -197,7 +202,10 @@ function settings() {
   }
   const t = H.tools; $('#tff').textContent = t.ffmpeg || 'Not found'; $('#tbr').textContent = t.browser || 'No Chrome or Edge found';
   $('#tffdo').replaceChildren(...(!t.ffmpeg ? [el('span', { className: 'tag warn', textContent: 'see the Videos page' })] : []));
-  $('#fhome').textContent = H.home; $('#fdata').textContent = H.data; $('#ver').textContent = 'Songbe ' + H.version;
+  $('#fhome').textContent = H.home; $('#fdata').textContent = H.data; $('#ver').textContent = 'Songbe ' + H.version; $('#fpacks').textContent = H.packsDir;
+  const what = (p) => [p.styles.length ? `look${p.styles.length === 1 ? '' : 's'}: ${p.styles.join(', ')}` : '', p.starters ? `${p.starters} starter${p.starters === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  $('#packs').replaceChildren(...H.packs.map((p) => el('div', { className: 'row' }, el('div', { className: 'k' }, `${p.name} ${p.version} `, el('span', { className: 'tag', textContent: p.where === 'bundled' ? 'comes with Songbe' : p.where })),
+    el('div', { className: 'd', textContent: [p.about, what(p)].filter(Boolean).join(' — ') }))));
 }
 
 function paint() {

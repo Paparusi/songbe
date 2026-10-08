@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { makePlan } from './plan.mjs';
 import { pageHtml } from './render.mjs';
 import { FFMPEG_WINDOWS, ffmpegAdvice, installFfmpeg } from './setup.mjs';
-import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES } from './spec.mjs';
+import { installedPacksDir, listPacks, starterDir, starterList } from './packs.mjs';
+import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES, refreshStyles } from './spec.mjs';
 import { writeSpec, writerFor } from './write.mjs';
 import { KIT, ROOT, WIN, dataDir, exists, killTree, log, mkdir, openOutside, projectsHome, readDotEnv, sha, tools } from './util.mjs';
 
@@ -19,7 +20,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.gif': 'image/gif',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 const MEDIA = /\.(png|jpe?g|svg|webp|gif|mp4|mov|webm|wav|mp3)$/i;
-const PAGES = path.join(ROOT, 'studio'), STARTERS = path.join(ROOT, 'examples');
+const PAGES = path.join(ROOT, 'studio');
 const KEYS = { FAL_KEY: 'fal', GROQ_API_KEY: 'groq', ANTHROPIC_API_KEY: 'anthropic' };
 // the only places outside this computer the app ever sends a person to
 const LINKS = { fal: 'https://fal.ai/dashboard/keys', groq: 'https://console.groq.com/keys', anthropic: 'https://console.anthropic.com/settings/keys', ffmpeg: 'https://ffmpeg.org/download.html' };
@@ -127,12 +128,10 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
       edited: fs.statSync(file).mtimeMs, built: videos.length ? Math.max(...videos.map((f) => fs.statSync(path.join(out, f)).mtimeMs)) : null,
       building: !!jobs.get(id) && !jobs.get(id).done, poster: posterFor(id, dir) };
   }
-  function starters() {
-    const list = fs.readdirSync(STARTERS).filter((n) => exists(path.join(STARTERS, n, 'video.json'))).map((n) => {
-      const about = readJson(path.join(STARTERS, n, 'starter.json')) || {}, spec = readJson(path.join(STARTERS, n, 'video.json'));
-      return { id: n, name: about.name || n, about: about.about || '', order: about.order ?? 50, size: spec?.size || FORMATS[spec?.format] || FORMATS.tall,
-        poster: exists(path.join(STARTERS, n, 'poster.jpg')) ? `/starter/${n}/poster.jpg` : null, colours: { ink: spec?.brand?.ink, primary: spec?.brand?.primary, accent: spec?.brand?.accent } };
-    }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  function starters() {      // Songbe's own examples, then those of every pack, then a blank one
+    const list = starterList().map((st) => { const spec = readJson(path.join(st.dir, 'video.json'));
+      return { id: st.id, name: st.name, about: st.about, pack: st.pack, size: (Array.isArray(spec?.size) && spec.size.length === 2 && spec.size) || FORMATS[spec?.format] || FORMATS.tall,
+        poster: exists(path.join(st.dir, 'poster.jpg')) ? `/starter-poster?id=${encodeURIComponent(st.id)}` : null, colours: { ink: spec?.brand?.ink, primary: spec?.brand?.primary, accent: spec?.brand?.accent } }; });
     return [...list, { id: 'blank', name: 'Blank', about: 'Three plain scenes to write over.', size: FORMATS.tall, poster: null, colours: {} }];
   }
   // "Write it for me": the folder is made at once, the writing goes on in the background, and the page asks how it is getting on.
@@ -157,12 +156,13 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     if (starter === 'write') return createWritten({ name, brief, style, format });
     const clean = tidyName(name);
     if (!clean) throw new Error('Give the video a name.');
-    if (starter !== 'blank' && (!/^[\w-]+$/.test(starter || '') || !exists(path.join(STARTERS, starter, 'video.json')))) throw new Error('Pick something to start from.');
+    const from = starter === 'blank' ? null : starterDir(String(starter || ''));
+    if (starter !== 'blank' && !from) throw new Error('Pick something to start from.');
     mkdir(home);
     let dir = path.join(home, clean); for (let n = 2; exists(dir); n++) dir = path.join(home, `${clean} ${n}`);
     if (starter === 'blank') {
       fs.writeFileSync(path.join(mkdir(dir), 'video.json'), JSON.stringify({ format: 'tall', brand: { name: clean }, scenes: [TEMPLATES.footage, TEMPLATES.list, TEMPLATES.end] }, null, 2) + '\n');
-    } else fs.cpSync(path.join(STARTERS, starter), dir, { recursive: true, filter: (f) => !NOT_COPIED.test(f) });
+    } else fs.cpSync(from, dir, { recursive: true, filter: (f) => !NOT_COPIED.test(f.slice(from.length)) });
     return idOf(dir);
   }
   function adopt(given) {      // a folder made elsewhere (by hand, by an agent, by `songbe init`)
@@ -197,8 +197,9 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
   // ---- one project: the editor's routes, all under /p/<id>/ ----
   async function projectRoute(req, res, u, id, dir, rest) {
     const prefix = `/p/${id}`, specFile = path.join(dir, 'video.json'), roots = [dir, KIT, PAGES], route = `${req.method} ${rest}`;
-    // kit files keep their folder layout under /kit/ so that relative addresses inside them (fonts in the stylesheet) still resolve
-    const link = (abs) => (within(abs, [KIT]) ? '/kit/' + path.relative(KIT, abs).split(path.sep).join('/') : `${prefix}/file?p=${encodeURIComponent(abs)}`);
+    // kit and pack files keep their folder layout (/kit/…, /pack/<id>/…) so that relative addresses inside them — fonts in a style sheet — still resolve
+    const link = (abs) => { if (within(abs, [KIT])) return '/kit/' + path.relative(KIT, abs).split(path.sep).join('/');
+      const pack = listPacks().find((p) => within(abs, [p.dir])); return pack ? `/pack/${pack.id}/` + path.relative(pack.dir, abs).split(path.sep).map(encodeURIComponent).join('/') : `${prefix}/file?p=${encodeURIComponent(abs)}`; };
     const state = async (spec) => {
       const errors = validate(spec, dir);
       if (errors.length) return { errors, plan: null };
@@ -283,11 +284,13 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
       if (route === 'GET /home') return serveFile(req, res, path.join(PAGES, 'home.html'), [PAGES]);
       if (req.method === 'GET' && u.pathname.startsWith('/kit/')) return serveFile(req, res, path.join(KIT, decodeURIComponent(u.pathname.slice(5))), [KIT]);
       if (req.method === 'GET' && u.pathname.startsWith('/studio/')) return serveFile(req, res, path.join(PAGES, decodeURIComponent(u.pathname.slice(8))), [PAGES]);
-      const st = /^\/starter\/([\w-]+)\/poster\.jpg$/.exec(u.pathname);
-      if (req.method === 'GET' && st) return serveFile(req, res, path.join(STARTERS, st[1], 'poster.jpg'), [STARTERS]);
+      if (route === 'GET /starter-poster') { const d = starterDir(u.searchParams.get('id') || ''); return d ? serveFile(req, res, path.join(d, 'poster.jpg'), [d]) : send(res, 404, { error: 'not found' }); }
+      const pk = /^\/pack\/([a-z][a-z0-9-]{1,23})\/(.+)$/.exec(u.pathname);      // a pack's own files: its style sheets and the fonts they name
+      if (req.method === 'GET' && pk) { const pack = listPacks().find((p) => p.id === pk[1]); return pack ? serveFile(req, res, path.join(pack.dir, decodeURIComponent(pk[2])), [pack.dir]) : send(res, 404, { error: 'not found' }); }
 
       if (route === 'GET /api/home') {
-        return send(res, 200, { version: VERSION, home, data: dataDir(), shell: process.env.SONGBE_SHELL || null, pinned: pinned ? idOf(pinned) : null,
+        refreshStyles();      // a pack may have been added since the last look
+        return send(res, 200, { packs: listPacks().map((p) => ({ id: p.id, name: p.name, version: p.version, about: p.about, licence: p.licence, where: p.where, styles: p.styles.map((x) => x.name), starters: p.starters.length })), packsDir: installedPacksDir(), version: VERSION, home, data: dataDir(), shell: process.env.SONGBE_SHELL || null, pinned: pinned ? idOf(pinned) : null,
           projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
           setup: { ...setup, canFetch: WIN, advice: ffmpegAdvice(), pick: { version: FFMPEG_WINDOWS.version, megabytes: Math.round(FFMPEG_WINDOWS.bytes / 1e6), from: FFMPEG_WINDOWS.from, licence: FFMPEG_WINDOWS.licence } } });
       }
@@ -299,7 +302,7 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
       if (route === 'PUT /api/keys') { try { saveKeys(await json(req)); return send(res, 200, keysFor(null)); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (route === 'POST /api/open') {
         const what = (await json(req)).what;
-        if (LINKS[what]) openOutside(LINKS[what]); else if (what === 'home') openOutside(mkdir(home)); else if (what === 'data') openOutside(mkdir(dataDir())); else return send(res, 400, { error: 'unknown place' });
+        if (LINKS[what]) openOutside(LINKS[what]); else if (what === 'home') openOutside(mkdir(home)); else if (what === 'data') openOutside(mkdir(dataDir())); else if (what === 'packs') openOutside(mkdir(installedPacksDir())); else return send(res, 400, { error: 'unknown place' });
         return send(res, 200, { ok: true });
       }
       if (route === 'POST /api/setup/ffmpeg') {

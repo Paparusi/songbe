@@ -65,8 +65,8 @@ test('a reply is read even when wrapped in words or a code fence', () => {
 
 test('what the model is told: the rules, the measured limits, the schema, and only the media that exists', () => {
   const sys = systemPrompt({});
-  for (const part of ['Use only what the brief states', `each up to ${limitOf('footage.title', 'bold')} characters`, '"additionalProperties":false', 'Never use this type without screens', 'Do not ask for generated footage', '"soft" | "bold"']) assert.ok(sys.includes(part), part);
-  assert.ok(!systemPrompt({ style: 'soft' }).includes('"style": "soft" | "bold"') && systemPrompt({ style: 'soft' }).includes(`each up to ${limitOf('footage.title', 'soft')} characters`));
+  for (const part of ['Use only what the brief states', '"additionalProperties":false', 'Never use this type without screens', 'Do not ask for generated footage', '"soft" | "bold" | "classic"', 'Serif headlines']) assert.ok(sys.includes(part), part);
+  assert.ok(!systemPrompt({ style: 'soft' }).includes('"style": "soft" | "bold"') && sys.includes(`each up to ${limitOf('footage.title', '*')} characters`) && systemPrompt({ style: 'soft' }).includes(`each up to ${limitOf('footage.title', 'soft')} characters`));
   assert.ok(systemPrompt({ footage: true }).includes('"generate"'));
   const user = userPrompt({ brief: BRIEF, format: 'wide', media: [{ path: 'media/quan.mp4', kind: 'video', size: [1080, 1920] }] });
   assert.ok(user.includes(BRIEF) && user.includes('wide 16:9') && user.includes('- media/quan.mp4 (video, 1080×1920, portrait)'));

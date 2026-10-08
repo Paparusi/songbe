@@ -17,7 +17,7 @@
   const lines = (v) => (Array.isArray(v) ? v : v ? [v] : []);
   // headline size and line step for the current style: [size, step]
   // (boxed: the lines sit on their own plates, as headlines over footage do in some styles)
-  const type = (size, step, boxed) => { const k = SB.style.title; return k.scale === 1 ? [size, step] : [Math.round(size * k.scale), Math.round(size * k.scale * ((boxed && k.boxLead) || k.lead))]; };
+  const type = (size, step, boxed) => { const k = SB.style.title; return k.scale === 1 && !k.lead ? [size, step] : [Math.round(size * k.scale), Math.round(size * k.scale * ((boxed && k.boxLead) || k.lead || step / size))]; };
   const wait = (sc) => (sc.start === 0 ? 0 : .26);       // let the cut's colour sweep pass first
   const fitTitle = (tl, size, width = 920) => { let z = size; for (const l of tl) z = Math.min(z, fit(l, width)); for (const l of tl) l.style.fontSize = z + 'px'; };
   // every one-line text has a widest it may get; past that its type shrinks (and past a third smaller the layout check speaks up)

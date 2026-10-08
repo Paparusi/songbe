@@ -64,8 +64,9 @@
 
   SB.mount = async function (plan) {
     SB.plan = plan;
-    SB.style = STYLES[plan.style] || STYLES.soft;
-    document.documentElement.dataset.style = STYLES[plan.style] ? plan.style : 'soft';
+    // a look from a pack arrives with its own numbers (plan.styleParams); the kit's own are in the table above
+    SB.style = plan.styleParams || STYLES[plan.style] || STYLES.soft;
+    document.documentElement.dataset.style = plan.styleParams || STYLES[plan.style] ? plan.style : 'soft';
     // the frame: its size and which family of layouts applies (tall 9:16, square 1:1 or 4:5, wide 16:9)
     // Scenes are laid out in design units: 1080 across for tall and square frames, 1080 high for wide ones. Any output size is that
     // design drawn larger or smaller (540×960 and 2160×3840 are the same picture), so type stays sharp at every resolution.
@@ -91,7 +92,8 @@
        <div id="notice"></div>${caps ? '<div id="captions"><div class="cline"></div></div>' : ''}<div id="vignette"></div><canvas id="grain" width="${Math.round(W / 2)}" height="${Math.round(FH / 2)}"></canvas>`);
     // the cut cover and the grain are sized from the frame (the numbers are the 1080×1920 design, scaled)
     const sx = W / 1080, sy = FH / 1920, band = (i) => document.getElementById('w' + i).style;
-    if (SB.style.wipe === 'curtain') [2600, 160, 40].forEach((h, i) => Object.assign(band(i + 1), { left: '0', top: '0', width: W + 'px', height: h * sy + 'px' }));
+    if (SB.style.wipe === 'veil') { Object.assign(band(1), { left: '0', top: '0', width: W + 'px', height: FH + 'px' }); band(2).display = band(3).display = 'none'; }
+    else if (SB.style.wipe === 'curtain') [2600, 160, 40].forEach((h, i) => Object.assign(band(i + 1), { left: '0', top: '0', width: W + 'px', height: h * sy + 'px' }));
     else [1900, 130, 30].forEach((w, i) => Object.assign(band(i + 1), { top: '-400px', height: FH + 800 + 'px', width: w * sx + 'px' }));
     Object.assign(document.getElementById('grain').style, { width: Math.round(1200 * sx) + 'px', height: Math.round(2134 * sy) + 'px' });
     await document.fonts.ready;
@@ -120,7 +122,8 @@
       if (k > 0 && k < 1) {
         sweeping = true; const e = ease.inOut(k), w = (i) => document.getElementById('w' + i).style;
         const sx = SB.frame.W / 1080, sy = SB.frame.FH / 1920;
-        if (SB.style.wipe === 'curtain') {          // a flat band drops through the frame
+        if (SB.style.wipe === 'veil') w(1).opacity = (1 - Math.abs(2 * k - 1)) ** .6;      // the frame dips through one flat colour and comes back
+        else if (SB.style.wipe === 'curtain') {     // a flat band drops through the frame
           const y = lerp(-2760, 1960, e) * sy; w(1).transform = `translateY(${y}px)`; w(2).transform = `translateY(${y + 2600 * sy}px)`; w(3).transform = `translateY(${y + 2760 * sy}px)`;
         } else {                                    // a slanted slab of brand colour sweeps across
           const x = lerp(-2300, 1300, e) * sx; w(1).transform = `translateX(${x}px) skewX(-14deg)`; w(2).transform = `translateX(${x + 1930 * sx}px) skewX(-14deg)`; w(3).transform = `translateX(${x + 2090 * sx}px) skewX(-14deg)`;

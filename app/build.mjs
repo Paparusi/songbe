@@ -15,7 +15,7 @@ const out = (cmd, args, cwd = ROOT) => { const r = spawnSync(cmd, args, { encodi
 if (+process.versions.node.split('.')[0] < 22) throw new Error(`the engine needs Node 22 or newer; this is ${process.version}`);
 
 // ---- the core: exactly what the repository tracks, never a project's caches or renders ----
-const PARTS = ['bin', 'src', 'kit', 'studio', 'examples', 'package.json', 'LICENSE', 'NOTICE'], SKIP = new Set(['.songbe', 'out', 'node_modules', '.git']);
+const PARTS = ['bin', 'src', 'kit', 'studio', 'examples', 'packs', 'package.json', 'LICENSE', 'NOTICE'], SKIP = new Set(['.songbe', 'out', 'node_modules', '.git']);
 function walk(rel) {
   const abs = path.join(ROOT, rel);
   if (!fs.statSync(abs).isDirectory()) return [rel];

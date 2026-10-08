@@ -4,6 +4,7 @@ Copyright 2026 the Songbe authors
 Bundled fonts (kit/fonts), both licensed under the SIL Open Font License 1.1:
   Be Vietnam Pro — see kit/fonts/OFL.txt
   Anton — see kit/fonts/OFL-Anton.txt
+  Playfair Display (in the bundled pack packs/classic) — see packs/classic/styles/fonts/OFL-PlayfairDisplay.txt
 Example media under examples/*/media was generated with AI image and video models for this project and is provided for demonstration.
 
 The desktop app (app/) is built with Tauri (MIT or Apache-2.0); the exact versions of everything compiled into it are listed in

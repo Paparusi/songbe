@@ -45,7 +45,8 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
 - One or two short sentences per scene in `say`. Where the pronunciation differs from the spelling, give both as `{spoken|shown}`:
   `{Vi Síp hai|VSIP 2}`, `{zero nine hundred|0900}`. The first is read aloud, the second appears in captions.
 - Turn on `"captions": true` for anything meant for a feed: most people watch with the sound off.
-- Pick the look with `"style"`: `soft` (rounded, friendly: apps, services) or `bold` (condensed capitals, flat colour: promotions, recruitment, retail).
+- Pick the look with `"style"`: `soft` (rounded, friendly: apps, services), `bold` (condensed capitals, flat colour: promotions, recruitment, retail)
+  or `classic` (serif headlines, quiet colour: cafés, beauty, property, education). `songbe pack list` shows any others that are installed.
   Compare both cheaply with `songbe frames <dir> --style=bold` before deciding.
 - The frame is `"format"`: `tall` (TikTok, Reels, Shorts), `square` (feeds) or `wide` (YouTube, screens). Write the spec once and
   build the others with `songbe build <dir> --formats=tall,square,wide`; the voice and music are reused, so they cost nothing more.

@@ -19,7 +19,8 @@ const HELP = `Songbe — short ads from a single video.json
   songbe setup ffmpeg             Windows: fetch ffmpeg into Songbe's own folder (elsewhere: says which package to install)
   songbe write <dir> "<brief>"    draft video.json from a description of the ad, check the draft and fix what the checks find
                                   (--style= --format= --no-captions --footage --brief=FILE --force; needs a key, see below)
-  songbe init <dir>               start a project from the example
+  songbe init <dir> [--from=ID]   start a project from the example, or from a starter of a pack (see: songbe pack list)
+  songbe pack list|add DIR|remove ID   looks and starters from outside the core: what is installed, install a pack folder, remove one
   songbe validate <dir>           check video.json and list every problem, and every text longer than its place
   songbe schema                   print the JSON Schema of video.json
   songbe frames <dir> [t1,t2,…]   render a few stills to out/frames (default: two per scene) — review before a full build
@@ -86,6 +87,16 @@ export async function main(argv) {
     return log(`installed: ${r.ffmpeg}\n  ${r.version}`);
   }
   if (cmd === 'schema') return log(JSON.stringify(jsonSchema(), null, 2));
+  if (cmd === 'pack') {
+    const { listPacks, installPack, removePack, starterList } = await import('./packs.mjs');
+    if (target === 'add') { const p = installPack(rest[0] || ''); return log(`installed ${p.name} ${p.version}: ${p.styles.length} look${p.styles.length === 1 ? '' : 's'}${p.styles.length ? ' (' + p.styles.map((x) => x.name).join(', ') + ')' : ''}, ${p.starters.length} starter${p.starters.length === 1 ? '' : 's'}`); }
+    if (target === 'remove') { removePack(rest[0] || ''); return log(`removed ${rest[0]}`); }
+    if (target && target !== 'list') throw new Error('songbe pack list | add <folder> | remove <id>');
+    const packs = listPacks();
+    for (const p of packs) log(`${p.id}  ${p.name} ${p.version}  [${p.where}]${p.licence ? '  ' + p.licence : ''}\n    looks: ${p.styles.map((x) => x.name).join(', ') || '—'}\n    starters: ${p.starters.map((x) => x.id).join(', ') || '—'}`);
+    if (!packs.length) log('no packs found');
+    return log(`starters to begin from (songbe init <dir> --from=ID): ${starterList().map((x) => x.id).join(', ')}`);
+  }
   if (!target) throw new Error('which project directory?\n\n' + HELP);
   const dir = path.resolve(target);
   if (cmd === 'write') {
@@ -102,7 +113,9 @@ export async function main(argv) {
   }
   if (cmd === 'init') {
     if (exists(path.join(dir, 'video.json'))) throw new Error(`${dir} already has a video.json`);
-    fs.cpSync(path.join(ROOT, 'examples', 'app-launch-en'), dir, { recursive: true, filter: (f) => !/[\\/](\.songbe|out)([\\/]|$)/.test(f) });
+    const { starterDir } = await import('./packs.mjs'), id = rest.find((x) => x.startsWith('--from='))?.slice(7) || 'app-launch-en', from = starterDir(id);
+    if (!from) throw new Error(`no starter is called "${id}" (see: songbe pack list)`);
+    fs.cpSync(from, dir, { recursive: true, filter: (f) => !/[\\/](\.songbe|out|starter\.json|poster\.jpg)([\\/]|$)/.test(f.slice(from.length)) });
     return log(`created ${dir}\nnext: songbe frames ${target}   then   songbe build ${target}`);
   }
   if (!exists(path.join(dir, 'video.json'))) throw new Error(`no video.json in ${dir}`);

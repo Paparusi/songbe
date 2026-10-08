@@ -3,12 +3,20 @@
 // before anything is drawn.
 import fs from 'node:fs';
 import path from 'node:path';
+import { listPacks } from './packs.mjs';
 import { KIT } from './util.mjs';
 
+// the kit's table, with a column added for every look a pack has measured (its fit.json)
 let table = null;
-export const fitTable = () => (table ??= JSON.parse(fs.readFileSync(path.join(KIT, 'fit.json'), 'utf8')).limits);
+export function fitTable() {
+  if (table) return table;
+  table = structuredClone(JSON.parse(fs.readFileSync(path.join(KIT, 'fit.json'), 'utf8')).limits);
+  for (const p of listPacks()) for (const [key, row] of Object.entries(p.fit || {})) if (table[key]) for (const [style, n] of Object.entries(row)) if (!(style in table[key]) && Number.isInteger(n)) table[key][style] = n;
+  return table;
+}
 // the limit for one place ("list.items.text") in one look
-export const limitOf = (key, style = 'soft') => fitTable()[key]?.[style] ?? fitTable()[key]?.soft ?? null;
+// ("*" asks for what fits in every look: the smallest of them)
+export const limitOf = (key, style = 'soft') => { const row = fitTable()[key]; return !row ? null : style === '*' ? Math.min(...Object.values(row)) : row[style] ?? row.soft ?? null; };
 
 // what is shown of a text: without the [[highlight]] and **accent** marks, and the shown half of {spoken|shown}
 export const shownLength = (text) => [...String(text).replace(/\{[^{}|]*\|([^{}]*)\}/g, '$1').replace(/\[\[|\]\]|\*\*/g, '').normalize('NFC')].length;

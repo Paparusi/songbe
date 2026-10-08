@@ -5,6 +5,7 @@
 //           ['a', 'b'] one of these literals · [shape] a list · { key: shape } an object · a trailing ! on a key marks it required.
 import fs from 'node:fs';
 import path from 'node:path';
+import { styleNames } from './packs.mjs';
 
 const COLOUR = 'str';
 const common = { say: 'text', duration: 'num', minDuration: 'num', notice: 'str' };
@@ -31,7 +32,9 @@ export const TEMPLATES = {
   end: { type: 'end', say: 'Close with the call to action.', tagline: 'One line that sums it up', cta: 'Get started' },
 };
 
-export const STYLES = ['soft', 'bold'];
+// the two looks of the kit plus the looks of every pack that is found; refreshStyles() looks again (a pack was just added)
+export const STYLES = styleNames();
+export const refreshStyles = () => { STYLES.splice(0, STYLES.length, ...styleNames()); return STYLES; };
 // named frames; "size": [w, h] in the spec overrides them for anything else (4:5 and the like use the square layouts)
 export const FORMATS = { tall: [1080, 1920], square: [1080, 1080], wide: [1920, 1080] };
 export const TOP = {

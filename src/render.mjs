@@ -14,7 +14,7 @@ export function pageHtml(plan, link) {
   const k = (f) => link(path.join(KIT, f)), esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // a spec may come from anywhere (a shared folder, an agent), so nothing from it reaches the page as markup
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(plan.brand?.name || 'Songbe')}</title>
-<link rel="stylesheet" href="${k('fonts/fonts.css')}"><link rel="stylesheet" href="${k('base.css')}">${plan.style && plan.style !== 'soft' ? `<link rel="stylesheet" href="${k(`styles/${plan.style}.css`)}">` : ''}</head>
+<link rel="stylesheet" href="${k('fonts/fonts.css')}"><link rel="stylesheet" href="${k('base.css')}">${plan.styleCss ? `<link rel="stylesheet" href="${esc(plan.styleCss)}">` : plan.style && plan.style !== 'soft' ? `<link rel="stylesheet" href="${k(`styles/${plan.style}.css`)}">` : ''}</head>
 <body><div id="stage"></div><script src="${k('runtime.js')}"></script><script src="${k('scenes.js')}"></script>
 <script>window.ready = SB.mount(${JSON.stringify(plan).replace(/</g, '\\u003c')}).then((n) => { if (!location.hash.includes('render')) SB.preview(); return n; });</script>
 </body></html>`;

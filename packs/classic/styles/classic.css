@@ -1,0 +1,45 @@
+/* Songbe style "classic": serif headlines, hairline frames, quiet colour. Lives in a pack: nothing here touches the kit. */
+@import url(fonts/playfair.css);
+
+[data-style="classic"] {
+  --font-title: 'Playfair Display', 'Be Vietnam Pro', serif; --title-weight: 700; --title-tracking: -1.4px; --title-lh: 1.2; --title-case: none;
+  --label-tracking: 8px;
+  --r-card: 10px; --r-stat: 10px; --r-contact: 12px; --r-frame: 4px; --r-row: 10px; --r-pill: 8px; --r-hl: 0px; --r-badge: 8px; --r-icon: 50%;
+  --r-bubble: 16px; --r-store: 8px; --r-cap: 4px; --r-logo: 50%;
+  --edge: 0px;
+  --shadow-card: 0 0 0 1.5px color-mix(in srgb, var(--ink) 13%, transparent), 0 20px 46px rgba(10,27,49,.07);
+  --shadow-row: 0 0 0 1.5px color-mix(in srgb, var(--ink) 12%, transparent);
+  --shadow-chip: 0 12px 30px rgba(0,0,0,.24); --shadow-contact: 0 30px 70px rgba(0,0,0,.34);
+  --shadow-cta: none; --shadow-callout: 0 0 0 1.5px color-mix(in srgb, var(--ink) 14%, transparent), 0 14px 34px rgba(0,0,0,.16);
+}
+
+/* quiet pages: flat paper and ink, and a hairline frame set in from the edge */
+[data-style="classic"] .glow, [data-style="classic"] .dots, [data-style="classic"] #vignette { display: none; }
+[data-style="classic"] .night { background: var(--ink); }
+[data-style="classic"] .scene.paper::before, [data-style="classic"] .scene.night::before { content: ''; position: absolute; inset: 34px; border: 1.5px solid color-mix(in srgb, var(--ink) 15%, transparent); pointer-events: none; }
+[data-style="classic"] .scene.night::before { border-color: color-mix(in srgb, var(--accent) 46%, transparent); }
+[data-style="classic"] #w1 { background: var(--paper); }
+
+/* type: the label carries a short rule; a highlight is a marker stroke on paper and the accent colour on ink */
+[data-style="classic"] .label { font-weight: 600; font-size: 27px; }
+[data-style="classic"] .mask.label > span::before { content: ''; display: inline-block; width: 54px; height: 2px; margin: 0 18px .32em 0; background: currentColor; vertical-align: middle; }
+[data-style="classic"] .mask.label svg { display: none; }
+[data-style="classic"] .mask.title { padding-top: .1em; margin-top: -.1em; }      /* room for stacked Vietnamese accents on capitals */
+[data-style="classic"] .title .hl { background: linear-gradient(transparent 66%, color-mix(in srgb, var(--accent) 88%, transparent) 0); color: inherit; padding: 0 8px; margin: 0 -8px; border-radius: 0; }
+[data-style="classic"] .night .title .hl, [data-style="classic"] .over-footage .title .hl { background: none; color: var(--accent); padding: 0; margin: 0; }
+[data-style="classic"] .sub { font-weight: 500; }
+
+/* parts */
+[data-style="classic"] .tag { background: var(--paper); color: var(--ink); }
+[data-style="classic"] .chip { background: var(--paper); }
+[data-style="classic"] .iconb { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2.5px var(--ink); }
+[data-style="classic"] .row.dark { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.24); }
+[data-style="classic"] .row.dark .iconb { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2.5px var(--accent); }
+[data-style="classic"] .badge { background: var(--ink); color: var(--paper); font-family: var(--font-title); font-weight: 700; letter-spacing: -1px !important; }
+[data-style="classic"] .card.contact .num { font-family: var(--font-title); font-weight: 800; letter-spacing: -1px !important; }
+[data-style="classic"] .logo-fallback { font-family: var(--font-title); font-weight: 700 !important; background: transparent; color: var(--accent); box-shadow: inset 0 0 0 4px var(--accent); }
+[data-style="classic"] .scene.paper .logo-fallback { color: var(--ink); box-shadow: inset 0 0 0 4px var(--ink); }
+[data-style="classic"] .store { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.4); }
+[data-style="classic"] .store.light { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 40%, transparent); }
+[data-style="classic"] .phone { box-shadow: 0 40px 80px rgba(0,0,0,.30), inset 0 0 0 3px #2A2F3A; }
+[data-style="classic"] .cline { border-radius: 8px; font-weight: 700; }

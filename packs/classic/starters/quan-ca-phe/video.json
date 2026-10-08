@@ -1,0 +1,43 @@
+{
+  "format": "tall",
+  "style": "classic",
+  "captions": true,
+  "brand": { "name": "Mộc", "ink": "#2A1A12", "primary": "#8A4B2A", "accent": "#E8B96A", "paper": "#FBF5EC", "muted": "#7A6A5E" },
+  "voice": { "voice": "Casual_Guy", "language": "Vietnamese", "speed": 1.08, "emotion": "happy" },
+  "music": { "prompt": "Warm acoustic café instrumental with fingerpicked guitar, soft upright bass and brushed drums, 100 BPM, unhurried and inviting" },
+  "scenes": [
+    {
+      "type": "footage",
+      "say": "Sáng nay bạn uống cà phê ở đâu?",
+      "label": "Quán cà phê Mộc",
+      "title": ["Cà phê", "[[rang mộc]]"],
+      "sub": "Rang tại quán mỗi sáng"
+    },
+    {
+      "type": "list",
+      "say": "Mộc rang hạt mỗi sáng, pha từng ly khi bạn gọi, và mở cửa từ sáu giờ.",
+      "label": "Vì sao chọn Mộc",
+      "title": ["Ngon từ", "hạt mới"],
+      "items": [
+        { "icon": "sun", "text": "Rang mỗi sáng", "sub": "Hạt mới trong ngày" },
+        { "icon": "heart", "text": "Pha từng ly", "sub": "Khi bạn gọi mới pha" },
+        { "icon": "clock", "text": "Mở cửa từ 6 giờ" }
+      ]
+    },
+    {
+      "type": "chat",
+      "say": ["Nhắn Zalo cho Mộc để đặt trước nhé.", "{Không chín trăm, không không không, không không không|0900 000 000}."],
+      "label": "Đặt trước",
+      "title": "Nhắn Mộc",
+      "messages": [ { "from": "them", "text": "Cho mình 2 ly sữa đá mang đi" }, { "from": "us", "text": "Có ngay, 5 phút nữa bạn ghé lấy nhé!" } ],
+      "contact": { "kicker": "Zalo", "button": "Nhắn tin", "number": ["0900", "000", "000"], "sub": "Đặt trước, ghé là có" },
+      "footer": { "name": "Cà phê Mộc", "line": "Rang mộc mỗi sáng" }
+    },
+    {
+      "type": "end",
+      "say": "Mộc, cà phê rang mộc mỗi sáng.",
+      "tagline": "Cà phê rang mộc mỗi sáng",
+      "cta": "Nhắn Zalo đặt trước"
+    }
+  ]
+}

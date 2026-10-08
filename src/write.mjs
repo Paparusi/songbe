@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fitGuide, tooLong, tooLongNote } from './fit.mjs';
+import { packStyles } from './packs.mjs';
 import { makePlan } from './plan.mjs';
 import { ask as askModel, modelFor, writerFor } from './providers/llm.mjs';      // (writerFor is re-exported below for the app)
 import { lintLayout } from './render.mjs';
@@ -23,15 +24,18 @@ const pattern = (name) => {      // an example, reduced to the part a writer wri
   const s = JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', name, 'video.json'), 'utf8'));
   return JSON.stringify({ style: s.style || 'soft', brand: { ...s.brand, logo: undefined }, voice: { language: s.voice?.language }, music: { prompt: s.music?.prompt }, scenes: s.scenes });
 };
+// the looks a writer may choose from, each with a line on what it suits
+const LOOKS = () => [['soft', 'rounded and friendly: apps, services, food, care'], ['bold', 'condensed capitals and flat colour: promotions, recruitment, retail, events'],
+  ...[...packStyles().values()].map((s) => [s.name, s.about || 'a look from the pack "' + s.pack + '"'])];
 export function systemPrompt({ style, footage = false } = {}) {
   return `You write video.json files for Songbe, a tool that turns one JSON description into a finished short ad with voice-over, motion graphics and music.
 Reply with one JSON object and nothing else: no explanation before or after, no code fence.
 
 THE OBJECT
-{ ${style ? '' : '"style": "soft" | "bold", '}"brand": { … }, "voice": { "language": "…" }, "music": { "prompt": "…" }, "scenes": [ … ] }
+{ ${style ? '' : `"style": ${LOOKS().map(([n]) => `"${n}"`).join(' | ')}, `}"brand": { … }, "voice": { "language": "…" }, "music": { "prompt": "…" }, "scenes": [ … ] }
 - brand: "name", and five colours written as #RRGGBB: "ink" (very dark; white text is set on it), "primary" (the brand colour; white text is set on it), "accent" (bright; ink text is set on it), "paper" (very light; ink text is set on it), "muted" (a grey for secondary text on white). Use the colours the brief names; otherwise choose a palette that suits the business.
 - voice.language: the language of the brief as an English word, for example "Vietnamese" or "English". Write every "say" and every text in that language.
-- music.prompt: one sentence describing an instrumental track that suits the ad: mood, instruments, and a tempo between 96 and 112 BPM.${style ? '' : '\n- style: "soft" (rounded, friendly: apps, services, food, care) or "bold" (condensed capitals and flat colour: promotions, recruitment, retail, events).'}
+- music.prompt: one sentence describing an instrumental track that suits the ad: mood, instruments, and a tempo between 96 and 112 BPM.${style ? '' : '\n- style: ' + LOOKS().map(([n, about]) => `"${n}" (${about})`).join('; ') + '.'}
 - scenes: four or five, one idea each. A scene lasts as long as its "say" takes to read aloud; aim for 15 to 25 seconds in all, which is 45 to 65 words (60 to 90 syllables in Vietnamese).
 
 SCENE TYPES
@@ -53,7 +57,7 @@ FACTS
 Use only what the brief states. Never add a price, salary, number, statistic, rating, phone number, address, web address, award, guarantee or benefit that the brief does not contain, and no promise it does not make ("no hidden fees", "cancel anytime", "included", "guaranteed", "the best"). No number in the brief worth showing: no stat card. No contact detail in the brief: close with the brand and a call to action that needs none.
 
 HOW MUCH FITS (characters as shown, counting spaces)
-${fitGuide(style || 'bold')}
+${fitGuide(style || '*')}
 Shorter is better than exactly at the limit; never go over.
 
 MEDIA
