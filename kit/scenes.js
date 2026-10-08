@@ -1,7 +1,10 @@
-// Songbe scene kit — three scene types that cover a short vertical ad:
+// Songbe scene kit — six scene types that cover most short vertical ads:
 //   footage  full-bleed footage or image with a headline on top
 //   card     light page: headline, a media card (proof shot) and a stat card
+//   list     headline and rows that arrive one by one
+//   phone    headline over a phone showing app screens, with callouts
 //   chat     dark page: headline, a short chat exchange, a contact card and the brand footer
+//   end      logo, name, tagline and a call to action
 // Each factory builds its DOM once and returns { layout?, cues, draw(u, t) } where u is seconds since the scene started.
 (() => {
   const { lerp, seg, ease, spring, clamp, rich, esc, tf, reveal, pop, fit, PIN, mediaSrc, setImg } = SB;
@@ -145,6 +148,126 @@
           ng.forEach((g, i) => { g.style.transform = `translateY(${lerp(112, 0, ease.outQuint(seg(u, groupAt[i], groupAt[i] + .45)))}%)`; });
         }
         const kf = ease.outQuint(seg(u, at.footer, at.footer + .7)); tf(ft, { y: lerp(50, 0, kf), o: kf });
+      },
+    };
+  };
+
+  // ---- shared bits for the newer scenes ----
+  const ICONS = {
+    check: ['s', 'M5 12.5l4.5 4.5L19 7.5'], star: ['f', 'M12 3.2l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17.1 6.6 20l1.1-6.1L3.2 9.6l6.1-.8z'],
+    bolt: ['f', 'M13 2L4.5 13.5H11L10 22l8.5-11.5H12z'], heart: ['f', 'M12 20.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.9c0 5.4-7.5 10-7.5 10z'],
+    shield: ['f', 'M12 2.8l7.5 2.8v5.6c0 4.6-3.2 8.3-7.5 10-4.3-1.7-7.5-5.4-7.5-10V5.6z'], drop: ['f', 'M12 2.8s6.2 6.6 6.2 11.2A6.2 6.2 0 0 1 5.8 14c0-4.6 6.2-11.2 6.2-11.2z'],
+    clock: ['s', 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2'], bell: ['s', 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0'],
+    sun: ['s', 'M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6'],
+    pin: ['f', 'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.6A2.6 2.6 0 1 1 12 6.4a2.6 2.6 0 0 1 0 5.2z'],
+  };
+  const icon = (name, size) => { const [mode, d] = ICONS[name] || ICONS.check;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"><path d="${d}" ${mode === 'f' ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"'}/></svg>`; };
+  const backdrop = (dark) => (dark
+    ? `<div class="glow g1" style="left:520px;top:-200px;width:760px;height:760px;background:color-mix(in srgb,var(--primary) 55%,transparent)"></div>
+       <div class="glow g2" style="left:-260px;top:1050px;width:700px;height:700px;background:color-mix(in srgb,var(--accent) 26%,transparent)"></div>`
+    : `<div class="dots"></div>
+       <div class="glow g1" style="left:-180px;top:1180px;width:620px;height:620px;background:color-mix(in srgb,var(--accent) 42%,transparent)"></div>
+       <div class="glow g2" style="left:640px;top:-120px;width:640px;height:640px;background:color-mix(in srgb,var(--primary) 22%,transparent)"></div>`);
+  const drift = (el, u, dark) => {
+    if (!dark) $(el, '.dots').style.transform = `translate(${-u * 9}px,${-u * 6}px)`;
+    tf($(el, '.g1'), dark ? { x: Math.sin(u * .6) * 40, y: u * 10 } : { x: Math.sin(u * .9) * 26, y: -u * 16 });
+    tf($(el, '.g2'), dark ? { x: u * 12, y: Math.cos(u * .7) * 30 } : { x: -u * 14, y: Math.cos(u * .8) * 22 });
+  };
+  const heading = (sc, dark, size) => `
+    ${sc.label ? `<div class="mask label lb" style="left:72px;top:214px;color:var(--${dark ? 'accent' : 'primary'})"><span>${esc(sc.label)}</span></div>` : ''}
+    ${lines(sc.title).map((s, i, a) => `<div class="mask title tl" style="left:68px;top:${280 + i * Math.round(size * 1.18)}px;font-size:${size}px;color:${dark ? '#fff' : `var(--${i === a.length - 1 && a.length > 1 ? 'primary' : 'ink'})`}"><span>${rich(s)}</span></div>`).join('')}`;
+  const fitTitle = (tl, size, width = 920) => { let z = size; for (const l of tl) z = Math.min(z, fit(l, width)); for (const l of tl) l.style.fontSize = z + 'px'; };
+  const wait = (sc) => (sc.start === 0 ? 0 : .26);       // let the cut's colour sweep pass first
+
+  // list: a headline and up to five rows that arrive one by one
+  SB.scenes.list = (el, sc) => {
+    const dark = sc.tone === 'dark', items = sc.items || [], size = 112, n = lines(sc.title).length;
+    const rowH = items.some((x) => x.sub) ? 184 : 150, top = 280 + n * Math.round(size * 1.18) + 70, pad = (rowH - 104) / 2;
+    el.classList.add(dark ? 'night' : 'paper');
+    el.innerHTML = backdrop(dark) + heading(sc, dark, size) + items.map((it, i) => `
+      <div class="a row" style="left:70px;top:${top + i * (rowH + 26)}px;width:940px;height:${rowH}px;border-radius:38px;${dark ? 'background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14)' : 'background:#fff;box-shadow:0 22px 50px rgba(10,27,49,.12)'}">
+        <div class="ic" style="position:absolute;left:30px;top:${pad}px;width:104px;height:104px;border-radius:30px;display:flex;align-items:center;justify-content:center;font-size:54px;font-weight:900;background:var(--${dark ? 'accent' : 'ink'});color:var(--${dark ? 'ink' : 'accent'})">${it.icon === 'number' ? i + 1 : icon(it.icon, 60)}</div>
+        <div class="rh" style="position:absolute;left:166px;top:${it.sub ? pad + 2 : (rowH - 62) / 2}px;font-size:48px;font-weight:800;letter-spacing:-1px;white-space:nowrap;color:${dark ? '#fff' : 'var(--ink)'}">${rich(it.text)}</div>
+        ${it.sub ? `<div class="rs" style="position:absolute;left:168px;top:${pad + 66}px;font-size:33px;font-weight:500;white-space:nowrap;color:${dark ? 'rgba(255,255,255,.72)' : 'var(--muted)'}">${esc(it.sub)}</div>` : ''}
+      </div>`).join('');
+    const lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], rows = [...el.querySelectorAll('.row')];
+    const dur = sc.end - sc.start, t0 = wait(sc), first = t0 + .7, step = clamp((dur - first - 1.6) / Math.max(1, rows.length), .3, 1.5);   // long lines: rows keep pace with the voice
+    return {
+      layout() { fitTitle(tl, size); for (const r of rows) { fit($(r, '.rh'), 740); if ($(r, '.rs')) fit($(r, '.rs'), 740); } },
+      cues: rows.map((_, i) => ({ t: first + i * step + .02, kind: 'pop' })),
+      async draw(u) {
+        drift(el, u, dark);
+        if (lb) reveal(lb, u, t0);
+        tl.forEach((l, i) => reveal(l, u, t0 + .1 + i * .14));
+        rows.forEach((r, i) => {
+          const at = first + i * step, s = spring(u - at, .62, 11);
+          tf(r, { x: lerp(170, 0, s), o: clamp((u - at) * 8) });
+          $(r, '.ic').style.transform = `scale(${lerp(.3, 1, spring(u - at - .1, .45, 16))})`;
+        });
+      },
+    };
+  };
+
+  // phone: a headline over a phone that rises into frame, showing one or more app screens with callouts
+  SB.scenes.phone = (el, sc) => {
+    const light = sc.tone === 'light', dark = !light, screens = lines(sc.screens), calls = sc.callouts || [], size = 112, n = lines(sc.title).length;
+    const W = 580, H = 1222, X = (1080 - W) / 2, Y = 280 + n * Math.round(size * 1.18) + 78;
+    el.classList.add(dark ? 'night' : 'paper');
+    el.innerHTML = backdrop(dark) + heading(sc, dark, size) + `
+      <div class="a ph" style="left:${X}px;top:${Y}px;width:${W}px;height:${H}px;transform-origin:50% 0">
+        <div class="phone" style="${light ? 'box-shadow:0 50px 90px rgba(10,27,49,.26), inset 0 0 0 3px #2A2F3A' : ''}"><div class="scr">${screens.map((s) => `<img class="ss" src="${s}">`).join('')}<div class="island"></div></div></div>
+        ${calls.map((c, i) => `<div class="a pill co" style="${(c.side || (i % 2 ? 'left' : 'right')) === 'left' ? `left:${40 - X}px;transform-origin:0 50%` : `right:${40 - X}px;transform-origin:100% 50%`};top:${Math.round((c.y ?? .2 + .2 * i) * H)}px;white-space:nowrap;background:#fff;color:var(--ink);font-size:38px;font-weight:700;padding:20px 34px 20px 28px;box-shadow:0 20px 48px rgba(0,0,0,.30)"><i style="display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--primary);margin-right:14px;vertical-align:2px"></i>${esc(c.text)}</div>`).join('')}
+      </div>`;
+    const lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], ph = $(el, '.ph'), ss = [...el.querySelectorAll('.ss')], co = [...el.querySelectorAll('.co')];
+    const dur = sc.end - sc.start, t0 = wait(sc), rise = t0 + .2;
+    const swap = ss.map((_, i) => (i === 0 ? -9 : rise + .9 + (i - 1) * Math.max(1.1, (dur - rise - 1.4) / ss.length) + (dur - rise - .9) / ss.length * .5));
+    const callAt = co.map((_, i) => rise + .95 + i * .45);
+    return {
+      layout() { fitTitle(tl, size); },
+      cues: [{ t: rise - .12, kind: 'swish' }, ...swap.slice(1).map((t) => ({ t: t - .05, kind: 'swish', gain: .8 })), ...callAt.map((t) => ({ t: t + .02, kind: 'pop' }))],
+      async draw(u) {
+        drift(el, u, dark);
+        if (lb) reveal(lb, u, t0);
+        tl.forEach((l, i) => reveal(l, u, t0 + .1 + i * .14));
+        const s = spring(u - rise, .58, 8.5), k = clamp(s);
+        ph.style.transform = `translateY(${lerp(1500, 0, s) + Math.sin(u * 1.3) * 6}px) perspective(1800px) rotateX(${lerp(26, 0, k)}deg) rotate(${lerp(-6, 0, k)}deg)`;
+        ph.style.opacity = u < rise ? 0 : 1;
+        ss.forEach((im, i) => {
+          const kin = i === 0 ? 1 : ease.inOut(seg(u, swap[i], swap[i] + .55)), kout = i < ss.length - 1 ? ease.inOut(seg(u, swap[i + 1], swap[i + 1] + .55)) : 0;
+          im.style.transform = `translateX(${(1 - kin) * 100 - kout * 30}%)`; im.style.zIndex = i;
+        });
+        co.forEach((c, i) => { const z = spring(u - callAt[i], .5, 14); tf(c, { s: Math.max(0, z), y: Math.sin((u - callAt[i]) * 2.2 + i) * 5, o: u < callAt[i] ? 0 : 1 }); });
+      },
+    };
+  };
+
+  // end: logo, name, tagline and a call to action
+  SB.scenes.end = (el, sc, plan) => {
+    const light = sc.tone === 'light', dark = !light, logo = plan.brand.logo || {}, name = sc.name ?? plan.brand.name ?? '';
+    const fg = light ? 'var(--ink)' : '#fff', soft = light ? 'var(--muted)' : 'rgba(255,255,255,.76)';
+    el.classList.add(dark ? 'night' : 'paper');
+    el.innerHTML = backdrop(dark) + (logo.mark
+      ? `<img class="a lg" src="${logo.mark}" style="left:420px;top:410px;width:240px;height:240px;object-fit:contain">`
+      : `<div class="a lg" style="left:420px;top:410px;width:240px;height:240px;border-radius:60px;background:var(--primary);color:#fff;font-size:150px;font-weight:900;text-align:center;line-height:236px">${esc(name.trim()[0] || '')}</div>`) + `
+      <div class="mask title nm" style="left:0;width:1080px;top:700px;text-align:center;font-size:132px;color:${fg}"><span>${esc(name)}</span></div>
+      ${sc.tagline ? `<div class="mask sub tg" style="left:0;width:1080px;top:876px;text-align:center;font-size:46px;font-weight:500;color:${soft}"><span>${rich(sc.tagline)}</span></div>` : ''}
+      ${sc.cta ? `<div class="a pill ca" style="left:160px;top:1010px;width:760px;height:140px;line-height:138px;text-align:center;font-size:54px;font-weight:800;white-space:nowrap;background:var(--accent);color:var(--ink);box-shadow:0 24px 54px rgba(0,0,0,.28)">${esc(sc.cta)}</div>` : ''}
+      ${(sc.badges || []).length ? `<div class="a bx" style="left:0;width:1080px;top:1200px;text-align:center;white-space:nowrap">${sc.badges.map((b) => `<span class="bdg" style="display:inline-block;margin:0 10px;padding:16px 34px;border-radius:22px;font-size:36px;font-weight:700;${light ? 'background:var(--ink);color:#fff' : 'background:rgba(255,255,255,.12);color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.22)'}">${esc(b)}</span>`).join('')}</div>` : ''}
+      ${sc.url ? `<div class="a ur" style="left:0;width:1080px;top:${(sc.badges || []).length ? 1330 : 1210}px;text-align:center;font-size:42px;font-weight:700;color:${soft}">${esc(sc.url)}</div>` : ''}`;
+    const lg = $(el, '.lg'), nm = $(el, '.nm'), tg = $(el, '.tg'), ca = $(el, '.ca'), bd = [...el.querySelectorAll('.bdg')], ur = $(el, '.ur');
+    const t0 = wait(sc), at = { logo: t0 + .1, name: t0 + .38, tag: t0 + .62, cta: t0 + 1.0, badge: t0 + 1.35, url: t0 + 1.7 };
+    const shrink = (m, max) => { let z = parseFloat(getComputedStyle(m).fontSize); while (m.firstElementChild.offsetWidth > max && z > 28) { z -= 2; m.style.fontSize = z + 'px'; } };
+    return {
+      layout() { shrink(nm, 940); if (tg) shrink(tg, 940); if (ca) { let z = 54; while (ca.scrollWidth > 760 && z > 30) { z -= 2; ca.style.fontSize = z + 'px'; } } },
+      cues: [{ t: at.logo, kind: 'pop' }, { t: at.logo + .12, kind: 'ding', gain: .8 }, ...(ca ? [{ t: at.cta, kind: 'pop' }] : []), ...bd.map((_, i) => ({ t: at.badge + i * .12, kind: 'tap' }))],
+      async draw(u) {
+        drift(el, u, dark);
+        const s = spring(u - at.logo, .45, 12); tf(lg, { s: lerp(.3, 1, s), r: lerp(-14, 0, clamp(s)), y: Math.sin(u * 1.4) * 5, o: clamp((u - at.logo) * 9) });
+        reveal(nm, u, at.name); if (tg) reveal(tg, u, at.tag, .55);
+        if (ca) { const z = spring(u - at.cta, .5, 13), beat = u > at.cta + .8 ? 1 + .03 * Math.max(0, Math.sin((u - at.cta - .8) * 3.6)) : 1; tf(ca, { s: lerp(.6, 1, z) * beat, o: clamp((u - at.cta) * 9) }); }
+        bd.forEach((b, i) => { const z = spring(u - at.badge - i * .12, .55, 14); b.style.transform = `scale(${Math.max(0, z)})`; b.style.opacity = u < at.badge + i * .12 ? 0 : 1; });
+        if (ur) { const k = ease.outQuint(seg(u, at.url, at.url + .6)); tf(ur, { y: lerp(30, 0, k), o: k }); }
       },
     };
   };

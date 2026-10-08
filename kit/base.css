@@ -27,6 +27,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .night { background: linear-gradient(170deg, color-mix(in srgb, var(--ink) 78%, var(--primary)) 0%, var(--ink) 46%, color-mix(in srgb, var(--ink) 70%, #000) 100%); }
 .bubble { position: absolute; font-size: 40px; font-weight: 500; line-height: 1.3; padding: 26px 34px; border-radius: 38px; }
 
+.phone { position: absolute; inset: 0; border-radius: 88px; background: #0B0D12; padding: 15px; box-shadow: 0 50px 90px rgba(0,0,0,.42), inset 0 0 0 3px #2A2F3A; }
+.phone .scr { position: relative; width: 100%; height: 100%; border-radius: 74px; overflow: hidden; background: #fff; }
+.phone .scr img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+.phone .island { position: absolute; left: 50%; top: 24px; width: 150px; height: 42px; margin-left: -75px; border-radius: 21px; background: #000; z-index: 5; }
+
 #wipe { position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: 50; }
 #wipe div { position: absolute; top: -400px; height: 2720px; }
 #notice { position: absolute; left: 56px; top: 1452px; z-index: 40; font-size: 23px; font-weight: 600; color: rgba(255,255,255,.88); padding: 7px 16px; border-radius: 12px; background: rgba(0,0,0,.30); visibility: hidden; letter-spacing: .2px; }

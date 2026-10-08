@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.1): three scene types, vertical 1080×1920, tested on Linux / WSL only.
+> Early version (0.2): six scene types, vertical 1080×1920, tested on Linux / WSL only.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -9,8 +9,11 @@ voice-over, footage, motion graphics, music, sound effects — and then checks i
 interactive steps, so an AI coding agent can drive it from start to finish.
 
 ```
-songbe build examples/recruitment-vi      →  examples/recruitment-vi/out/video.mp4  (+ sheet.jpg, check.json)
+songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.mp4  (+ sheet.jpg, check.json)
 ```
+
+Two examples are included: `examples/app-launch-en` (an app launch, English, graphics only) and
+`examples/recruitment-vi` (a recruitment ad, Vietnamese, with footage).
 
 ## Why
 
@@ -30,6 +33,8 @@ node bin/songbe.mjs frames examples/recruitment-vi # a few stills in out/frames 
 node bin/songbe.mjs build  examples/recruitment-vi # full build
 node bin/songbe.mjs preview examples/recruitment-vi # prints a file:// address: scrub and play in any browser
 node bin/songbe.mjs init my-ad                     # start your own project from the example
+node bin/songbe.mjs validate my-ad                 # every problem in video.json, with suggestions for typos
+node bin/songbe.mjs schema                         # JSON Schema of video.json
 ```
 
 Keys go in the environment or in `<project>/.env` (git-ignored): `FAL_KEY`, optionally `GROQ_API_KEY`.
@@ -53,9 +58,15 @@ In text fields `[[words]]` puts them on a highlight plate and `**words**` colour
 
 | Type | What it shows | Fields |
 | --- | --- | --- |
-| `footage` | Full-bleed footage or image with a headline on top | `media`, `mediaOffset`, `label`, `labelStyle: "pill"`, `pin`, `title[]`, `sub`, `chip`, `notice` |
-| `card` | Light page: headline, a media card and a stat card | `label`, `title[]`, `media`, `caption`, `stat { badge, heading, sub }` |
-| `chat` | Dark page: headline, a short chat, a contact card, brand footer | `label`, `title`, `messages[] { from: "them" \| "us", text }`, `contact { kicker, button, number[], sub }`, `footer { name, line }` |
+| `footage` | Full-bleed footage or image with a headline on top | `media`, `mediaOffset`, `label`, `labelStyle: "pill"`, `pin`, `title`, `sub`, `chip` |
+| `card` | Light page: headline, a media card and a stat card | `label`, `title`, `media`, `caption`, `stat { badge, heading, sub }` |
+| `list` | Headline and rows that arrive one by one | `tone`, `label`, `title`, `items[] { text, sub, icon }` |
+| `phone` | Headline over a phone showing app screens, with callouts | `tone`, `label`, `title`, `screens`, `callouts[] { text, side, y }` |
+| `chat` | Dark page: headline, a short chat, a contact card, brand footer | `label`, `title`, `messages[] { from, text }`, `contact { kicker, button, number[], sub }`, `footer { name, line }` |
+| `end` | Logo, name, tagline and a call to action | `tone`, `name`, `tagline`, `cta`, `badges[]`, `url` |
+
+Every scene also accepts `say`, `duration` (when it has nothing to say) and `notice`.
+The table above is a summary; `songbe schema` prints the exact shape and `songbe validate` checks a project against it.
 
 `media` is a path to a video or image, or `{ "generate": { "image": "prompt", "motion": "prompt" } }` to create footage with the configured provider.
 Set `notice` (for example "Illustration generated with AI") on scenes that use generated people or places.
@@ -69,9 +80,14 @@ Set `notice` (for example "Illustration generated with AI") on scenes that use g
 
 Generated assets are cached in `.songbe/cache` by a hash of their inputs: editing one sentence regenerates one voice clip, nothing else.
 
+## Using it from an AI agent
+
+`AGENTS.md` describes the loop for any coding agent. For Claude Code there is a ready-made skill: copy `skill/` to
+`~/.claude/skills/songbe/` and ask for a video; the agent writes the spec, checks stills, builds and reads the report.
+
 ## Limits today
 
-- Three scene types and one visual style. The scene kit (`kit/scenes.js`) is the place to add more.
+- Six scene types and one visual style. The scene kit (`kit/scenes.js`) is the place to add more.
 - One provider (fal.ai) for voice, images, image-to-video and music.
 - Vertical 1080×1920 is the only layout that has been tested.
 - No timeline editor yet; `songbe preview` gives a scrubber and playback only.

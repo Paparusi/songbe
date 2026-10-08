@@ -1,0 +1,45 @@
+{
+  "size": [1080, 1920],
+  "fps": 30,
+  "brand": { "name": "Sprout", "ink": "#10261C", "primary": "#1F9D62", "accent": "#C8F26B", "paper": "#F3F8EF", "muted": "#5B6F63",
+             "logo": { "mark": "media/mark.svg" } },
+  "voice": { "voice": "Friendly_Person", "language": "English", "speed": 1.05, "emotion": "happy" },
+  "music": { "prompt": "Light, fresh acoustic-electronic instrumental for a friendly mobile app launch video, 104 BPM, plucky guitar, soft handclaps, airy pads, gentle kick drum, optimistic and clean" },
+  "scenes": [
+    {
+      "type": "phone",
+      "say": "Forgot to water your plants again?",
+      "label": "Meet Sprout",
+      "title": ["Your plants,", "on [[autopilot]]"],
+      "screens": ["media/screen-today.png"],
+      "callouts": [ { "text": "3 plants thirsty", "side": "right", "y": 0.2 }, { "text": "Water today", "side": "left", "y": 0.47 } ]
+    },
+    {
+      "type": "list",
+      "say": "Sprout reminds you when to water, checks the light, and gives you a care guide for every plant.",
+      "label": "Everything in one place",
+      "title": ["Care that", "runs itself"],
+      "items": [
+        { "icon": "bell", "text": "Smart reminders", "sub": "Never miss a watering day" },
+        { "icon": "sun", "text": "Light meter", "sub": "Find the right spot with your camera" },
+        { "icon": "heart", "text": "Care guides", "sub": "For more than 4,000 plants" }
+      ]
+    },
+    {
+      "type": "phone", "tone": "light",
+      "say": "Every plant gets its own page, with a schedule that adapts to the season.",
+      "label": "Plant profiles",
+      "title": ["Know what each", "one needs"],
+      "screens": ["media/screen-plant.png"],
+      "callouts": [ { "text": "Every 7 days", "side": "left", "y": 0.5 }, { "text": "Bright, indirect light", "side": "right", "y": 0.62 } ]
+    },
+    {
+      "type": "end",
+      "say": "Download Sprout. It's free.",
+      "tagline": "Plant care that runs itself",
+      "cta": "Get it free",
+      "badges": ["App Store", "Google Play"],
+      "url": "sprout.example"
+    }
+  ]
+}

@@ -2,7 +2,8 @@
 
 Songbe has no interactive steps. A build is: write `video.json`, look at stills, build, read the report, fix, rebuild.
 
-1. **Write the spec.** Copy `examples/recruitment-vi/video.json` and change the text. One idea per scene, one or two short
+1. **Write the spec.** Start from an example (`songbe init <dir>`) and change the text; `songbe schema` prints the exact
+   shape and `songbe validate <dir>` lists every problem. One idea per scene, one or two short
    sentences in `say`. Use only facts the person gave you: do not invent prices, salaries, phone numbers or benefits.
 2. **Look before rendering.** `songbe frames <dir>` writes two stills per scene to `out/frames/`. Open them and check for clipped
    text, text over faces, and anything outside the safe area (keep important content between y = 190 and y = 1500).

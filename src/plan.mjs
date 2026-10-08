@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as fal from './providers/fal.mjs';
 import { run, sha, mkdir, exists, tools, duration, log } from './util.mjs';
+import { validate } from './spec.mjs';
 
 const GAP = 0.35;          // pause between sentences
 const LEAD = 0.25;         // silence before the first word
@@ -13,7 +14,10 @@ const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const url = (f) => pathToFileURL(f).href;
 
 export async function makePlan(dir, opts = {}) {
-  const spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8'));
+  let spec;
+  try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
+  const errs = validate(spec, dir);
+  if (errs.length) throw new Error(`video.json has ${errs.length} problem${errs.length > 1 ? 's' : ''}:\n  - ` + errs.join('\n  - '));
   const work = mkdir(path.join(dir, '.songbe')), cache = mkdir(path.join(work, 'cache'));
   const size = spec.size || [1080, 1920], fps = spec.fps || 30;
   const notes = [];
@@ -81,6 +85,7 @@ export async function makePlan(dir, opts = {}) {
     } else sc.media = { kind: 'image', src: url(src) };
   }
 
+  for (const sc of scenes) if (sc.screens) sc.screens = list(sc.screens).map((p) => url(path.resolve(dir, p)));
   const brand = { ...spec.brand };
   if (brand.logo) brand.logo = Object.fromEntries(Object.entries(brand.logo).map(([k, v]) => [k, url(path.resolve(dir, v))]));
   const plan = {
