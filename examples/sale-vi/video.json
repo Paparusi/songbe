@@ -1,0 +1,89 @@
+{
+  "format": "tall",
+  "style": "bold",
+  "captions": true,
+  "brand": {
+    "name": "Bếp Na",
+    "ink": "#1B1410",
+    "primary": "#D9412B",
+    "accent": "#FFC83D",
+    "paper": "#FFF6EA",
+    "muted": "#7A6558"
+  },
+  "voice": {
+    "voice": "Casual_Guy",
+    "language": "Vietnamese",
+    "speed": 1.08,
+    "emotion": "happy"
+  },
+  "music": {
+    "prompt": "Upbeat cheerful Vietnamese street-food advert instrumental, 108 BPM, bright plucked strings, handclaps, bouncy bass, playful and warm"
+  },
+  "scenes": [
+    {
+      "type": "footage",
+      "say": "Trưa nay ăn gì cho nhanh?",
+      "label": "Bếp Na",
+      "title": [
+        "Cơm trưa",
+        "[[có ngay]]"
+      ],
+      "sub": "Nấu mới mỗi buổi sáng"
+    },
+    {
+      "type": "offer",
+      "say": "Tuần này, cơm phần chỉ {hai mươi lăm nghìn|25k}, giảm từ {ba mươi lăm nghìn|35k}.",
+      "label": "Tuần lễ khai trương",
+      "title": [
+        "Cơm phần",
+        "giá mở hàng"
+      ],
+      "was": "35k",
+      "price": "25k",
+      "terms": "Đến hết Chủ nhật · Tại quán",
+      "code": "BEPNA"
+    },
+    {
+      "type": "quote",
+      "say": "Khách quen nói gì về Bếp Na?",
+      "label": "Khách nói gì",
+      "quote": "Cơm nóng, canh ngon, mười phút là có phần mang về.",
+      "name": "Chị Hạnh",
+      "role": "Khách quen",
+      "stars": 5
+    },
+    {
+      "type": "chat",
+      "say": [
+        "Nhắn Zalo đặt trước, tới là có.",
+        "{Không chín trăm, không không không, không không không|0900 000 000}."
+      ],
+      "label": "Đặt trước",
+      "title": "Nhắn Bếp Na",
+      "messages": [
+        {
+          "from": "them",
+          "text": "Cho em 3 phần mang về"
+        },
+        {
+          "from": "us",
+          "text": "Có ngay, 10 phút nữa em ghé lấy nhé!"
+        }
+      ],
+      "contact": {
+        "kicker": "Zalo",
+        "button": "Nhắn tin",
+        "number": [
+          "0900",
+          "000",
+          "000"
+        ],
+        "sub": "Đặt trước, tới là có"
+      },
+      "footer": {
+        "name": "Bếp Na",
+        "line": "Cơm trưa nấu mới mỗi ngày"
+      }
+    }
+  ]
+}

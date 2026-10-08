@@ -60,6 +60,18 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .store { border-radius: var(--r-store); background: rgba(255,255,255,.12); color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22); }
 .store.light { background: var(--ink); color: #fff; box-shadow: none; }
 .logo-fallback { border-radius: var(--r-logo); background: var(--primary); color: #fff; }
+/* offer */
+.price { background: var(--accent); color: var(--ink); font-family: var(--font-title); font-weight: 900; font-size: 250px; line-height: 1.14; letter-spacing: -6px; text-transform: var(--title-case);
+  padding: 0 46px 10px; border-radius: var(--r-card); box-shadow: var(--shadow-cta); border: var(--edge) solid var(--edge-colour); }
+.was { color: rgba(255,255,255,.74); } .paper .was { color: var(--muted); }
+.was .strike { position: absolute; left: -10px; right: -10px; top: 52%; height: 7px; border-radius: 4px; background: var(--accent); transform-origin: 0 50%; } .paper .was .strike { background: var(--primary); }
+.terms { color: var(--muted); } .terms.on-dark { color: rgba(255,255,255,.82); }
+.code { border: 4px dashed currentColor; color: var(--accent); border-radius: var(--r-row); font-weight: 800; letter-spacing: 6px; text-transform: uppercase; } .paper .code { color: var(--ink); }
+/* photos */
+.shot .frame { border-radius: calc(var(--r-frame) * .8); }
+.nopic { position: absolute; inset: 0; display: grid; place-items: center; color: color-mix(in srgb, var(--ink) 22%, transparent); background: color-mix(in srgb, var(--primary) 10%, var(--paper)); }
+/* quote */
+.qt { font-weight: var(--title-weight); text-transform: none; } .night .logo-fallback.av, .paper .logo-fallback.av { border-radius: 50%; }
 
 .paper { background: var(--paper); }
 .dots { position: absolute; inset: -60px; opacity: .5; background-image: radial-gradient(color-mix(in srgb, var(--primary) 16%, transparent) 2px, transparent 2.4px); background-size: 44px 44px; }

@@ -71,7 +71,7 @@ test('the app offers pack starters and serves a pack\'s style sheet and fonts, a
   try {
     const h = await fetch(u + '/api/home').then(J);
     assert.deepEqual(h.packs.map((p) => [p.id, p.where]).sort(), [['classic', 'bundled'], ['neon', 'linked']]);
-    assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'neon/sale', 'classic/quan-ca-phe', 'blank']);
+    assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'sale-vi', 'neon/sale', 'classic/quan-ca-phe', 'blank']);
     assert.ok(h.styles.includes('classic') && h.styles.includes('neon'));
     const poster = await fetch(u + h.starters.find((x) => x.id === 'classic/quan-ca-phe').poster); assert.equal(poster.headers.get('content-type'), 'image/jpeg');
     const { id } = await fetch(u + '/api/projects', { method: 'POST', headers: own, body: JSON.stringify({ name: 'Quán của tôi', starter: 'classic/quan-ca-phe' }) }).then(J);

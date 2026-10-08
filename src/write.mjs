@@ -44,6 +44,9 @@ SCENE TYPES
 - "list": benefits arriving one by one. items[] of { icon, text, sub }; three rows are best. icon is one of: check, star, bolt, heart, shield, drop, clock, bell, sun, pin, number.
 - "phone": an app or website in use. Needs "screens" (portrait screenshots from the available media); one or two callouts[] of { text, side: "left" | "right", y: 0.2 to 0.7 }. Never use this type without screens.
 - "chat": how to get in touch. messages[] of { from: "them" | "us", text } (them asks first, us answers), contact { kicker, button, number, sub }, footer { name, line }. contact.number is the phone number as a list of digit groups, for example ["0900", "000", "000"].
+- "offer": a promotion. One big figure in "price" ("-30%", "99k", "$29"), optionally the old price in "was" (it is struck out), "terms" (until when, where) and a coupon "code". Only when the brief states that price or discount.
+- "photos": one to four pictures from the available media in cards: photos[] of { src, caption }. Only with pictures that are listed.
+- "quote": what a customer said: "quote" (their words, as given in the brief), name, role, stars (1 to 5). Only when the brief contains a real customer's words; never write a testimonial yourself.
 - "end": the sign-off. name (defaults to the brand), tagline, cta (the button), badges[], url.
 A good order: hook, proof or benefits, how it works or what you get, how to act.
 
@@ -117,7 +120,7 @@ function finish(draft, { brief, style, format, captions, language, dir }) {
 
 // ---- checks beyond the validator ----
 const squash = (s) => String(s).replace(/(?<=\d)[\s.,\-–](?=\d)/g, '');      // "0900 000 000" and "4,000" as runs of digits
-const NOT_TEXT = new Set(['type', 'icon', 'side', 'from', 'tone', 'labelStyle', 'media', 'screens', 'y', 'pin', 'duration', 'minDuration', 'mediaOffset']);
+const NOT_TEXT = new Set(['type', 'icon', 'side', 'from', 'tone', 'labelStyle', 'media', 'screens', 'y', 'pin', 'duration', 'minDuration', 'mediaOffset', 'src', 'photo', 'stars']);
 function texts(value, at, out = []) {
   if (typeof value === 'string') out.push([at, value]);
   else if (Array.isArray(value)) value.forEach((v, i) => texts(v, `${at}[${i}]`, out));

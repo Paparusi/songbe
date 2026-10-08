@@ -194,7 +194,7 @@
       const said = new Set(), once = (level, message) => { if (!said.has(message)) { said.add(message); say(level, message); } };
       const walk = document.createTreeWalker(s.el, NodeFilter.SHOW_TEXT), texts = [];
       for (let n; (n = walk.nextNode());) {
-        const words = n.nodeValue.replace(/\s+/g, ' ').trim(); if (!words || !seen(n.parentElement)) continue;
+        const words = n.nodeValue.replace(/\s+/g, ' ').trim(); if (!words || !seen(n.parentElement) || n.parentElement.closest('[data-deco]')) continue;      // ornaments (a big quotation mark) are not text to read
         const range = document.createRange(); range.selectNodeContents(n);
         const r = rect(range), quoted = `"${words.slice(0, 34)}"`; if (r.r - r.l < 2) continue;
         texts.push({ r, quoted, host: n.parentElement });
@@ -212,7 +212,7 @@
         const a = mid(A), b = mid(B), w = Math.min(a.r, b.r) - Math.max(a.l, b.l), h = Math.min(a.b, b.b) - Math.max(a.t, b.t);
         if (w > 6 && h > 4) once('problem', `${A.quoted} runs into ${B.quoted}`);
       }
-      if (s.el.querySelector('[data-placeholder]')) say('note', 'the phone has no screenshot to show and draws a placeholder: give the scene "screens"');
+      if (s.el.querySelector('[data-placeholder]')) say('note', sc.type === 'photos' ? 'a picture is missing and a placeholder is drawn in its place: give every photo a "src"' : 'the phone has no screenshot to show and draws a placeholder: give the scene "screens"');
       const label = (b) => (b.text && b.name !== 'phone' && b.name !== 'media card' && b.name !== 'footage frame' ? `${b.name} "${b.text}"` : b.name);
       for (const b of boxes) {
         const over = { left: -b.l, right: b.r - W, top: -b.t, bottom: b.b - FH };

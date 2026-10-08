@@ -1,9 +1,12 @@
-// Songbe scene kit — six scene types that cover most short ads:
+// Songbe scene kit — nine scene types that cover most short ads:
 //   footage  full-bleed footage or image with a headline on top
 //   card     light page: headline, a media card (proof shot) and a stat card
 //   list     headline and rows that arrive one by one
 //   phone    headline over a phone showing app screens, with callouts
 //   chat     dark page: headline, a short chat exchange, a contact card and the brand footer
+//   offer    a promotion: headline, one big figure on a plate, the old price struck out, terms, a code
+//   photos   headline over one to four pictures in cards
+//   quote    what a customer said: the words large, stars, who said it
 //   end      logo, name, tagline and a call to action
 // Each factory builds its DOM once and returns { layout?, cues, draw(u, t) } where u is seconds since the scene started.
 //
@@ -341,6 +344,130 @@
           ng.forEach((g, i) => { g.style.transform = `translateY(${lerp(112, 0, ease.outQuint(seg(u, groupAt[i], groupAt[i] + .45)))}%)`; });
         }
         const kf = ease.outQuint(seg(u, at.footer, at.footer + .7)); tf(ft, { y: lerp(50, 0, kf), o: kf });
+      },
+    };
+  };
+
+  // offer: a promotion — one big figure on a plate, the old price struck out above it, the terms and a code below
+  SB.scenes.offer = (el, sc) => {
+    const { W, H, kind } = SB.frame, light = sc.tone === 'light', dark = !light, n = lines(sc.title).length, [size, step] = type(112, 132);
+    const top = 280 + n * step + 84, py = top + (sc.was ? 104 : 0), ty = py + 372, cy = ty + (sc.terms ? 96 : 0), bottom = cy + (sc.code ? 124 : 0);
+    el.classList.add(dark ? 'night' : 'paper');
+    el.innerHTML = backdrop(dark) + blk('head', heading(sc, dark, size, step)) + blk('deal', `
+      ${sc.was ? `<div class="a was ws" style="left:84px;top:${top}px;font-size:66px;font-weight:700;white-space:nowrap"><span>${esc(sc.was)}</span><i class="strike"></i></div>` : ''}
+      <div class="a price pr" style="left:70px;top:${py}px;white-space:nowrap;transform-origin:8% 60%"><span>${esc(sc.price)}</span></div>
+      ${sc.terms ? `<div class="a sub terms tm${dark ? ' on-dark' : ''}" style="left:76px;top:${ty}px;font-size:42px;white-space:nowrap">${esc(sc.terms)}</div>` : ''}
+      ${sc.code ? `<div class="a code cd" style="left:72px;top:${cy}px;font-size:46px;padding:18px 40px;white-space:nowrap;transform-origin:0 50%">${esc(sc.code)}</div>` : ''}`);
+    const hy = headTop(sc), hh = headHeight(sc, step), dealH = bottom - top;
+    if (kind === 'tall') squeeze(el, top, bottom, { deal: top });
+    if (kind === 'square') {            // heading on top, the deal under it as large as the height allows
+      const kh = .62, hb = 60 + hh * kh, kd = clamp((SB.frame.floor - hb - 30) / dealH, .45, 1);
+      put(el, 'head', 68, hy, 64, 60, kh); put(el, 'deal', 70, top, 64, hb + 30, kd);
+    }
+    if (kind === 'wide') {              // heading on the left, the deal on the right
+      const kh = .9, kd = Math.min(1, (H - 160) / dealH);
+      put(el, 'head', 68, hy, 110, (H - hh * kh) / 2, kh); put(el, 'deal', 70, top, W - 110 - 900 * kd, (H - dealH * kd) / 2, kd);
+    }
+    const lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], ws = $(el, '.ws'), pr = $(el, '.pr'), tm = $(el, '.tm'), cd = $(el, '.cd');
+    const t0 = wait(sc), at = { was: t0 + .55, price: t0 + .8, terms: t0 + 1.35, code: t0 + 1.7 };
+    return {
+      layout() { fitTitle(tl, size, kind === 'wide' ? 860 : 920); fitAll(el, { '.lb': 936, '.ws': 880, '.pr': 900, '.tm': 930, '.cd': 900 }); },
+      cues: [{ t: at.price - .05, kind: 'swish' }, { t: at.price + .1, kind: 'ding' }, ...(cd ? [{ t: at.code, kind: 'pop' }] : [])],
+      async draw(u) {
+        drift(el, u, dark);
+        if (lb) reveal(lb, u, t0);
+        tl.forEach((l, i) => reveal(l, u, t0 + .1 + i * .14));
+        if (ws) { tf(ws, { y: lerp(30, 0, ease.outQuint(seg(u, at.was, at.was + .5))), o: clamp((u - at.was) * 6) }); $(ws, '.strike').style.transform = `scaleX(${ease.inOut(seg(u, at.was + .35, at.was + .75))})`; }
+        const z = spring(u - at.price, .5, 12), beat = u > at.price + 1 ? 1 + .025 * Math.max(0, Math.sin((u - at.price - 1) * 3.2)) : 1;
+        tf(pr, { s: lerp(.55, 1, z) * beat, r: lerp(-10, -3, clamp(z)), o: clamp((u - at.price) * 9) });
+        if (tm) { const k = ease.outQuint(seg(u, at.terms, at.terms + .6)); tf(tm, { y: lerp(34, 0, k), o: k }); }
+        if (cd) pop(cd, u, at.code, { from: .7, dy: 30 });
+      },
+    };
+  };
+
+  // photos: a headline over one to four pictures, each in its own card
+  SB.scenes.photos = (el, sc) => {
+    const { W, H, kind } = SB.frame, dark = sc.tone === 'dark', shots = (sc.photos || []).slice(0, 4), n = lines(sc.title).length, [size, step] = type(112, 132), top = 280 + n * step + 70;
+    // where each card sits in a 940-wide column: [x, y, width, height]
+    const GRID = { 1: [[0, 0, 940, 900]], 2: [[0, 0, 940, 440], [0, 464, 940, 440]], 3: [[0, 0, 940, 470], [0, 494, 458, 410], [482, 494, 458, 410]], 4: [[0, 0, 458, 440], [482, 0, 458, 440], [0, 464, 458, 440], [482, 464, 458, 440]] }[Math.max(1, shots.length)];
+    const gridH = Math.max(...GRID.map((g) => g[1] + g[3]));
+    el.classList.add(dark ? 'night' : 'paper');
+    el.innerHTML = backdrop(dark) + blk('head', heading(sc, dark, size, step)) + blk('grid', (shots.length ? shots : [{}]).map((p, i) => { const [x, y, w, h] = GRID[i];
+      return `<div class="a card shot pc" style="left:${70 + x}px;top:${top + y}px;width:${w}px;height:${h}px;padding:14px;transform-origin:50% 60%">
+        <div class="frame" style="position:relative;width:100%;height:100%">
+          ${p.src ? `<img class="pi" src="${p.src}" style="position:absolute;left:-3%;top:-3%;width:106%;height:106%;object-fit:cover">` : `<div class="nopic" data-placeholder="1">${icon('sun', 120)}</div>`}
+          ${p.caption ? `<div class="cap" style="position:absolute;left:18px;bottom:18px;font-size:30px;font-weight:600;padding:10px 20px;white-space:nowrap">${esc(p.caption)}</div>` : ''}
+        </div></div>`; }).join(''));
+    const hy = headTop(sc), hh = headHeight(sc, step);
+    if (kind === 'tall') squeeze(el, top, top + gridH, { grid: top });
+    if (kind === 'square') {            // heading on top, the pictures under it, as large as the height allows
+      const kh = .62, hb = 60 + hh * kh, kg = clamp((SB.frame.floor - hb - 24) / gridH, .4, 1);
+      put(el, 'head', 68, hy, 64, 60, kh); put(el, 'grid', 70, top, (W - 940 * kg) / 2, hb + 24, kg);
+    }
+    if (kind === 'wide') {              // heading on the left, the pictures on the right
+      const kh = .9, kg = Math.min(.98, (H - 130) / gridH);
+      put(el, 'head', 68, hy, 110, (H - hh * kh) / 2, kh); put(el, 'grid', 70, top, W - 110 - 940 * kg, (H - gridH * kg) / 2, kg);
+    }
+    const lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], pc = [...el.querySelectorAll('.pc')];
+    const dur = sc.end - sc.start, t0 = wait(sc), first = t0 + .6, gap = clamp((dur - first - 1.4) / Math.max(1, pc.length), .22, .9);
+    return {
+      layout() { fitTitle(tl, size, kind === 'wide' ? 860 : 920); fitAll(el, { '.lb': 936 }); for (const c of pc) { const cap = $(c, '.cap'); if (cap) fit(cap, c.offsetWidth - 64); } },
+      cues: pc.map((_, i) => ({ t: first + i * gap + .02, kind: i ? 'pop' : 'swish' })),
+      async draw(u) {
+        drift(el, u, dark);
+        if (lb) reveal(lb, u, t0);
+        tl.forEach((l, i) => reveal(l, u, t0 + .1 + i * .14));
+        pc.forEach((c, i) => {
+          const at = first + i * gap, z = spring(u - at, .62, 10);
+          tf(c, { y: lerp(200, 0, z) + Math.sin(u * 1.3 + i) * 3, r: lerp(i % 2 ? 5 : -5, 0, clamp(z)), s: lerp(.9, 1, clamp(z)), o: clamp((u - at) * 8) });
+          const im = $(c, '.pi'); if (im) im.style.transform = `scale(${1 + .05 * seg(u, at, at + 4)})`;
+        });
+      },
+    };
+  };
+
+  // quote: what a customer said — the words large, then stars and who said it
+  SB.scenes.quote = (el, sc) => {
+    const { W, H, kind } = SB.frame, dark = sc.tone === 'dark', words = String(sc.quote || '').split(/\s+/).filter(Boolean), stars = Math.round(clamp(sc.stars || 0, 0, 5));
+    const fg = dark ? '#fff' : 'var(--ink)', soft = dark ? 'rgba(255,255,255,.72)' : 'var(--muted)', who = sc.name || sc.role || sc.photo, qy = sc.label ? 470 : 420;
+    el.classList.add(dark ? 'night' : 'paper');
+    el.innerHTML = backdrop(dark) + blk('say', `
+      ${sc.label ? `<div class="mask label lb" style="left:72px;top:214px;color:var(--${dark ? 'accent' : 'primary'})"><span>${esc(sc.label)}</span></div>` : ''}
+      <div class="a title qm" data-deco="1" style="left:58px;top:${qy - 236}px;font-size:330px;line-height:1;color:var(--${dark ? 'accent' : 'primary'});transform-origin:20% 70%">“</div>
+      <div class="a title qt" style="left:72px;top:${qy}px;width:936px;font-size:78px;line-height:1.22;letter-spacing:-1px;color:${fg}">${words.map((w) => `<span class="qw" style="display:inline-block">${esc(w)}</span>`).join(' ')}</div>`) + blk('who', `
+      ${stars ? `<div class="a st5" style="left:72px;top:0;white-space:nowrap;color:var(--accent)">${[0, 1, 2, 3, 4].map((i) => `<span class="star" style="display:inline-block;margin-right:10px;opacity:${i < stars ? 1 : .22}">${icon('star', 62)}</span>`).join('')}</div>` : ''}
+      ${who ? `<div class="a ps" style="left:72px;top:${stars ? 104 : 0}px;width:936px;height:128px">
+        ${sc.photo ? `<img class="av" src="${sc.photo}" style="position:absolute;left:0;top:0;width:128px;height:128px;border-radius:50%;object-fit:cover">` : `<div class="logo-fallback av" style="position:absolute;left:0;top:0;width:128px;height:128px;border-radius:50%;font-size:64px;font-weight:900;text-align:center;line-height:126px">${esc((sc.name || '?').trim()[0] || '?')}</div>`}
+        <div class="pn" style="position:absolute;left:158px;top:${sc.role ? 14 : 34}px;font-size:48px;font-weight:800;letter-spacing:-.5px;white-space:nowrap;color:${fg}">${esc(sc.name || '')}</div>
+        ${sc.role ? `<div class="pl" style="position:absolute;left:160px;top:78px;font-size:34px;font-weight:500;white-space:nowrap;color:${soft}">${esc(sc.role)}</div>` : ''}</div>` : ''}`);
+    const lb = $(el, '.lb'), qm = $(el, '.qm'), qt = $(el, '.qt'), qw = [...el.querySelectorAll('.qw')], st = [...el.querySelectorAll('.star')], ps = $(el, '.ps'), whoH = (stars ? 104 : 0) + (who ? 128 : 0);
+    // the words set how tall the quote is, so the blocks are placed once the fonts are in
+    const place = () => {
+      let z = 78; while (qt.offsetHeight > 640 && z > 44) { z -= 2; qt.style.fontSize = z + 'px'; } qt.dataset.designed ??= 78;
+      const qh = qt.offsetHeight, wy = qy + qh + 64, bottom = wy + whoH;
+      if (kind === 'tall') {            // a short quote sits a little lower, nearer the middle of the frame, rather than hanging from the top
+        const k = bottom <= SB.frame.floor ? 1 : Math.max(.6, (SB.frame.floor - 214) / (bottom - 214)), y = 214 + Math.min(240, Math.max(0, (SB.frame.floor - 60 - bottom) / 2));
+        put(el, 'say', 540, 214, 540, y, k); put(el, 'who', 72, 0, 540 - 468 * k, y + (wy - 214) * k, k);
+      }
+      if (kind === 'square') { const k = clamp((SB.frame.floor - 70) / (bottom - 214), .4, .82), x = (W - 1080 * k) / 2; put(el, 'say', 0, 214, x, 50, k); put(el, 'who', 72, 0, x + 72 * k, 50 + (wy - 214) * k, k); }
+      if (kind === 'wide') {              // the words on the left, who said them on the right
+        const k = clamp((H - 150) / (qy + qh - 214), .5, .96); put(el, 'say', 0, 214, 90, (H - (qy + qh - 214) * k) / 2, k);
+        put(el, 'who', 72, 0, W - 110 - 660, (H - whoH) / 2, 1);
+      }
+    };
+    place();
+    const dur = sc.end - sc.start, t0 = wait(sc), w0 = t0 + .5, wgap = clamp((dur - w0 - 2.2) / Math.max(1, qw.length), .03, .16), after = w0 + qw.length * wgap, at = { stars: after + .2, who: after + .5 };
+    return {
+      layout() { fitAll(el, { '.lb': 936, '.pn': 770, '.pl': 770 }); place(); },
+      cues: [{ t: t0 + .15, kind: 'pop' }, ...st.slice(0, stars).map((_, i) => ({ t: at.stars + i * .09, kind: 'tap' })), ...(ps ? [{ t: at.who, kind: 'swish', gain: .7 }] : [])],
+      async draw(u) {
+        drift(el, u, dark);
+        if (lb) reveal(lb, u, t0);
+        const m = spring(u - t0 - .1, .5, 12); tf(qm, { s: lerp(.4, 1, m), r: lerp(-12, 0, clamp(m)), o: clamp((u - t0 - .1) * 8) });
+        qw.forEach((w, i) => { const k = ease.outQuint(seg(u, w0 + i * wgap, w0 + i * wgap + .4)); w.style.transform = `translateY(${lerp(26, 0, k)}px)`; w.style.opacity = k; });
+        st.forEach((x, i) => { const z = spring(u - at.stars - i * .09, .5, 15); x.style.transform = `scale(${Math.max(0, z)})`; });
+        if (ps) { const k = ease.outQuint(seg(u, at.who, at.who + .6)); tf(ps, { y: lerp(40, 0, k), o: k }); }
       },
     };
   };

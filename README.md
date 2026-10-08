@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.12): six scene types, three looks, packs for more, any frame size, captions, cuts on the beat, built-in checks, a writer that
+> Early version (0.13): nine scene types, three looks, packs for more, any frame size, captions, cuts on the beat, built-in checks, a writer that
 > drafts the whole video from a description, and an app with a visual editor (in the browser, or installed on Windows). Tested on Linux / WSL and on Windows 11; macOS has not been tried.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
@@ -14,8 +14,8 @@ would rather click than type (see *The app*).
 songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.mp4  (+ sheet.jpg, check.json)
 ```
 
-Two examples are included: `examples/app-launch-en` (an app launch, English, graphics only) and
-`examples/recruitment-vi` (a recruitment ad, Vietnamese, with footage).
+Three examples are included: `examples/app-launch-en` (an app launch, English, with phone screens), `examples/recruitment-vi`
+(a recruitment ad, Vietnamese, with footage) and `examples/sale-vi` (a promotion, Vietnamese, no footage at all).
 
 ## Why
 
@@ -74,6 +74,9 @@ In text fields `[[words]]` puts them on a highlight plate and `**words**` colour
 | `list` | Headline and rows that arrive one by one | `tone`, `label`, `title`, `items[] { text, sub, icon }` |
 | `phone` | Headline over a phone showing app screens, with callouts | `tone`, `label`, `title`, `screens`, `callouts[] { text, side, y }` |
 | `chat` | Dark page: headline, a short chat, a contact card, brand footer | `label`, `title`, `messages[] { from, text }`, `contact { kicker, button, number[], sub }`, `footer { name, line }` |
+| `offer` | A promotion: one big figure on a plate, the old price struck out, terms, a code | `tone`, `label`, `title`, `price`, `was`, `terms`, `code` |
+| `photos` | Headline over one to four pictures in cards | `tone`, `label`, `title`, `photos[] { src, caption }` |
+| `quote` | What a customer said: the words large, stars, who said it | `tone`, `label`, `quote`, `name`, `role`, `stars`, `photo` |
 | `end` | Logo, name, tagline and a call to action | `tone`, `name`, `tagline`, `cta`, `badges[]`, `url` |
 
 Every scene also accepts `say`, `duration` (when it has nothing to say) and `notice`.
@@ -269,7 +272,7 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 
 ## Limits today
 
-- Six scene types; three looks (two in the kit, one bundled as a pack). Scene types live in `kit/scenes.js` and cannot come from packs.
+- Nine scene types; three looks (two in the kit, one bundled as a pack). Scene types live in `kit/scenes.js` and cannot come from packs.
 - One provider (fal.ai) for voice, images, image-to-video and music; the writer also takes an Anthropic key.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.

@@ -50,7 +50,7 @@ test('the home screen starts empty, with starters to pick from', async () => {
   const h = await fetch(u + '/api/home').then(J);
   assert.deepEqual(h.projects, []);
   assert.equal(h.home, process.env.SONGBE_HOME);
-  assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'classic/quan-ca-phe', 'blank']);
+  assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'sale-vi', 'classic/quan-ca-phe', 'blank']);
   for (const st of h.starters.filter((x) => x.id !== 'blank')) { assert.ok(st.poster, `${st.id} has a poster`); assert.equal((await fetch(u + st.poster)).headers.get('content-type'), 'image/jpeg'); }
   assert.deepEqual(h.keys, { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null });
   for (const page of ['/home', '/studio/ui.css', '/studio/icon.svg', '/kit/fonts/fonts.css']) assert.equal((await fetch(u + page)).status, 200, page);

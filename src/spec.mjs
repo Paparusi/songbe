@@ -17,6 +17,9 @@ export const SCENES = {
   phone: { ...common, tone: ['dark', 'light'], label: 'str', 'title!': 'text', screens: 'text', callouts: [{ 'text!': 'str', side: ['left', 'right'], y: 'num' }] },
   chat: { ...common, label: 'str', 'title!': 'text', messages: [{ 'from!': ['them', 'us'], 'text!': 'str' }],
     contact: { kicker: 'str', button: 'str', 'number!': 'text', sub: 'str' }, footer: { name: 'str', line: 'str' } },
+  offer: { ...common, tone: ['dark', 'light'], label: 'str', 'title!': 'text', 'price!': 'str', was: 'str', terms: 'str', code: 'str' },
+  photos: { ...common, tone: ['light', 'dark'], label: 'str', 'title!': 'text', 'photos!': [{ src: 'str', caption: 'str' }] },
+  quote: { ...common, tone: ['light', 'dark'], label: 'str', 'quote!': 'str', name: 'str', role: 'str', stars: 'num', photo: 'str' },
   end: { ...common, tone: ['dark', 'light'], name: 'str', tagline: 'str', cta: 'str', badges: ['str'], url: 'str' },
 };
 
@@ -29,6 +32,9 @@ export const TEMPLATES = {
   phone: { type: 'phone', say: 'Show the product being used.', label: 'In the app', title: ['See it', 'in action'], callouts: [{ text: 'A short callout', side: 'right', y: 0.3 }] },
   chat: { type: 'chat', say: ['Tell people how to reach you.', 'Zero nine hundred, zero zero zero, zero zero zero.'], label: 'Get in touch', title: 'Message us',
     messages: [{ from: 'them', text: 'Hi, I am interested' }, { from: 'us', text: 'Hello! Happy to help.' }], contact: { kicker: 'Phone', button: 'Message', number: ['0900', '000', '000'], sub: 'Replies within the day' } },
+  offer: { type: 'offer', say: 'Say the offer and until when it runs.', label: 'This week only', title: ['The offer', 'in two lines'], price: '-20%', terms: 'Until Sunday, in store' },
+  photos: { type: 'photos', say: 'Show what people get.', label: 'Have a look', title: ['See it', 'for yourself'], photos: [{ caption: 'First picture' }, { caption: 'Second picture' }] },
+  quote: { type: 'quote', say: 'Let a customer say it.', label: 'What customers say', quote: 'Replace this with the words of a real customer.', name: 'Their name', role: 'Who they are', stars: 5 },
   end: { type: 'end', say: 'Close with the call to action.', tagline: 'One line that sums it up', cta: 'Get started' },
 };
 
@@ -105,6 +111,10 @@ export function validate(spec, dir) {
     const { type, ...rest } = sc;
     walk(rest, SCENES[type], at, errs, dir);
     if (type === 'phone' && dir) for (const s of [].concat(sc.screens || [])) if (typeof s === 'string' && !fs.existsSync(path.resolve(dir, s))) errs.push(`${at}.screens: file not found: ${s}`);
+    if (type === 'photos' && dir && Array.isArray(sc.photos)) sc.photos.forEach((p, n) => { if (typeof p?.src === 'string' && !fs.existsSync(path.resolve(dir, p.src))) errs.push(`${at}.photos[${n}].src: file not found: ${p.src}`); });
+    if (type === 'photos' && Array.isArray(sc.photos) && (sc.photos.length < 1 || sc.photos.length > 4)) errs.push(`${at}.photos: one to four pictures`);
+    if (type === 'quote' && dir && typeof sc.photo === 'string' && !fs.existsSync(path.resolve(dir, sc.photo))) errs.push(`${at}.photo: file not found: ${sc.photo}`);
+    if (type === 'quote' && typeof sc.stars === 'number' && (sc.stars < 1 || sc.stars > 5)) errs.push(`${at}.stars: from 1 to 5`);
     if (!sc.say && !sc.duration) errs.push(`${at}: give the scene something to "say" or a "duration" in seconds`);
   });
   return errs;

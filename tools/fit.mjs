@@ -22,7 +22,7 @@ const STYLES = pack ? pack.styles.map((s) => s.name) : BUILTIN_STYLES;      // t
 const SHRINK = .9;                                           // type may shrink this far and still count as fitting
 // ordinary words in two languages; the stricter of the two decides
 const WORDS = ['Smart reminders for every plant and a care guide that adapts to the season all year round today', 'Tuyển công nhân sản xuất chế độ đầy đủ đi làm ngay gần nhà bạn không mất bất kỳ khoản phí nào hết nhé'];
-const cut = (sample, n) => { let s = sample.slice(0, n); if (s.endsWith(' ')) s = s.slice(0, -1) + 'a'; return s; };
+const cut = (full, n) => { const sample = (full + ' ').repeat(Math.ceil(n / full.length) + 1); let s = sample.slice(0, n); if (s.endsWith(' ')) s = s.slice(0, -1) + 'a'; return s; };
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAkAAAAUCAIAAADQu4ACAAAAF0lEQVR42mPUqIhiwAGYGHCDUbmRKQcATsgBIi1V5UoAAAAASUVORK5CYII=', 'base64');      // a small portrait picture
 
 const BASE = {
@@ -32,6 +32,9 @@ const BASE = {
   phone: { type: 'phone', duration: 5, screens: ['media/x.png'], label: 'Label', title: ['Short', 'title'], callouts: [{ text: 'Call', side: 'right', y: .3 }, { text: 'Call', side: 'left', y: .5 }] },
   chat: { type: 'chat', duration: 9, label: 'Label', title: ['Short', 'title'], messages: [{ from: 'them', text: 'Hi' }, { from: 'us', text: 'Hello' }],
     contact: { kicker: 'Phone', button: 'Call', number: ['0900', '000', '000'], sub: 'Sub' }, footer: { name: 'Name', line: 'Line' } },
+  offer: { type: 'offer', duration: 5, label: 'Label', title: ['Short', 'title'], price: '-20%', was: '100k', terms: 'Terms', code: 'CODE' },
+  photos: { type: 'photos', duration: 5, label: 'Label', title: ['Short', 'title'], photos: [{ src: 'media/x.png', caption: 'Cap' }, { src: 'media/x.png', caption: 'Cap' }, { src: 'media/x.png', caption: 'Cap' }] },
+  quote: { type: 'quote', duration: 9, label: 'Label', quote: 'Short words.', name: 'Name', role: 'Role', stars: 5 },
   end: { type: 'end', duration: 5, name: 'Name', tagline: 'Tagline', cta: 'Go', badges: ['One', 'Two'], url: 'example.com' },
 };
 const LINE = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32], SHORT = [6, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 34, 38, 42, 48], LONG = [8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 100, 130];
@@ -45,11 +48,15 @@ const FIELDS = {
   chat: [['label', SHORT, (s, t) => { s.label = t; }], ['title', LINE, (s, t) => { s.title = [t, t]; }], ['messages.text', LONG, (s, t) => { for (const m of s.messages) m.text = t; }, { lines: 3 }],
     ['contact.kicker', SHORT, (s, t) => { s.contact.kicker = t; }], ['contact.button', SHORT, (s, t) => { s.contact.button = t; }], ['contact.sub', SHORT, (s, t) => { s.contact.sub = t; }],
     ['footer.name', SHORT, (s, t) => { s.footer.name = t; }], ['footer.line', LONG, (s, t) => { s.footer.line = t; }]],
+  offer: [['label', SHORT, (s, t) => { s.label = t; }], ['title', LINE, (s, t) => { s.title = [t, t]; }], ['price', [3, 4, 5, 6, 7, 8, 10, 12, 14], (s, t) => { s.price = t; }], ['was', SHORT, (s, t) => { s.was = t; }],
+    ['terms', LONG, (s, t) => { s.terms = t; }], ['code', SHORT, (s, t) => { s.code = t; }]],
+  photos: [['label', SHORT, (s, t) => { s.label = t; }], ['title', LINE, (s, t) => { s.title = [t, t]; }], ['caption', SHORT, (s, t) => { for (const p of s.photos) p.caption = t; }]],
+  quote: [['label', SHORT, (s, t) => { s.label = t; }], ['quote', [16, 40, 60, 80, 100, 120, 140, 160, 200, 240], (s, t) => { s.quote = t; }, { lines: 7, shrink: .8 }], ['name', SHORT, (s, t) => { s.name = t; }], ['role', LONG, (s, t) => { s.role = t; }]],
   end: [['name', LINE, (s, t) => { s.name = t; }], ['tagline', LONG, (s, t) => { s.tagline = t; }], ['cta', SHORT, (s, t) => { s.cta = t; }], ['badges', SHORT, (s, t) => { s.badges = [t, t]; }], ['url', SHORT, (s, t) => { s.url = t; }]],
 };
 // Where measuring alone would allow more than the design means to hold (a button is a word or two, a title three lines at most),
 // the smaller number stands.
-const CAPS = { 'footage.label': 30, 'card.label': 30, 'list.label': 30, 'phone.label': 30, 'chat.label': 30, 'card.caption': 36, 'chat.contact.kicker': 16, 'chat.contact.button': 14, 'chat.contact.sub': 40,
+const CAPS = { 'offer.label': 30, 'photos.label': 30, 'quote.label': 30, 'offer.code': 16, 'offer.was': 14, 'photos.caption': 24, 'quote.name': 28, 'quote.role': 40, 'footage.label': 30, 'card.label': 30, 'list.label': 30, 'phone.label': 30, 'chat.label': 30, 'card.caption': 36, 'chat.contact.kicker': 16, 'chat.contact.button': 14, 'chat.contact.sub': 40,
   'chat.footer.name': 30, 'chat.footer.line': 48, 'end.badges': 14, 'end.url': 32, 'footage.title.lines': 3, 'list.items.count': 5 };
 // counts that are not lengths: how many of something a scene takes
 const COUNTS = {
@@ -58,6 +65,8 @@ const COUNTS = {
   'list.title.lines': [[1, 2, 3], (n) => ({ ...structuredClone(BASE.list), title: Array(n).fill('Ten letters') })],
   'phone.title.lines': [[1, 2, 3], (n) => ({ ...structuredClone(BASE.phone), title: Array(n).fill('Ten letters') })],
   'chat.title.lines': [[1, 2, 3], (n) => ({ ...structuredClone(BASE.chat), title: Array(n).fill('Ten letters') })],
+  'offer.title.lines': [[1, 2, 3], (n) => ({ ...structuredClone(BASE.offer), title: Array(n).fill('Ten letters') })],
+  'photos.title.lines': [[1, 2, 3], (n) => ({ ...structuredClone(BASE.photos), title: Array(n).fill('Ten letters') })],
   'list.items.count': [[2, 3, 4, 5, 6], (n) => ({ ...structuredClone(BASE.list), items: Array.from({ length: n }, (_, i) => ({ text: 'Row number ' + (i + 1), sub: 'A few words more' })) })],
   'end.badges.count': [[1, 2, 3, 4], (n) => ({ ...structuredClone(BASE.end), badges: Array(n).fill('App Store') })],
 };

@@ -130,6 +130,8 @@ export async function makePlan(dir, opts = {}) {
   }
 
   for (const sc of scenes) if (sc.screens) sc.screens = list(sc.screens).map((p) => url(path.resolve(dir, p)));
+  for (const sc of scenes) if (sc.type === 'photos' && Array.isArray(sc.photos)) sc.photos = sc.photos.map((p) => (p.src ? { ...p, src: url(path.resolve(dir, p.src)) } : p));
+  for (const sc of scenes) if (sc.type === 'quote' && sc.photo) sc.photo = url(path.resolve(dir, sc.photo));
   // ---- captions: short lines that follow the voice, the word being spoken highlighted ----
   const wantCaptions = opts.captions ?? spec.captions ?? false, frame = size[0] / size[1];
   const captions = wantCaptions ? scenes.flatMap((sc) => sc.say.flatMap((line) =>

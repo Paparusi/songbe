@@ -33,7 +33,9 @@ export function tooLong(spec, style = spec?.style || 'soft') {
     text(`${at}.label`, `${type}.label`, sc.label);
     lines(sc.title).forEach((line, n, all) => text(all.length > 1 ? `${at}.title line ${n + 1}` : `${at}.title`, `${type}.title`, line));
     count(`${at}.title`, `${type}.title.lines`, lines(sc.title).length, 'lines');
-    for (const f of ['sub', 'chip', 'caption', 'tagline', 'cta', 'url']) text(`${at}.${f}`, `${type}.${f}`, sc[f]);
+    for (const f of ['sub', 'chip', 'caption', 'tagline', 'cta', 'url', 'price', 'was', 'terms', 'code', 'quote', 'role']) text(`${at}.${f}`, `${type}.${f}`, sc[f]);
+    if (type === 'quote') text(`${at}.name`, 'quote.name', sc.name);
+    (Array.isArray(sc.photos) ? sc.photos : []).forEach((p, n) => text(`${at}.photos[${n}].caption`, 'photos.caption', p?.caption));
     if (type === 'end') text(`${at}.name`, 'end.name', sc.name ?? spec.brand?.name);
     for (const f of ['badge', 'heading', 'sub']) text(`${at}.stat.${f}`, `${type}.stat.${f}`, sc.stat?.[f]);
     (Array.isArray(sc.items) ? sc.items : []).forEach((it, n) => { text(`${at}.items[${n}].text`, `${type}.items.text`, it?.text); text(`${at}.items[${n}].sub`, `${type}.items.sub`, it?.sub); });
@@ -59,6 +61,9 @@ export function fitGuide(style = 'soft') {
     `list: up to ${l('list.items.count')} rows (3 is best); row text ${l('list.items.text')}, row sub ${l('list.items.sub')}.`,
     `phone: callout ${l('phone.callouts.text')}.`,
     `chat: each message ${l('chat.messages.text')}; contact kicker ${l('chat.contact.kicker')}, button ${l('chat.contact.button')}, sub ${l('chat.contact.sub')}; footer name ${l('chat.footer.name')}, line ${l('chat.footer.line')}.`,
+    `offer: the figure (price) ${l('offer.price')} characters, old price ${l('offer.was')}, terms ${l('offer.terms')}, code ${l('offer.code')}.`,
+    `photos: one to four pictures, caption ${l('photos.caption')}.`,
+    `quote: the words up to ${l('quote.quote')} characters, name ${l('quote.name')}, role ${l('quote.role')}.`,
     `end: name ${l('end.name')}, tagline ${l('end.tagline')}, button (cta) ${l('end.cta')}, up to ${l('end.badges.count')} badges of ${l('end.badges')} each, address (url) ${l('end.url')}.`,
   ].join('\n');
 }

@@ -30,9 +30,9 @@ const fresh = (name) => { const d = path.join(scratch, name); fs.mkdirSync(d, { 
 test('the fit table covers every place a scene shows text, for every look', () => {
   const table = fitTable();
   for (const [key, row] of Object.entries(table)) for (const style of STYLES) assert.ok(Number.isInteger(row[style]) && row[style] > 0, `${key} ${style}`);
-  for (const type of Object.keys(SCENES)) if (type !== 'end') for (const f of ['label', 'title', 'title.lines']) assert.ok(table[`${type}.${f}`], `${type}.${f}`);
+  for (const [type, shape] of Object.entries(SCENES)) { if ('label' in shape) assert.ok(table[`${type}.label`], `${type}.label`); if ('title!' in shape) for (const f of ['title', 'title.lines']) assert.ok(table[`${type}.${f}`], `${type}.${f}`); }
   for (const key of ['footage.sub', 'footage.chip', 'card.caption', 'card.stat.badge', 'card.stat.heading', 'card.stat.sub', 'list.items.text', 'list.items.sub', 'list.items.count', 'phone.callouts.text',
-    'chat.messages.text', 'chat.contact.kicker', 'chat.contact.button', 'chat.contact.sub', 'chat.footer.name', 'chat.footer.line', 'end.name', 'end.tagline', 'end.cta', 'end.badges', 'end.badges.count', 'end.url']) assert.ok(table[key], key);
+    'offer.price', 'offer.was', 'offer.terms', 'offer.code', 'photos.caption', 'quote.quote', 'quote.name', 'quote.role', 'chat.messages.text', 'chat.contact.kicker', 'chat.contact.button', 'chat.contact.sub', 'chat.footer.name', 'chat.footer.line', 'end.name', 'end.tagline', 'end.cta', 'end.badges', 'end.badges.count', 'end.url']) assert.ok(table[key], key);
   assert.ok(limitOf('footage.title', 'bold') <= limitOf('footage.title', 'soft'), 'the condensed capitals of bold take no more than soft');
 });
 
@@ -52,7 +52,7 @@ test('numbers and addresses that the brief never gave are caught', () => {
 });
 
 test('colour pairs that cannot be read are caught; the bundled palettes pass', () => {
-  for (const name of ['app-launch-en', 'recruitment-vi']) assert.deepEqual(unreadable(JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', name, 'video.json'), 'utf8')).brand), [], name);
+  for (const name of ['app-launch-en', 'recruitment-vi', 'sale-vi']) assert.deepEqual(unreadable(JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', name, 'video.json'), 'utf8')).brand), [], name);
   assert.deepEqual(unreadable(GOOD.brand), []); assert.deepEqual(unreadable({ name: 'no colours given' }), []);
   const bad = unreadable({ ink: '#111827', primary: '#F5B700', accent: '#FFE28A', paper: '#FFFFFF', muted: '#6B7280' });
   assert.ok(bad.some((x) => x.includes('white text on primary')) && bad.some((x) => x.includes('belongs in "accent"')), bad.join('\n'));

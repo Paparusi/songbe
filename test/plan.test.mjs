@@ -17,7 +17,7 @@ delete process.env.FAL_KEY;                      // these tests must never spend
 let ffmpeg = true; try { tools.ffmpeg; tools.ffprobe; } catch { ffmpeg = false; }
 const needs = (name) => ({ skip: name === 'recruitment-vi' && !ffmpeg && 'ffmpeg not found' });
 
-for (const name of ['app-launch-en', 'recruitment-vi']) {
+for (const name of ['app-launch-en', 'recruitment-vi', 'sale-vi']) {
   test(`${name}: scenes follow one another without gaps`, needs(name), async () => {
     const plan = await makePlan(copy(name), { offline: true });
     assert.equal(plan.scenes[0].start, 0);
@@ -40,7 +40,7 @@ for (const name of ['app-launch-en', 'recruitment-vi']) {
   });
 
   test(`${name}: captions cover the speech and nothing else`, needs(name), async () => {
-    const off = await makePlan(copy(name), { offline: true }), on = await makePlan(copy(name), { offline: true, captions: true });
+    const off = await makePlan(copy(name), { offline: true, captions: false }), on = await makePlan(copy(name), { offline: true, captions: true });
     assert.equal(off.captions.length, 0);
     assert.ok(on.captions.length >= on.scenes.length);
     for (let i = 0; i < on.captions.length; i++) {

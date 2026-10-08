@@ -36,6 +36,9 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
 | Three benefits | `list` | 3 rows is best, 5 at most. `icon`: check, star, bolt, heart, shield, drop, clock, bell, sun, pin, or `number`. |
 | An app or website in use | `phone` | `screens` are portrait screenshots (about 9:19.5), required. 1–2 `callouts`, each up to 22 characters. |
 | How to get in touch | `chat` | `contact.number` is a list of digit groups, read aloud by the last sentence of `say`. |
+| A promotion with a price | `offer` | `price` is the one big figure ("-30%", "99k"); `was` is struck out; `terms` says until when; optional `code`. Only real offers. |
+| Pictures of the product or place | `photos` | One to four `photos[] { src, caption }`. |
+| A customer's words | `quote` | `quote`, `name`, `role`, `stars`. Only words a real customer said: never write a testimonial yourself. |
 | Sign-off | `end` | Logo, `tagline`, `cta`, optional `badges` and `url`. |
 
 ## Writing rules

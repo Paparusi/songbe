@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { makePlan } from '../src/plan.mjs';
 import { lintLayout, stills, openPage, writePage, pageHtml } from '../src/render.mjs';
-import { FORMATS, STYLES } from '../src/spec.mjs';
+import { FORMATS, STYLES, TEMPLATES } from '../src/spec.mjs';
 import { tools, run, ROOT } from '../src/util.mjs';
 import { fitTable } from '../src/fit.mjs';
 
@@ -18,7 +18,7 @@ const copy = (name) => { const to = path.join(copies, name); if (!fs.existsSync(
 test.after(() => fs.rmSync(copies, { recursive: true, force: true }));
 delete process.env.FAL_KEY;
 
-for (const name of ['app-launch-en', 'recruitment-vi']) for (const format of Object.keys(FORMATS)) for (const style of STYLES) {
+for (const name of ['app-launch-en', 'recruitment-vi', 'sale-vi']) for (const format of Object.keys(FORMATS)) for (const style of STYLES) {
   test(`${name} · ${format} · ${style}: nothing leaves the frame, overlaps or is covered by captions`, { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
     for (const captions of [true, false]) {
       const found = await lintLayout(copy(name), await makePlan(copy(name), { offline: true, format, style, captions }));
@@ -87,6 +87,9 @@ const PLACES = {      // one scene per one-line text field, with that field hope
   phone: { base: { type: 'phone', duration: 5, title: ['Tiêu đề', 'ngắn'], callouts: [{ text: 'Ngắn', side: 'right', y: 0.3 }] }, put: { 'callouts.text': (s, t) => { s.callouts[0].text = t; } } },
   chat: { base: { type: 'chat', duration: 9, title: 'Tiêu đề', messages: [{ from: 'them', text: 'Chào' }, { from: 'us', text: 'Dạ' }], contact: { kicker: 'Zalo', button: 'Nhắn', number: ['0900', '000', '000'], sub: 'Phụ' }, footer: { name: 'Tên', line: 'Dòng' } },
     put: { 'contact.kicker': (s, t) => { s.contact.kicker = t; }, 'contact.button': (s, t) => { s.contact.button = t; }, 'contact.sub': (s, t) => { s.contact.sub = t; }, 'footer.name': (s, t) => { s.footer.name = t; }, 'footer.line': (s, t) => { s.footer.line = t; } } },
+  offer: { base: { type: 'offer', duration: 5, title: ['Tiêu đề', 'ngắn'], price: '-20%' }, put: { price: (s, t) => { s.price = t; }, was: (s, t) => { s.was = t; }, terms: (s, t) => { s.terms = t; }, code: (s, t) => { s.code = t; } } },
+  photos: { base: { type: 'photos', duration: 5, title: ['Tiêu đề', 'ngắn'], photos: [{ caption: 'Một' }, { caption: 'Hai' }] }, put: { caption: (s, t) => { s.photos[0].caption = t; } } },
+  quote: { base: { type: 'quote', duration: 6, quote: 'Lời khen ngắn.', name: 'Tên', role: 'Vai' }, put: { name: (s, t) => { s.name = t; }, role: (s, t) => { s.role = t; } } },
   end: { base: { type: 'end', duration: 5, name: 'Tên', tagline: 'Khẩu hiệu', cta: 'Bấm' }, put: { name: (s, t) => { s.name = t; }, tagline: (s, t) => { s.tagline = t; }, cta: (s, t) => { s.cta = t; }, badges: (s, t) => { s.badges = [t, t]; }, url: (s, t) => { s.url = t; } } },
 };
 for (const style of STYLES) {
@@ -116,4 +119,15 @@ test('a phone with no screenshot draws a placeholder and says so', { skip: !read
   fs.writeFileSync(path.join(dir, 'video.json'), JSON.stringify({ voice: false, music: false, brand: { name: 'x' }, scenes: [{ type: 'phone', duration: 4, title: ['Đặt qua', 'điện thoại'] }] }));
   const found = await lintLayout(dir, await makePlan(dir, { offline: true }));
   assert.deepEqual(found.map((f) => [f.level, f.message.includes('placeholder')]), [['note', true]]);
+});
+
+test('every scene type, as the editor inserts it, is clean in every frame and look', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
+  const dir = path.join(copies, 'templates'); fs.mkdirSync(path.join(dir, 'media'), { recursive: true });
+  fs.copyFileSync(path.join(root, 'examples', 'app-launch-en', 'media', 'screen-today.png'), path.join(dir, 'media', 'p.png'));
+  const scenes = Object.values(TEMPLATES).map((t) => { const sc = structuredClone(t); sc.duration = 6; delete sc.say; if (sc.type === 'phone') sc.screens = ['media/p.png']; if (sc.type === 'photos') sc.photos = sc.photos.map((p) => ({ ...p, src: 'media/p.png' })); return sc; });
+  for (const style of STYLES) for (const format of Object.keys(FORMATS)) {
+    fs.writeFileSync(path.join(dir, 'video.json'), JSON.stringify({ style, format, voice: false, music: false, brand: { name: 'Mẫu' }, scenes }));
+    const found = await lintLayout(dir, await makePlan(dir, { offline: true }));
+    assert.deepEqual(found.filter((f) => f.level === 'problem').map((f) => `${f.type}: ${f.message}`), [], `${style} ${format}`);
+  }
 });
