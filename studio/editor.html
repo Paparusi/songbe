@@ -41,6 +41,7 @@ textarea { resize: vertical; min-height: 38px; } input[type=color] { width: 38px
   <a class="crumb" href="/home">Videos</a><span class="sep">/</span><div class="proj" id="proj"></div><div class="gap"></div>
   <span class="tag" id="saved">loading…</span><a class="tag" id="kfal" href="/home#settings" title="Keys are set on the Videos page">voice · music</a>
   <button class="btn quiet" id="folder" title="Show this project's folder">Folder</button>
+  <select id="frames" title="Which frames to build" style="width:auto;padding:7px 10px;border-radius:10px;background:var(--raise)"><option value="">This frame</option><option value="all">All three frames</option></select>
   <button class="btn go" id="go">Build video</button>
 </header>
 <main>
@@ -234,7 +235,7 @@ $('#go').onclick = async () => {
   if (building) { $('#go').disabled = true; return api('api/build/stop', { method: 'POST' }); }
   if (!S.tools.ready) return missing();
   clearTimeout(timer); await save();
-  const r = await api('api/build', { method: 'POST' }); if (!r.ok) return alertBox((await r.json()).error);
+  const r = await api('api/build', { method: 'POST', body: JSON.stringify($('#frames').value === 'all' ? { formats: S.table.TOP.format } : {}) }); if (!r.ok) return alertBox((await r.json()).error);
   setBuilding(true); watch();
 };
 $('#folder').onclick = () => api('api/reveal', { method: 'POST', body: JSON.stringify({ what: 'folder' }) });
@@ -249,9 +250,12 @@ function watch() {
     sum.className = 'sum ' + (c.ok ? 'ok' : 'bad'); sum.textContent = `${c.ok ? 'Done' : 'Built with problems'} · ${c.duration.toFixed(1)} s · ${c.audio ? 'sound ' + (c.loudness ? c.loudness.mean + ' dB' : '') : 'NO SOUND'} · ${c.sizeMB} MB`;
     for (const p of c.problems) side.insertBefore(el('div', { className: 'msg bad', textContent: '✕ ' + p }), log);
     if (c.heard) side.insertBefore(el('div', { className: 'msg note', textContent: 'Heard: ' + c.heard }), log);
-    const v = el('video', { src: c.video, controls: true, playsInline: true }), where = el('button', { className: 'btn small', textContent: 'Show in folder' });
-    where.onclick = () => api('api/reveal', { method: 'POST', body: JSON.stringify({ what: 'video' }) });
-    vid.append(v, el('div', { style: 'display:flex;gap:6px;margin-top:8px' }, where, el('a', { href: c.video, download: S.name + '.mp4', className: 'btn small', textContent: 'Save a copy' })));
+    const v = el('video', { src: c.video, controls: true, playsInline: true }), where = el('button', { className: 'btn small', textContent: 'Show in folder' }), keep = el('a', { href: c.video, download: S.name + '.mp4', className: 'btn small', textContent: 'Save a copy' });
+    where.onclick = () => api('api/reveal', { method: 'POST', body: JSON.stringify({ what: (r.all || []).length ? 'folder' : 'video' }) });
+    // several frames were built: a button for each switches the player
+    const pick = (r.all || []).length > 1 ? r.all.map((x, n) => { const b = el('button', { className: 'btn small', textContent: x.format + (x.check.ok ? '' : ' !') }); b.onclick = () => { v.src = x.check.video; keep.href = x.check.video; keep.download = `${S.name}-${x.format}.mp4`; for (const o of pick) o.style.borderColor = o === b ? 'var(--accent)' : ''; }; if (!n) b.style.borderColor = 'var(--accent)'; return b; }) : [];
+    for (const x of (r.all || []).slice(1)) for (const p of x.check.problems) side.insertBefore(el('div', { className: 'msg bad', textContent: `✕ ${x.format}: ${p}` }), log);
+    vid.append(v, ...(pick.length ? [el('div', { style: 'display:flex;gap:6px;margin-top:8px' }, ...pick)] : []), el('div', { style: 'display:flex;gap:6px;margin-top:8px' }, where, keep));
     $('#foot').scrollTop = 1e6; });
 }
 

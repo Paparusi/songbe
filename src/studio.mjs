@@ -205,10 +205,10 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
       if (errors.length) return { errors, plan: null };
       try { return { errors: [], plan: forBrowser(await makePlan(dir, { offline: true }), link) }; } catch (e) { return { errors: [e.message], plan: null }; }
     };
-    const result = (j) => {
-      const check = j.code !== 1 && !j.stopped ? readJson(path.join(dir, 'out', 'check.json')) : null, v = '&v=' + Date.now();
-      if (check) { check.video = link(check.video) + v; check.sheet = link(check.sheet) + v; }
-      return { code: j.code, stopped: j.stopped, check };
+    const result = (j) => {      // the self-check of what was built: one frame, or one per frame when several were asked for
+      const v = '&v=' + Date.now(), read = (tag) => { const c = j.code !== 1 && !j.stopped ? readJson(path.join(dir, 'out', `check${tag}.json`)) : null; if (c) { c.video = link(c.video) + v; c.sheet = link(c.sheet) + v; } return c; };
+      const all = (j.formats || []).map((f) => ({ format: f, check: read('-' + f) })).filter((x) => x.check);
+      return { code: j.code, stopped: j.stopped, check: j.formats ? all[0]?.check || null : read(''), all };
     };
     const job = jobs.get(id);
 
@@ -241,10 +241,11 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     }
     if (route === 'POST /api/build') {
       if (job && !job.done) return send(res, 409, { error: 'A build is already running.' });
-      const j = { lines: [], done: false, code: null, stopped: false, watchers: new Set() }; jobs.set(id, j);
+      const want = (await json(req)).formats, formats = Array.isArray(want) && want.length && want.every((f) => FORMATS[f]) ? [...new Set(want)] : null;
+      const j = { lines: [], done: false, code: null, stopped: false, watchers: new Set(), formats }; jobs.set(id, j);
       const say = (ev, data) => { for (const w of j.watchers) w.write(`event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`); };
       const feed = (d) => { for (const line of String(d).split(/\r?\n/)) if (line.trim()) { j.lines.push(line); say('line', line); } };
-      j.proc = spawn(process.execPath, [path.join(ROOT, 'bin', 'songbe.mjs'), 'build', dir], { env: process.env, windowsHide: true, detached: !WIN });
+      j.proc = spawn(process.execPath, [path.join(ROOT, 'bin', 'songbe.mjs'), 'build', dir, ...(formats ? ['--formats=' + formats.join(',')] : [])], { env: process.env, windowsHide: true, detached: !WIN });
       j.proc.stdout.on('data', feed); j.proc.stderr.on('data', feed);
       j.proc.on('error', (e) => feed('could not start the build: ' + e.message));
       j.proc.on('close', (code) => { j.done = true; j.code = code; say('done', result(j)); for (const w of j.watchers) w.end(); });
