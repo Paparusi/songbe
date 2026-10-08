@@ -16,10 +16,12 @@ Run the CLI as `node <songbe repo>/bin/songbe.mjs <command>` (or `songbe <comman
    Without `FAL_KEY` there is no voice, music or generated footage; tell the user before you build.
 2. `songbe init <dir>` then edit `<dir>/video.json`. `songbe schema` prints the full JSON Schema.
 3. `songbe validate <dir>` — fix every problem it lists.
-4. `songbe frames <dir>` — two stills per scene in `<dir>/out/frames/`. **Open them and look** before spending on a build:
-   clipped or overlapping text, text across a face, anything important below y = 1500 (the app's caption area).
+4. `songbe frames <dir>` — two stills per scene in `<dir>/out/frames/`, plus the layout check: lines starting with `!` are problems
+   (something leaves the frame, overlaps, or would be covered by captions) and must be fixed, usually by using fewer words; lines
+   starting with `·` are notes. **Open the stills and look** as well: the check measures boxes, it cannot see text across a face.
 5. `songbe build <dir>` — writes `out/video.mp4`, `out/sheet.jpg`, `out/check.json`.
-6. Read `out/check.json`: `problems` must be empty; compare `heard` with `spoken`. Look at `out/sheet.jpg`.
+6. Read `out/check.json`: `problems` must be empty (layout, black frames, flashes, missing sound); read the `notes`; compare `heard`
+   with `spoken`. Look at `out/sheet.jpg`.
 7. Report: duration, whether there is sound, which scenes use AI imagery, what you could not verify.
 
 ## Choosing scenes

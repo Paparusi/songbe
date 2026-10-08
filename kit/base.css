@@ -17,7 +17,7 @@
 html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 #stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: #000; transform-origin: 0 0; }   /* sized from the plan at mount */
 .scene { position: absolute; inset: 0; overflow: hidden; visibility: hidden; }
-.a { position: absolute; transform-origin: 50% 50%; will-change: transform, opacity; }
+.a { position: absolute; transform-origin: 50% 50%; }
 .fill { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
 /* a block: a layer whose children keep their 1080×1920 design coordinates; scenes move and scale whole blocks for other frames */
 .blk { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0; }
@@ -26,7 +26,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 
 /* a line of text revealed from behind a mask */
 .mask { position: absolute; overflow: hidden; white-space: nowrap; padding: 0 0 .14em; }
-.mask > span { display: inline-block; will-change: transform; }
+.mask > span { display: inline-block; }
 .label { font-weight: 700; font-size: 30px; letter-spacing: var(--label-tracking); text-transform: uppercase; }
 .title { font-family: var(--font-title); font-weight: var(--title-weight); letter-spacing: var(--title-tracking); line-height: var(--title-lh); text-transform: var(--title-case); }
 .sub { font-weight: 600; letter-spacing: -.3px; }

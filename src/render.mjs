@@ -62,13 +62,21 @@ async function openPage(pageFile, [w, h]) {
   return { evaluate, shot, close, fonts };
 }
 
-// A few stills for review before committing to a full render.
+const lintOn = async (page) => JSON.parse(await page.evaluate('SB.lint().then((r) => JSON.stringify(r))'));
+
+// The layout check alone: what leaves the frame, overlaps, or would be covered.
+export async function lintLayout(dir, plan) {
+  const page = await openPage(writePage(dir, plan), plan.size);
+  try { return await lintOn(page); } finally { page.close(); }
+}
+
+// A few stills for review before committing to a full render (the layout check runs alongside).
 export async function stills(dir, plan, times) {
   const page = await openPage(writePage(dir, plan), plan.size), out = mkdir(path.join(dir, 'out', 'frames'));
   try {
-    const files = [];
+    const files = [], layout = await lintOn(page);
     for (const t of times) { const f = path.join(out, `t${t.toFixed(2)}.jpg`); fs.writeFileSync(f, await page.shot(t, 90)); files.push(f); }
-    return files;
+    return { files, layout };
   } finally { page.close(); }
 }
 
@@ -76,6 +84,7 @@ export async function renderVideo(dir, plan) {
   const work = path.join(dir, '.songbe'), page = await openPage(writePage(dir, plan), plan.size);
   try {
     fs.writeFileSync(path.join(work, 'cues.json'), await page.evaluate('JSON.stringify(SB.cues)'));
+    fs.writeFileSync(path.join(work, 'layout.json'), JSON.stringify(await lintOn(page)));
     const { fps } = plan, frames = Math.round(plan.duration * fps), blur = plan.motionBlur, out = path.join(work, 'picture.mp4');
     // Motion blur = four samples per frame across a 180° shutter, averaged by ffmpeg. Outside the cuts two real samples are enough
     // (each is sent twice); around a cut, where a colour field crosses the whole frame, all four are drawn so its edge stays smooth.

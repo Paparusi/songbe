@@ -36,6 +36,7 @@
   // shrink a line's font until it fits the given width
   function fit(el, maxWidth) {
     let size = parseFloat(getComputedStyle(el).fontSize);
+    el.dataset.designed ??= size;                       // remembered for the layout check
     while (el.scrollWidth > maxWidth && size > 24) { size -= 2; el.style.fontSize = size + 'px'; }
     return size;
   }
@@ -68,8 +69,9 @@
     // the frame: its size and which family of layouts applies (tall 9:16, square 1:1 or 4:5, wide 16:9)
     // H is the height scenes lay themselves out in: square and wide frames give up a band at the bottom when captions are on
     const [W, FH] = plan.size, ratio = W / FH, kind = ratio < .7 ? 'tall' : ratio > 1.3 ? 'wide' : 'square', caps = (plan.captions || []).length > 0;
-    const H = FH - (caps && kind !== 'tall' ? 110 : 0);
-    SB.frame = { W, H, FH, kind };
+    const H = FH - (caps && kind !== 'tall' ? 165 : 0);
+    // floor: the lowest line content may reach. In a tall frame that is where phone apps start their own caption, or the caption band.
+    SB.frame = { W, H, FH, kind, floor: kind === 'tall' ? (caps ? 1470 : 1590) : H - 12 };
     document.documentElement.dataset.format = kind; document.documentElement.dataset.captions = caps ? 'on' : 'off';
     const root = document.documentElement.style, b = plan.brand;
     for (const [k, v] of Object.entries({ ink: b.ink, primary: b.primary, accent: b.accent, paper: b.paper, muted: b.muted })) if (v) root.setProperty('--' + k, v);
@@ -147,6 +149,63 @@
     cx.putImageData(im, 0, 0);
   };
 
+  // Layout check. Each scene is drawn near its end, when everything has arrived, and its content is measured: nothing may leave the
+  // frame, lie on top of other content, or (in a tall frame) sit where phone apps put their own caption and buttons. Returns a list of
+  // { scene, level: 'problem' | 'note', message }. It looks at boxes, not at taste.
+  const PARTS = { '.lb': 'label', '.tl': 'headline', '.sb': 'supporting line', '.ch': 'chip', '.md': 'media card', '.st': 'stat card', '.row': 'row', '.co': 'callout',
+    '.b1': 'chat message', '.b2': 'chat reply', '.ct': 'contact card', '.ft': 'footer', '.lg': 'logo', '.nm': 'name', '.tg': 'tagline', '.ca': 'button', '.bx': 'badges',
+    '.ur': 'address', '.sf': 'footage frame', '.ph': 'phone' };
+  const INNER = new Set(['label', 'headline', 'supporting line', 'name', 'tagline']);      // masked lines: measure the text, not the mask
+  SB.lint = async function () {
+    const plan = SB.plan, { W, FH, kind } = SB.frame, out = [], stage = document.getElementById('stage').getBoundingClientRect(), k = stage.width / W;
+    const rect = (el) => { const r = el.getBoundingClientRect(); return { l: (r.left - stage.left) / k, t: (r.top - stage.top) / k, r: (r.right - stage.left) / k, b: (r.bottom - stage.top) / k }; };
+    const seen = (el) => { for (let e = el; e && e.id !== 'stage'; e = e.parentElement) { const c = getComputedStyle(e); if (c.visibility === 'hidden' || +c.opacity < .05) return false; } return true; };
+    // the widest caption line, as the band captions can occupy
+    let band = null;
+    if ((plan.captions || []).length) {
+      const box = document.getElementById('captions'), line = box.firstElementChild, keep = [line.innerHTML, line.style.fontSize, box.style.visibility, line.style.transform, line.style.opacity];
+      box.style.visibility = 'visible'; line.style.transform = 'none'; line.style.opacity = 1; let wide = 0;
+      for (const c of plan.captions) { line.style.fontSize = ''; line.textContent = c.words.map((w) => w.text).join(' '); const r = rect(line); if (r.r - r.l > wide) { wide = r.r - r.l; band = r; } }
+      [line.innerHTML, line.style.fontSize, box.style.visibility, line.style.transform, line.style.opacity] = keep; SB.capShown = -1;
+    }
+    for (const [i, s] of SB.live.entries()) {
+      const sc = s.sc, at = Math.max(sc.start + .1, (i === SB.live.length - 1 ? plan.duration : sc.end) - .3), say = (level, message) => out.push({ scene: i + 1, type: sc.type, level, message });
+      await SB.draw(at);
+      const boxes = [];
+      for (const [sel, name] of Object.entries(PARTS)) for (const el of s.el.querySelectorAll(sel)) {
+        const target = INNER.has(name) ? el.firstElementChild : el;
+        if (!target || !seen(target)) continue;
+        const r = rect(target); if (r.r - r.l < 2 || r.b - r.t < 2) continue;
+        boxes.push({ name, ...r, text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 28) });
+      }
+      // any text the kit had to shrink a lot to make fit is too long for its place
+      for (const el of s.el.querySelectorAll('[data-designed]')) {
+        const now = parseFloat(getComputedStyle(el).fontSize), was = +el.dataset.designed;
+        if (now < was * .7) say('note', `"${(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 34)}" is too long for its place: the type was shrunk from ${Math.round(was)} px to ${Math.round(now)} px`);
+      }
+      const label = (b) => (b.text && b.name !== 'phone' && b.name !== 'media card' && b.name !== 'footage frame' ? `${b.name} "${b.text}"` : b.name);
+      for (const b of boxes) {
+        const over = { left: -b.l, right: b.r - W, top: -b.t, bottom: b.b - FH };
+        for (const [side, px] of Object.entries(over)) {
+          if (px <= 3) continue;
+          if (b.name === 'phone' && side === 'bottom') continue;                           // the phone is meant to run off the bottom
+          say('problem', `the ${label(b)} runs off the ${side} of the frame by ${Math.round(px)} px`);
+        }
+        if (kind === 'tall' && !['phone', 'footage frame'].includes(b.name) && b.b > FH - 330 + 8) say('note', `the ${label(b)} reaches into the bottom 330 px, which phone apps cover with their own caption`);
+        if (band && !['phone', 'footage frame', 'media card'].includes(b.name) && b.l < band.r && b.r > band.l && b.t < band.b - 6 && b.b > band.t + 6) say('problem', `captions would cover the ${label(b)}`);
+      }
+      for (let x = 0; x < boxes.length; x++) for (let y = x + 1; y < boxes.length; y++) {
+        const a = boxes[x], b = boxes[y], names = [a.name, b.name];
+        if (a.name === b.name || names.includes('callout') && names.includes('phone')) continue;      // rows and headline lines stack; callouts sit on the phone
+        const w = Math.min(a.r, b.r) - Math.max(a.l, b.l), h = Math.min(a.b, b.b) - Math.max(a.t, b.t);
+        if (w <= 0 || h <= 0) continue;
+        const share = w * h / Math.min((a.r - a.l) * (a.b - a.t), (b.r - b.l) * (b.b - b.t));
+        if (share > .12) say('problem', `the ${label(a)} and the ${label(b)} overlap`);
+      }
+    }
+    return out;
+  };
+
   // Preview in a normal browser: scale to the window and add a scrubber. The renderer opens the page with #render and never sees this.
   SB.preview = function () {
     const plan = SB.plan, stage = document.getElementById('stage');
@@ -165,6 +224,8 @@
     if (at > 0) show(Math.min(at, plan.duration - .04));
     addEventListener('message', (e) => { if (e.data && typeof e.data.sbSeek === 'number') { playing = false; pp.textContent = 'Play'; if (audio) audio.pause(); show(Math.min(e.data.sbSeek, plan.duration - .04)); } });
     if (parent !== window) setInterval(() => parent.postMessage({ sbTime: +sk.value }, '*'), 250);
+    // tell the studio what the layout check found, then return to where the editor was
+    if (parent !== window) SB.lint().then((found) => { parent.postMessage({ sbLint: found }, '*'); show(at > 0 ? Math.min(at, plan.duration - .04) : 0); });
   };
 
   window.SB = SB;

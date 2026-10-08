@@ -23,6 +23,14 @@
   const blk = (name, html) => (html ? `<div class="blk ${name}">${html}</div>` : '');
   // put a block so that its design point (dx, dy) lands on (x, y) of the frame, drawn at scale k
   const put = (el, name, dx, dy, x, y, k = 1) => { const b = $(el, '.' + name); if (b) b.style.transform = `translate(${(x - dx * k).toFixed(2)}px,${(y - dy * k).toFixed(2)}px) scale(${k})`; };
+  // In a tall frame blocks keep their design position unless they would pass the floor; then everything from `top` down is scaled
+  // about the middle of the frame so that `bottom` lands on the floor. tops: { block: its design top }.
+  const squeeze = (el, top, bottom, tops) => {
+    const { floor } = SB.frame; if (bottom <= floor) return 1;
+    const k = Math.max(.6, (floor - top) / (bottom - top));
+    for (const [name, y] of Object.entries(tops)) put(el, name, 540, y, 540, top + (y - top) * k, k);
+    return k;
+  };
   const headTop = (sc) => (sc.label ? 214 : 280);                                    // where a heading starts in the design
   const headHeight = (sc, step) => (sc.label ? 66 : 0) + lines(sc.title).length * step;
 
@@ -108,8 +116,9 @@
         <div class="sh" style="position:absolute;left:226px;top:46px;font-size:50px;font-weight:800;color:var(--ink);letter-spacing:-1px;white-space:nowrap">${esc(st.heading)}</div>
         <div class="ss" style="position:absolute;left:228px;top:124px;font-size:34px;font-weight:500;color:var(--muted);white-space:nowrap">${esc(st.sub || '')}</div></div>` : '');
     const hy = headTop(sc), hh = headHeight(sc, step);
-    if (kind === 'square') {            // heading on top, then the media card and the stat card, centred and smaller
-      const kh = .64, km = .78, hb = 66 + hh * kh, x = (W - 940 * km) / 2;
+    if (kind === 'tall') squeeze(el, mediaTop, st ? statTop + 226 : mediaTop + 560, { media: mediaTop, stat: statTop });
+    if (kind === 'square') {            // heading on top, then the media card and the stat card, centred and as large as the height allows
+      const kh = .64, hb = 66 + hh * kh, km = Math.min(.78, (SB.frame.floor - hb - 26 - (m && st ? 22 : 0)) / ((m ? 560 : 0) + (st ? 226 : 0) || 1)), x = (W - 940 * km) / 2;
       put(el, 'head', 68, hy, 64, 66, kh); put(el, 'media', 70, mediaTop, x, hb + 26, km); put(el, 'stat', 70, statTop, x, m ? hb + 26 + 560 * km + 22 : hb + 40, km);
     }
     if (kind === 'wide') {              // heading and stat on the left, media on the right
@@ -156,8 +165,9 @@
         ${it.sub ? `<div class="rs" style="position:absolute;left:168px;top:${pad + 66}px;font-size:33px;font-weight:500;white-space:nowrap">${esc(it.sub)}</div>` : ''}
       </div>`).join(''));
     const hy = headTop(sc), hh = headHeight(sc, step);
+    if (kind === 'tall') squeeze(el, top, top + rowsH, { rows: top });
     if (kind === 'square') {            // same stack, tighter: the rows take whatever height is left
-      const kh = .62, hb = 60 + hh * kh, kr = clamp((H - hb - 24 - 64) / rowsH, .55, 1);
+      const kh = .62, hb = 60 + hh * kh, kr = clamp((SB.frame.floor - hb - 24) / rowsH, .5, 1);
       put(el, 'head', 68, hy, 64, 60, kh); put(el, 'rows', 70, top, (W - 940 * kr) / 2, hb + 24, kr);
     }
     if (kind === 'wide') {              // heading on the left, rows on the right, both centred vertically
@@ -202,6 +212,9 @@
       put(el, 'head', 68, hy, 110, (FH - hh * kh) / 2, kh); put(el, 'device', X, Y, FW - 110 - (210 + W) * kp, 55, kp);
     }
     const lb = $(el, '.lb'), tl = [...el.querySelectorAll('.tl')], ph = $(el, '.ph'), ss = [...el.querySelectorAll('.ss')], co = [...el.querySelectorAll('.co')];
+    // callouts stay above the floor (the phone itself may run past it): how far down the phone that is, in its own coordinates
+    const [py, kp] = kind === 'square' ? [56 + hh * .6 + 34, .78] : kind === 'wide' ? [55, (FH - 110) / H] : [Y, 1], lowest = (SB.frame.floor - py) / kp - 96;
+    for (const c of co) if (parseFloat(c.style.top) > lowest) c.style.top = Math.round(lowest) + 'px';
     const dur = sc.end - sc.start, t0 = wait(sc), rise = t0 + .2;
     const swap = ss.map((_, i) => (i === 0 ? -9 : rise + .9 + (i - 1) * Math.max(1.1, (dur - rise - 1.4) / ss.length) + (dur - rise - .9) / ss.length * .5));
     const callAt = co.map((_, i) => rise + .95 + i * .45);
@@ -235,7 +248,7 @@
       c ? `<div class="a card contact ct" style="left:70px;top:${900 + down}px;width:940px;height:372px;transform-origin:50% 100%">
         <div class="kicker" style="position:absolute;left:48px;top:40px;font-size:36px;font-weight:700;letter-spacing:3px;text-transform:uppercase">${esc(c.kicker || '')}</div>
         ${c.button ? `<div class="pill ghost" style="position:absolute;right:48px;top:36px;font-size:30px;font-weight:600;padding:8px 22px">${esc(c.button)}</div>` : ''}
-        <div class="nm" style="position:absolute;left:46px;top:124px;font-size:120px;font-weight:900;color:var(--ink);letter-spacing:-3px;white-space:nowrap">
+        <div class="num" style="position:absolute;left:46px;top:124px;font-size:120px;font-weight:900;color:var(--ink);letter-spacing:-3px;white-space:nowrap">
           ${lines(c.number).map((g, i) => `<span class="mask" style="position:relative;display:inline-block;vertical-align:top;margin-left:${i ? 26 : 0}px"><span class="ng">${esc(g)}</span></span>`).join('')}</div>
         <div class="cs" style="position:absolute;left:48px;top:292px;font-size:34px;font-weight:500;color:var(--muted);white-space:nowrap">${esc(c.sub || '')}</div></div>` : '') + blk('sign', `
       <div class="a ft" style="left:70px;top:${1352 + down}px;width:940px;height:110px">
@@ -246,8 +259,9 @@
           <div style="font-size:26px;font-weight:500;color:rgba(255,255,255,.7);white-space:nowrap;margin-top:4px">${esc(f.line || '')}</div></div>
       </div>`);
     const hy = headTop(sc), hh = headHeight(sc, step);
-    if (kind === 'square') {            // heading, the chat at full size, then a smaller contact card and footer
-      const kh = .58, kc = .74, hb = 56 + hh * kh, x = (W - 940 * kc) / 2, cy = hb + 20 + 310 + 24;
+    if (kind === 'tall') squeeze(el, 900 + down, 1352 + down + 110, { reach: 900 + down, sign: 1352 + down });
+    if (kind === 'square') {            // heading, the chat at full size, then a contact card and footer as large as the height allows
+      const kh = .58, hb = 56 + hh * kh, cy = hb + 20 + 310 + 24, kc = Math.min(.74, (SB.frame.floor - cy - 20) / ((c ? 372 : 0) + 110)), x = (W - 940 * kc) / 2;
       put(el, 'head', 68, hy, 64, 56, kh); put(el, 'talk', 70, 486 + down, 70, hb + 20, 1);
       put(el, 'reach', 70, 900 + down, x, cy, kc); put(el, 'sign', 70, 1352 + down, x, (c ? cy + 372 * kc + 20 : cy), kc);
     }
@@ -268,7 +282,7 @@
     return {
       layout() {
         fitTitle(tl, size, kind === 'wide' ? 860 : 920);
-        if (ct) { fit($(el, '.nm'), 852); fit($(el, '.cs'), 852); }
+        if (ct) { fit($(el, '.num'), 852); fit($(el, '.cs'), 852); }
         if ($(el, '.lw')) $(el, '.fx').style.left = $(el, '.lw').offsetWidth + 134 + 'px';
       },
       cues: [

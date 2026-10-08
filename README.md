@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.6): six scene types, two looks, three frames (9:16, 1:1, 16:9), captions, a local studio. Tested on Linux / WSL only.
+> Early version (0.7): six scene types, two looks, three frames (9:16, 1:1, 16:9), captions, built-in checks, a local studio. Tested on Linux / WSL only.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -23,7 +23,9 @@ Two examples are included: `examples/app-launch-en` (an app launch, English, gra
 - **The timeline follows the voice.** Each scene opens just before its line is spoken; change a sentence and everything re-times itself.
 - **Bring your own keys — or none.** With `FAL_KEY` you get voice, music and generated footage. Without it the build still completes (no voice or music, plain backgrounds).
 - **No npm dependencies.** Node 22+, ffmpeg and a Chrome/Chromium binary. Chrome is driven directly over the DevTools protocol.
-- **Self-check.** Every build writes a contact sheet (two frames per scene) and a report: duration, loudness, missing audio, and — with `GROQ_API_KEY` — a transcript of what is actually audible.
+- **It checks its own work.** Before drawing: nothing may leave the frame, overlap, or be covered by captions. After building: no black
+  frames, no flashes, sound present and not clipping, the right length, a contact sheet, and — with `GROQ_API_KEY` — a transcript of
+  what is actually audible.
 
 ## Quick start
 
@@ -119,7 +121,7 @@ leading, how lines arrive, how cuts are covered). Scenes set geometry only, so a
 1. **Plan** — one voice clip per sentence, silence trimmed; scenes are laid on a timeline that follows the speech; footage is cut into frames.
 2. **Picture** — the scene page is written to `.songbe/index.html`; Chrome draws each frame and the screenshots are piped into ffmpeg.
 3. **Sound** — voice on the timeline, music with sidechain ducking, synthesised effects on the animation's cues, loudness normalised.
-4. **Check** — `out/sheet.jpg` and `out/check.json`. The command exits non-zero if the audio is missing or the duration is off.
+4. **Check** — `out/sheet.jpg` and `out/check.json`. The command exits non-zero when a check finds a problem (see *Checks*).
 
 Generated assets are cached in `.songbe/cache` by a hash of their inputs: editing one sentence regenerates one voice clip, nothing else.
 
@@ -133,6 +135,24 @@ A local page for people who would rather not edit JSON: scenes and their fields 
 you type. The preview is free — it reuses voice clips that already exist and estimates the timing of new sentences — and the
 **Build video** button runs the full build and shows the result with its self-check. Images and clips can be uploaded into the
 project's `media/` folder from the form. The server listens on 127.0.0.1 only and serves nothing outside the project and the kit.
+
+## Checks
+
+```bash
+node bin/songbe.mjs lint my-ad      # layout only, a few seconds: what leaves the frame, overlaps, or would be covered
+npm test                            # the test suite (36 tests, about ten seconds; drawing tests need Chrome and ffmpeg)
+```
+
+**Layout check** (`songbe lint`, and automatically with `frames` and `build`). Each scene is drawn near its end and its content is
+measured. *Problems*: something runs off the frame, two things overlap, captions would cover something. *Notes*: text that had to be
+shrunk a lot to fit, content in the bottom 330 px of a tall frame (phone apps cover it). Scenes do most of the fitting themselves —
+they squeeze toward the floor of the usable area and make room for the caption band — so a problem here usually means too many words.
+
+**After a build** the whole picture is watched once for black frames, for flashes (the picture jumps and comes straight back), for
+long stretches where nothing moves, and the sound is measured. Findings go to `out/check.json` as `problems` (the command exits
+non-zero) and `notes`.
+
+Frames are drawn without cached layers, so a frame is the same pixels whatever was drawn before it; scaled cards stay sharp.
 
 ## Using it from an AI agent
 

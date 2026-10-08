@@ -97,7 +97,14 @@ function strip() {
   $('#strip').replaceChildren(...plan.scenes.map((sc, i) => { const d = el('div', { textContent: `${i + 1} · ${sc.type} · ${(sc.end - sc.start).toFixed(1)}s`, className: i === open ? 'on' : '' }); d.style.flex = (sc.end - sc.start) + ' 1 0'; d.onclick = () => { open = i; seek(i); draw(); }; return d; }));
 }
 function seek(i) { if (!plan || !plan.scenes[i]) return; const sc = plan.scenes[i]; lastT = sc.start + (sc.end - sc.start) * .6; $('#pv').contentWindow?.postMessage({ sbSeek: lastT }, '*'); }
-addEventListener('message', (e) => { if (e.data && typeof e.data.sbTime === 'number') lastT = e.data.sbTime; });
+addEventListener('message', (e) => {
+  if (e.data && typeof e.data.sbTime === 'number') lastT = e.data.sbTime;
+  if (e.data && Array.isArray(e.data.sbLint)) {            // the preview's own layout check
+    for (const old of document.querySelectorAll('.msg.lay')) old.remove();
+    const keep = $('#build'), rows = e.data.sbLint.map((f) => el('div', { className: 'msg lay ' + (f.level === 'problem' ? 'bad' : 'note'), textContent: `${f.level === 'problem' ? '✕' : '·'} scene ${f.scene} (${f.type}): ${f.message}` }));
+    keep ? keep.before(...rows) : $('#foot').append(...rows);
+  }
+});
 
 // ---- form builder driven by the same table the validator uses ----
 function field(key, shape, get, set) {

@@ -19,6 +19,25 @@ export async function check(dir, plan) {
     if (loud.mean < -40) problems.push(`audio is nearly silent (mean ${loud.mean} dB)`);
   }
 
+  // watch the whole picture once: black frames, single-frame flashes and long stills are things a contact sheet cannot show
+  const notes = [...(plan.notes || [])], nearCut = (t) => plan.cuts.some((c) => t > c - .45 && t < c + .5);
+  const seenLog = run(tools.ffmpeg, ['-hide_banner', '-i', video, '-an', '-vf', "blackdetect=d=0.1:pix_th=0.03,freezedetect=n=0.003:d=2.5,select='gt(scene,0.45)',showinfo", '-f', 'null', '-'], { stderr: true });
+  for (const m of seenLog.matchAll(/black_start:([\d.]+) black_end:([\d.]+)/g)) if (!nearCut(+m[1])) problems.push(`black frames from ${(+m[1]).toFixed(2)} s to ${(+m[2]).toFixed(2)} s`);
+  const jumps = [...seenLog.matchAll(/pts_time:([\d.]+)/g)].map((m) => +m[1]).filter((t) => !nearCut(t));
+  // an abrupt change is a flash when the picture is the same just before and just after it, and a cut otherwise
+  const tiny = (t) => run(tools.ffmpeg, ['-v', 'error', '-ss', Math.max(0, t).toFixed(3), '-i', video, '-frames:v', '1', '-vf', 'scale=64:-2,format=gray', '-f', 'rawvideo', '-'], { binary: true });
+  const alike = (a, b) => { const n = Math.min(a.length, b.length); let sum = 0; for (let i = 0; i < n; i++) sum += Math.abs(a[i] - b[i]); return n > 0 && sum / n < 8; };
+  for (const t of jumps) {
+    if (alike(tiny(t - .12), tiny(t + .12))) problems.push(`a flash at ${t.toFixed(2)} s: the picture jumps and comes straight back`);
+    else notes.push(`the picture changes abruptly at ${t.toFixed(2)} s (a cut inside the footage?)`);
+  }
+  const stills = [...seenLog.matchAll(/freeze_start: ([\d.]+)/g)].map((m) => +m[1]), lengths = [...seenLog.matchAll(/freeze_duration: ([\d.]+)/g)].map((m) => +m[1]);
+  stills.forEach((t, i) => notes.push(`the picture does not move for ${(lengths[i] ?? dur - t).toFixed(1)} s from ${t.toFixed(2)} s`));
+  if (loud && loud.peak > -0.3) notes.push(`the sound peaks at ${loud.peak} dB, close to clipping`);
+  // what the layout check found while the picture was being drawn
+  const layoutFile = path.join(dir, '.songbe', 'layout.json'), layout = exists(layoutFile) ? JSON.parse(fs.readFileSync(layoutFile, 'utf8')) : [];
+  for (const f of layout) (f.level === 'problem' ? problems : notes).push(`scene ${f.scene} (${f.type}): ${f.message}`);
+
   // two frames per scene (35 % and 85 % through) tiled into one sheet
   const tmp = mkdir(path.join(dir, '.songbe', 'sheet')); for (const f of fs.readdirSync(tmp)) fs.rmSync(path.join(tmp, f));
   const times = plan.scenes.flatMap((s) => [s.start + (s.end - s.start) * .35, s.start + (s.end - s.start) * .85]).map((t) => Math.min(t, dur - .05));
@@ -43,7 +62,7 @@ export async function check(dir, plan) {
 
   const report = { ok: problems.length === 0, problems, frame: plan.size.join('x'), duration: dur, sizeMB: +(info.format.size / 1048576).toFixed(1), picture: v && `${v.width}x${v.height} ${v.codec_name}`,
     audio: a ? `${a.codec_name} ${a.sample_rate} Hz ${a.channels}ch` : null, loudness: loud, scenes: plan.scenes.map((s) => ({ type: s.type, start: s.start, end: s.end })),
-    spoken, heard, notes: plan.notes, sheet, video };
+    spoken, heard, notes, sheet, video };
   fs.writeFileSync(path.join(out, `check${tag}.json`), JSON.stringify(report, null, 1));
   return report;
 }

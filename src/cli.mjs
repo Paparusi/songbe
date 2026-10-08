@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { makePlan } from './plan.mjs';
-import { renderVideo, stills, writePage } from './render.mjs';
+import { renderVideo, stills, writePage, lintLayout } from './render.mjs';
 import { makeAudio, mux } from './audio.mjs';
 import { check } from './check.mjs';
 import { tools, loadDotEnv, exists, log } from './util.mjs';
@@ -15,6 +15,7 @@ const HELP = `Songbe — short ads from a single video.json
   songbe validate <dir>           check video.json and list every problem
   songbe schema                   print the JSON Schema of video.json
   songbe frames <dir> [t1,t2,…]   render a few stills to out/frames (default: two per scene) — review before a full build
+  songbe lint <dir>               layout check only: content that leaves the frame, overlaps, or would be covered
   songbe build <dir> [--force]    voice → timeline → footage → picture → sound → out/video.mp4, then self-check
                                   frames and build accept --style=soft|bold and --format=tall|square|wide to try
                                   another look or frame without editing the spec; build --formats=tall,square,wide makes several;
@@ -87,12 +88,22 @@ export async function main(argv) {
   if (cmd === 'frames') {
     const arg = rest.find((x) => !x.startsWith('--'));
     const times = arg ? arg.split(',').map(Number) : plan.scenes.flatMap((s) => [s.start + (s.end - s.start) * .35, s.start + (s.end - s.start) * .85]);
-    const files = await stills(dir, plan, times.map((t) => Math.min(t, plan.duration - .04)));
-    return log(files.join('\n'));
+    const { files, layout } = await stills(dir, plan, times.map((t) => Math.min(t, plan.duration - .04)));
+    log(files.join('\n')); return findings(layout);
+  }
+  if (cmd === 'lint') {
+    const layout = await lintLayout(dir, plan); findings(layout);
+    if (!layout.length) log('layout: nothing leaves the frame, overlaps or would be covered');
+    if (layout.some((f) => f.level === 'problem')) process.exitCode = 2;
+    return;
   }
   if (cmd !== 'build') throw new Error(`unknown command "${cmd}"\n\n` + HELP);
   const r = await finish(dir, plan);
   if (!r.ok) process.exitCode = 2;
+}
+
+function findings(layout) {
+  for (const f of layout) log(`${f.level === 'problem' ? '!' : '·'} scene ${f.scene} (${f.type}): ${f.message}`);
 }
 
 async function finish(dir, plan) {
