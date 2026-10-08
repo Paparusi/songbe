@@ -73,7 +73,7 @@ const BASIC = ['str', 'num', 'bool', 'text', 'media'];
 const isEnum = (s) => Array.isArray(s) && (s.length > 1 || (typeof s[0] === 'string' && !BASIC.includes(s[0])));
 const clean = (k) => k.replace(/!$/, '');
 
-let S = null, spec = null, tab = 'scenes', open = 0, timer = null, lastT = 0, plan = null;
+let S = null, spec = null, tab = 'scenes', open = 0, timer = null, lastT = 0, plan = null, undo = null, making = null;
 
 function changed() { clearTimeout(timer); $('#saved').textContent = 'editing…'; timer = setTimeout(save, 450); }
 async function save() {
@@ -174,7 +174,8 @@ function draw() {
       btn('↑', () => { if (i) { spec.scenes.splice(i - 1, 0, spec.scenes.splice(i, 1)[0]); open = i - 1; } }), btn('↓', () => { if (i < spec.scenes.length - 1) { spec.scenes.splice(i + 1, 0, spec.scenes.splice(i, 1)[0]); open = i + 1; } }),
       btn('✕', () => { if (spec.scenes.length > 1) { spec.scenes.splice(i, 1); open = Math.max(0, open - (i <= open ? 1 : 0)); } }));
     head.onclick = () => { open = open === i ? -1 : i; draw(); strip(); seek(i); };
-    const body = el('div', { className: 'body' }); if (i === open) body.append(...fields(S.table.SCENES[sc.type], sc));
+    const body = el('div', { className: 'body' });
+    if (i === open) { body.append(...fields(S.table.SCENES[sc.type], sc)); if (sc.media && typeof sc.media === 'object' && sc.media.generate) body.append(footageRow(i)); if (S.writer) body.append(rewriteRow(i)); }
     card.append(head, body); pane.append(card);
   });
   const adds = el('div', { className: 'adds' }); adds.append(el('span', { className: 'hint', style: 'margin:6px 4px 0 0', textContent: 'Add a scene:' }));
@@ -182,6 +183,49 @@ function draw() {
   pane.append(adds);
 }
 for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { tab = b.dataset.tab; draw(); };
+
+// ---- a scene rewritten on request (the old one is kept for one undo) ----
+function rewriteRow(i) {
+  const box = el('div', { className: 'group' }), t = el('textarea', { rows: 2, placeholder: 'What should change? "Shorter." "Make it about the price." "Turn it into three reasons."' });
+  const go = el('button', { className: 'btn small', textContent: 'Rewrite' }), msg = el('span', { className: 'hint', style: 'margin:0' });
+  go.onclick = async () => {
+    if (t.value.trim().length < 3) { msg.textContent = 'Say what should change.'; return; }
+    go.disabled = true; msg.textContent = 'Writing…'; clearTimeout(timer); await save();
+    let r, j; try { r = await api('api/rewrite', { method: 'POST', body: JSON.stringify({ scene: i, ask: t.value }) }); j = await r.json(); } catch { r = { ok: false }; j = { error: 'No answer. Try again.' }; }
+    go.disabled = false;
+    if (!r.ok) { msg.textContent = j.error.split('\n')[0]; return; }
+    undo = { i, scene: spec.scenes[i] }; spec.scenes[i] = j.scene; draw(); changed();
+    for (const x of j.left || []) $('#foot').prepend(el('div', { className: 'msg note', textContent: '· Still to look at: ' + x }));
+  };
+  const row = el('div', { className: 'rowf', style: 'margin-top:8px' }, go);
+  if (undo && undo.i === i) { const back = el('button', { className: 'btn small', textContent: 'Undo' }); back.onclick = () => { spec.scenes[i] = undo.scene; undo = null; draw(); changed(); }; row.append(back); }
+  row.append(msg);
+  box.append(el('div', { className: 'gh' }, el('span', { textContent: 'Rewrite this scene' })), el('div', { className: 'f' }, t), row); return box;
+}
+// ---- footage generated for one scene, now, instead of at the next build ----
+function footageRow(i) {
+  const box = el('div', { className: 'group' }), go = el('button', { className: 'btn small', textContent: 'Generate now' }), msg = el('span', { className: 'hint', id: 'fstat', style: 'margin:0', textContent: making && making.i === i ? making.text : '' });
+  go.disabled = !!making || !S.keys.fal;
+  go.onclick = async () => {
+    clearTimeout(timer); await save();
+    const r = await api('api/footage', { method: 'POST', body: JSON.stringify({ scene: i }) }); if (!r.ok) { msg.textContent = (await r.json()).error; return; }
+    making = { i, text: 'Starting…' }; draw(); watchFootage();
+  };
+  box.append(el('div', { className: 'gh' }, el('span', { textContent: 'Generate this footage' })),
+    el('div', { className: 'hint', textContent: S.keys.fal ? 'Uses your fal.ai key: one picture, and a five-second clip when motion is described. It is kept, so the build will not make it again.' : 'Needs your fal.ai key (Videos → Settings).' }),
+    el('div', { className: 'rowf', style: 'margin-top:8px' }, go, msg)); return box;
+}
+async function watchFootage() {
+  for (;;) {
+    await new Promise((ok) => setTimeout(ok, 1500));
+    let j; try { j = await (await fetch('api/footage')).json(); } catch { continue; }
+    const say = (text) => { if (making) making.text = text; const m = $('#fstat'); if (m) m.textContent = text; };
+    if (!j.done) { say(/clip:/.test(j.last) ? 'Making the clip… (a few minutes)' : /image:/.test(j.last) ? 'Making the picture…' : 'Working…'); continue; }
+    const failed = j.error; making = null; draw();
+    if (failed) alertBox('Footage: ' + failed); else { $('#foot').prepend(el('div', { className: 'msg note', textContent: '· The footage is ready and shown in the preview.' })); await save(); }
+    return;
+  }
+}
 
 // ---- build ----
 let building = false;
@@ -218,6 +262,7 @@ function watch() {
   if (!spec) { $('#pane').append(el('div', { className: 'msg bad', textContent: S.errors[0] })); return; }
   if (S.plan) { const sc = S.plan.scenes[0]; lastT = sc.start + (sc.end - sc.start) * .6; }
   draw(); show(S); if (S.building) { setBuilding(true); watch(); }
+  fetch('api/footage').then((r) => r.json()).then((j) => { if (!j.done) { making = { i: j.scene, text: 'Working…' }; draw(); watchFootage(); } }).catch(() => {});      // one was under way when the page was opened
   if (!S.tools.ready) missing();
   // straight from "Write it for me": say what the checks still found, and that the claims are the person's to verify
   let w = null; try { w = JSON.parse(sessionStorage.getItem('songbe-written-' + S.id)); sessionStorage.removeItem('songbe-written-' + S.id); } catch {}

@@ -33,6 +33,7 @@ const HELP = `Songbe — short ads from a single video.json
   songbe check <dir>              re-run the self-check on out/video.mp4
   songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
   songbe poster <dir>             one small still of the opening scene (.songbe/poster.jpg; --out=FILE --width=480)
+  songbe footage <dir> --scene=N  generate the footage one scene asks for now, without building (uses FAL_KEY)
 
 Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage, and
 the writer), ANTHROPIC_API_KEY (optional: the writer then uses Claude directly), GROQ_API_KEY (optional transcript check).
@@ -132,6 +133,13 @@ export async function main(argv) {
       return log('video.json is valid' + long.map((f) => '\n  · ' + tooLongNote(f)).join(''));
     }
     process.exitCode = 2; return log(`${errs.length} problem${errs.length > 1 ? 's' : ''}:\n  - ` + errs.join('\n  - '));
+  }
+  if (cmd === 'footage') {
+    const n = +(rest.find((x) => x.startsWith('--scene='))?.slice(8) || 0);
+    if (!Number.isInteger(n) || n < 1) throw new Error('which scene? --scene=1 is the first');
+    const { generateFootage } = await import('./plan.mjs');
+    const r = await generateFootage(dir, n - 1, { format: rest.find((x) => x.startsWith('--format='))?.slice(9), force: flags.has('--force') });
+    return log(r.made.length ? `generated the ${r.made.join(' and the ')}: ${r.clip || r.still}` : `already there: ${r.clip || r.still}`);
   }
   if (cmd === 'poster') {
     const out = rest.find((x) => x.startsWith('--out='))?.slice(6), width = +(rest.find((x) => x.startsWith('--width='))?.slice(8) || 480);

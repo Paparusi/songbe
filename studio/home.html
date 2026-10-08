@@ -46,7 +46,7 @@ code { font: 12.5px/1.5 ui-monospace, Consolas, Menlo, monospace; background: va
 .bar2 { height: 6px; border-radius: 3px; background: var(--raise); overflow: hidden; margin-top: 10px; width: 260px; } .bar2 i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
 
 dialog { margin: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); padding: 0; width: min(720px, calc(100vw - 40px)); max-height: calc(100vh - 60px); box-shadow: 0 40px 120px rgba(0,0,0,.6); }
-dialog::backdrop { background: rgba(4,7,11,.66); backdrop-filter: blur(3px); }
+#dname { width: auto; } dialog::backdrop { background: rgba(4,7,11,.66); backdrop-filter: blur(3px); }
 dialog form, dialog .in { padding: 22px 24px 20px; }
 dialog h2 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; margin-bottom: 4px; } dialog .lead { color: var(--soft); margin-bottom: 16px; }
 dialog .starts { justify-content: start; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
@@ -89,6 +89,12 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
   <div class="end"><span class="msg bad" id="nerr"></span><span class="msg busy" id="nbusy" hidden><i></i><span></span></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" id="ngo" type="submit">Create</button></div>
 </form></dialog>
 
+<dialog id="dname"><form method="dialog" id="fname" style="min-width:min(460px, calc(100vw - 80px))">
+  <h2 id="tname"></h2>
+  <label for="iname">Name</label><input type="text" id="iname" maxlength="60" autocomplete="off" spellcheck="false">
+  <div class="end"><span class="msg bad" id="ename"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" id="gname" type="submit"></button></div>
+</form></dialog>
+
 <dialog id="dopen"><form method="dialog" id="fopen">
   <h2>Open a folder</h2><div class="lead">Any folder with a <code>video.json</code> in it: one you made by hand, with the command line, or that an AI agent wrote for you.</div>
   <label for="odir">Folder</label><input type="text" id="odir" autocomplete="off" spellcheck="false" placeholder="">
@@ -128,7 +134,9 @@ const KEYS = [['fal', 'FAL_KEY', 'fal.ai', 'Voice-over, music, generated footage
   ['groq', 'GROQ_API_KEY', 'Groq', 'Optional. After a build, listens to the video and writes down what is actually audible.']];
 const SPARK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l1.8 4.7L16.5 9.5l-4.7 1.8L10 16l-1.8-4.7L3.5 9.5l4.7-1.8z"/><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z"/></svg>';
 const ICON = { folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
-  off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' };
+  off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
+  pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>' };
 
 let H = null, seen = '', pick = null, tries = 0, timer = null;
 const shape = ([w, h]) => (w === 1080 && h === 1920 ? 'Tall 9:16' : w === h ? 'Square 1:1' : w === 1920 && h === 1080 ? 'Wide 16:9' : `${w}×${h}`);
@@ -157,7 +165,9 @@ function status(p) {
 function card(p) {
   const a = el('a', { className: 'proj', href: `/p/${p.id}/` }), [dot, text] = status(p), tools = el('div', { className: 'tools' });
   const btn = (icon, title, fn) => { const b = el('button', { title, innerHTML: ICON[icon] }); b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); fn(); }; return b; };
-  tools.append(btn('folder', 'Show the folder', () => api(`/p/${p.id}/api/reveal`, { method: 'POST', body: '{"what":"folder"}' })));
+  tools.append(btn('pen', 'Rename', () => askName('Rename', p.name, 'Rename', (name) => post('/api/projects/rename', { id: p.id, name }))),
+    btn('copy', 'Make a copy', () => askName('Make a copy', p.name + ' copy', 'Copy', (name) => post('/api/projects/duplicate', { id: p.id, name }))),
+    btn('folder', 'Show the folder', () => api(`/p/${p.id}/api/reveal`, { method: 'POST', body: '{"what":"folder"}' })));
   if (p.elsewhere && p.id !== H.pinned) tools.append(btn('off', 'Take off this list (the folder stays where it is)', async () => { await post('/api/projects/forget', { id: p.id }); load(); }));
   a.append(stage(p, p.brand || p.name), tools, el('div', { className: 'meta' }, el('div', { className: 'nm', textContent: p.name, title: p.dir }),
     el('div', { className: 'sub', textContent: `${shape(p.size)} · ${p.scenes} scene${p.scenes === 1 ? '' : 's'}`, title: 'Edited ' + ago(p.edited) }), el('div', { className: 'st' }, el('span', { className: 'dot ' + dot }), text)));
@@ -259,6 +269,10 @@ $('#fnew').onsubmit = async (e) => {
     location.href = `/p/${r.id}/`; return;
   }
 };
+// one small dialog for the two things that only need a name
+let named = null;
+function askName(title, value, button, then) { named = then; $('#tname').textContent = title; $('#gname').textContent = button; $('#ename').textContent = ''; $('#iname').value = value; $('#dname').showModal(); $('#iname').select(); }
+$('#fname').onsubmit = async (e) => { e.preventDefault(); const r = await named($('#iname').value.trim()); if (r.id) { $('#dname').close(); load(); } else $('#ename').textContent = r.error || 'That did not work.'; };
 $('#bopen').onclick = () => { $('#oerr').textContent = ''; $('#odir').value = ''; $('#odir').placeholder = H.home; $('#dopen').showModal(); $('#odir').focus(); };
 $('#fopen').onsubmit = async (e) => {
   e.preventDefault();

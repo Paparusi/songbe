@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.13): nine scene types, three looks, packs for more, any frame size, captions, cuts on the beat, built-in checks, a writer that
+> Early version (0.14): nine scene types, three looks, packs for more, any frame size, captions, cuts on the beat, built-in checks, a writer that
 > drafts the whole video from a description, and an app with a visual editor (in the browser, or installed on Windows). Tested on Linux / WSL and on Windows 11; macOS has not been tried.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
@@ -225,6 +225,10 @@ whether its video is up to date; *New video* writes one from your description, o
 *Settings* holds your keys and shows what is installed. The **editor** has scenes and their fields on the left and the video on the right, updating as you type. The preview
 is free — it reuses voice clips that already exist and estimates the timing of new sentences — and **Build video** runs the full
 build and shows the result with its self-check. Images and clips are added to the project's `media/` folder from the form.
+With a key, every scene also has **Rewrite this scene** (say what should change; the new scene is checked against the rest of the
+video and can be undone) and, where footage is described rather than supplied, **Generate now**, which makes that picture or clip
+at once instead of at the next build (`songbe footage <dir> --scene=N` does the same from the command line). On the home screen a
+project can be renamed and copied.
 
 Projects are ordinary folders (`video.json` plus `media/`) in your system's video folder, under `Songbe/`; a folder made by hand, by
 the command line or by an agent joins the list with *Open a folder*. `songbe doctor` prints both that folder and the data folder,

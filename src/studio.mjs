@@ -13,7 +13,7 @@ import { pageHtml } from './render.mjs';
 import { FFMPEG_WINDOWS, ffmpegAdvice, installFfmpeg } from './setup.mjs';
 import { installedPacksDir, listPacks, starterDir, starterList } from './packs.mjs';
 import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES, refreshStyles } from './spec.mjs';
-import { writeSpec, writerFor } from './write.mjs';
+import { rewriteScene, writeSpec, writerFor } from './write.mjs';
 import { KIT, ROOT, WIN, dataDir, exists, killTree, log, mkdir, openOutside, projectsHome, readDotEnv, sha, tools } from './util.mjs';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
@@ -53,7 +53,7 @@ export const forBrowser = (plan, link) => JSON.parse(JSON.stringify(plan), (k, v
 export async function serve({ port: wantPort = 4173, project = null, home = projectsHome(), ask = null } = {}) {      // `ask` stands in for the language model in tests
   const pinned = project ? path.resolve(project) : null;      // `songbe studio <dir>`: this project is the front door
   const registry = path.join(dataDir(), 'projects.json');
-  const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map();
+  const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map();
   let setup = { running: false, step: null, done: 0, total: 0, error: null, version: null }, toolsSeen = null, toolsAt = 0;
 
   const send = (res, code, body, type = 'application/json; charset=utf-8', more = {}) => { res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', ...more }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
@@ -217,7 +217,7 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     if (route === 'GET /poster') return serveFile(req, res, path.join(dir, '.songbe', 'poster.jpg'), roots);
     if (route === 'GET /api/state') {
       const spec = readJson(specFile);
-      return send(res, 200, { id, dir, name: path.basename(dir), version: VERSION, spec, table: { TOP, SCENES }, templates: TEMPLATES, keys: keysFor(dir), tools: toolState(),
+      return send(res, 200, { id, dir, name: path.basename(dir), version: VERSION, spec, table: { TOP, SCENES }, templates: TEMPLATES, keys: keysFor(dir), tools: toolState(), writer: ask ? 'custom' : writerFor({ ...keyEnv(), ...readDotEnv(path.join(dir, '.env')) }),
         building: !!job && !job.done, ...(spec ? await state(spec) : { errors: ['video.json is not valid JSON. Fix it in a text editor, or start again from a copy.'], plan: null }) });
     }
     if (route === 'PUT /api/spec') {
@@ -261,6 +261,23 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
       if (job.done) { res.write(`event: done\ndata: ${JSON.stringify(result(job))}\n\n`); return res.end(); }
       job.watchers.add(res); req.on('close', () => job.watchers.delete(res)); return;
     }
+    if (route === 'POST /api/rewrite') {      // one scene, rewritten the way the person asks; the page puts it in place and can undo it
+      const q = await json(req);
+      try { return send(res, 200, await rewriteScene(dir, +q.scene, String(q.ask || ''), { ask, env: { ...keyEnv(), ...readDotEnv(path.join(dir, '.env')) } })); } catch (e) { return send(res, 400, { error: e.message }); }
+    }
+    if (route === 'POST /api/footage') {      // generate what one scene asks for now, in a process of its own (a clip takes minutes)
+      const n = +(await json(req)).scene, old = footage.get(id);
+      if (old && !old.done) return send(res, 409, { error: 'Footage is already being generated.' });
+      if (!Number.isInteger(n) || n < 0) return send(res, 400, { error: 'which scene?' });
+      const f = { scene: n, done: false, error: null, lines: [] }; footage.set(id, f);
+      const feed = (d) => { for (const line of String(d).split(/\r?\n/)) if (line.trim()) f.lines.push(line.trim()); };
+      f.proc = spawn(process.execPath, [path.join(ROOT, 'bin', 'songbe.mjs'), 'footage', dir, `--scene=${n + 1}`], { env: process.env, windowsHide: true, detached: !WIN });
+      f.proc.stdout.on('data', feed); f.proc.stderr.on('data', feed);
+      f.proc.on('error', (e) => { f.done = true; f.error = e.message; });
+      f.proc.on('close', (code) => { f.done = true; if (code !== 0) f.error = (f.lines.at(-1) || 'it did not work').replace(/^songbe: /, ''); });
+      return send(res, 200, { started: true });
+    }
+    if (route === 'GET /api/footage') { const f = footage.get(id); return send(res, 200, f ? { scene: f.scene, done: f.done, error: f.error, last: f.lines.at(-1) || '' } : { done: true, idle: true }); }
     if (route === 'POST /api/reveal') {      // show the project, or its finished video, in the system's file manager
       const video = path.join(dir, 'out', 'video.mp4'), what = (await json(req)).what;
       openOutside(what === 'video' && exists(video) ? video : dir, { select: what === 'video' && exists(video) });
@@ -298,6 +315,20 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
       const wr = /^\/api\/writing\/([0-9a-f]{16})$/.exec(u.pathname);
       if (req.method === 'GET' && wr) { const job = writing.get(wr[1]); return job ? send(res, 200, job) : send(res, 404, { error: 'not found' }); }
       if (route === 'POST /api/projects/open') { try { return send(res, 200, { id: adopt((await json(req)).dir) }); } catch (e) { return send(res, 400, { error: e.message }); } }
+      if (route === 'POST /api/projects/duplicate' || route === 'POST /api/projects/rename') {
+        const q = await json(req), from = dirOf(q.id), busy = jobs.get(q.id) && !jobs.get(q.id).done;
+        if (!from) return send(res, 404, { error: 'That project is no longer there.' });
+        const copy = route.endsWith('duplicate'), clean = tidyName(copy ? (q.name || path.basename(from) + ' copy') : q.name);
+        if (!clean) return send(res, 400, { error: 'Give it a name.' });
+        if (!copy && busy) return send(res, 409, { error: 'It is being built; rename it when that is done.' });
+        if (!copy && clean === path.basename(from)) return send(res, 200, { id: q.id });
+        const base = copy ? mkdir(home) : path.dirname(from); let to = path.join(base, clean); for (let n = 2; exists(to); n++) to = path.join(base, `${clean} ${n}`);
+        try {
+          if (copy) fs.cpSync(from, to, { recursive: true, filter: (f) => !/[\\/](\.songbe|out)([\\/]|$)/.test(f.slice(from.length)) });      // the work, not its caches and renders
+          else { fs.renameSync(from, to); known.delete(q.id); const rest = recent().filter((d) => idOf(d) !== q.id); if (rest.length !== recent().length) fs.writeFileSync(registry, JSON.stringify({ recent: [to, ...rest] }, null, 1)); }
+        } catch (e) { return send(res, 500, { error: 'That did not work: ' + e.message }); }
+        return send(res, 200, { id: idOf(to), name: path.basename(to) });
+      }
       if (route === 'POST /api/projects/forget') { const id = (await json(req)).id, dir = dirOf(id); if (dir) { remember(dir, false); known.delete(id); } return send(res, 200, { ok: true }); }      // only leaves the list; the folder stays
       if (route === 'PUT /api/keys') { try { saveKeys(await json(req)); return send(res, 200, keysFor(null)); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (route === 'POST /api/open') {
@@ -323,6 +354,7 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
   const close = () => {
     posters.queue.length = 0; if (posters.proc) killTree(posters.proc);
     for (const j of jobs.values()) if (!j.done) { j.stopped = true; killTree(j.proc); }
+    for (const f of footage.values()) if (!f.done) killTree(f.proc);
     server.close(); server.closeAllConnections?.();
   };
   return { server, port, url: `http://127.0.0.1:${port}/`, home, close };

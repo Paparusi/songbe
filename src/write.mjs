@@ -193,4 +193,35 @@ export async function writeSpec(dir, brief, { style, format = 'tall', captions =
   fs.writeFileSync(file, JSON.stringify(spec, null, 2) + '\n');
   return { file, spec, rounds: used, provider, model, note, seconds: found.seconds ?? null, left: found.other };
 }
+// Rewrites one scene of an existing video the way the person asks ("shorter", "make it about the price"). Nothing is saved here:
+// the new scene is returned for the editor to put in place (and to undo). The video itself stands in for the brief: a number or
+// an address the new scene shows must already be in the file or in the request.
+export async function rewriteScene(dir, index, request, { ask, env = process.env, rounds = 2 } = {}) {
+  let spec; try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
+  const old = spec.scenes?.[index];
+  if (!old) throw new Error('there is no such scene');
+  if (!request || request.trim().length < 3) throw new Error('Say what should change.');
+  if (!ask && !writerFor(env)) throw new Error('Rewriting needs a key: ANTHROPIC_API_KEY, or the FAL_KEY that also makes the voice and music.');
+  const say = async (q) => { const r = await (ask ? ask(q) : askModel(q, env)); return typeof r === 'string' ? r : r.text; };
+  const system = systemPrompt({ style: spec.style || 'soft' }) + `
+
+REWRITING ONE SCENE
+This time you do not write a whole file. You are given a finished video.json and asked to change one of its scenes. Reply with that one scene as a single JSON object (it starts with "type") and nothing else. Keep the language of the file. Keep its facts: every number, price, name, address and phone number in your scene must already be in the file or in the request. You may change the scene's type when the request calls for it.`;
+  const first = `THE VIDEO\n${JSON.stringify({ style: spec.style || 'soft', brand: spec.brand, scenes: spec.scenes })}\n\nAvailable media: ${mediaOf(dir).map((m) => m.path).join(', ') || 'none'}\n\nREWRITE SCENE ${index + 1} OF ${spec.scenes.length} (it is the "${old.type}" scene)\n${request.trim()}`;
+  let scene = null, found = null, last = '', used = 0;
+  for (let round = 1; round <= rounds; round++) {
+    const reply = await say({ system, prompt: round === 1 ? first : `${first}\n\nYOUR PREVIOUS REPLY\n${last}\n\nThe checks found the problems below. Fix every one and reply with the complete corrected scene, nothing else.\n${[...found.fatal, ...found.other].map((x) => '- ' + x).join('\n')}` }); used = round;
+    let draft; try { draft = parseReply(reply); } catch (e) { last = reply.slice(0, 4000); scene = null; found = { fatal: [`the reply was not one JSON object (${e.message})`], other: [] }; continue; }
+    if (draft && Array.isArray(draft.scenes) && draft.scenes[index]) draft = draft.scenes[index];      // a whole file came back: take the scene that was asked for
+    scene = draft; last = JSON.stringify(scene);
+    const next = { ...spec, scenes: spec.scenes.map((sc, i) => (i === index ? scene : sc)) }, here = `scenes[${index}]`;
+    found = { fatal: validate(next, dir).filter((e) => e.startsWith(here) || !e.startsWith('scenes[')).map((e) => 'not valid: ' + e), other: [] };
+    if (scene?.type === 'phone' && ![].concat(scene.screens || []).length) found.fatal.push('a "phone" scene has no screens: use another scene type');
+    if (!found.fatal.length) found.other = [...tooLong(next).filter((f) => f.at.startsWith(here)).map((f) => tooLongNote(f) + (f.count ? '' : ': say it in fewer words (count the characters)')),
+      ...inventedFacts({ scenes: [scene] }, JSON.stringify(spec) + ' ' + request).map((x) => x.replace('scenes[0]', here).replace('the brief', 'the video or the request'))];
+    if (!found.fatal.length && !found.other.length) break;
+  }
+  if (!scene || found.fatal.length) throw new Error(`The rewrite did not come out valid after ${used} ${used === 1 ? 'try' : 'tries'}:\n  - ` + found.fatal.join('\n  - '));
+  return { scene, rounds: used, left: found.other };
+}
 export { writerFor };

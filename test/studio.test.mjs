@@ -181,6 +181,30 @@ test('"Write it for me" makes the project in the background and says how it is g
   } finally { w.close(); }
 });
 
+test('a project can be copied and renamed; its caches and renders stay out of the copy', async () => {
+  const dir = path.join(process.env.SONGBE_HOME, 'Trống'), id = idOf(dir);
+  fs.mkdirSync(path.join(dir, 'out'), { recursive: true }); fs.writeFileSync(path.join(dir, 'out', 'video.mp4'), 'x'); fs.mkdirSync(path.join(dir, '.songbe', 'cache'), { recursive: true }); fs.writeFileSync(path.join(dir, '.songbe', 'cache', 'a.wav'), 'x');
+  const copy = await post('/api/projects/duplicate', { id }).then(J);
+  assert.equal(copy.name, 'Trống copy'); assert.deepEqual(fs.readdirSync(path.join(process.env.SONGBE_HOME, 'Trống copy')).sort(), ['media', 'video.json']);
+  assert.equal((await post('/api/projects/duplicate', { id, name: 'Trống copy' }).then(J)).name, 'Trống copy 2', 'a taken name gets a number');
+  const renamed = await post('/api/projects/rename', { id: copy.id, name: 'Bản nháp: "mới"' }).then(J);
+  assert.equal(renamed.name, 'Bản nháp mới'); assert.ok(!fs.existsSync(path.join(process.env.SONGBE_HOME, 'Trống copy')) && fs.existsSync(path.join(process.env.SONGBE_HOME, 'Bản nháp mới', 'video.json')));
+  assert.equal((await fetch(`${u}/p/${copy.id}/`)).status, 404, 'the old address is gone'); assert.equal((await fetch(`${u}/p/${renamed.id}/api/state`).then(J)).name, 'Bản nháp mới');
+  assert.equal((await post('/api/projects/rename', { id: renamed.id, name: ' . ' })).status, 400); assert.equal((await post('/api/projects/rename', { id: '0123456789abcdef', name: 'x' })).status, 404);
+  assert.ok(fs.existsSync(path.join(dir, 'out', 'video.mp4')), 'the original keeps everything');
+});
+
+test('rewriting a scene and generating footage answer plainly when there is no key', async () => {
+  const id = idOf(path.join(process.env.SONGBE_HOME, 'Trống'));
+  const r = await fetch(`${u}/p/${id}/api/rewrite`, { method: 'POST', headers: mine, body: JSON.stringify({ scene: 0, ask: 'Shorter.' }) });
+  assert.equal(r.status, 400); assert.match((await r.json()).error, /needs a key/);
+  assert.equal((await fetch(`${u}/p/${id}/api/state`).then(J)).writer, null);
+  assert.deepEqual(await fetch(`${u}/p/${id}/api/footage`).then(J), { done: true, idle: true });
+  assert.equal((await fetch(`${u}/p/${id}/api/footage`, { method: 'POST', headers: mine, body: JSON.stringify({ scene: 0 }) })).status, 200);
+  let f; for (let i = 0; i < 100; i++) { f = await fetch(`${u}/p/${id}/api/footage`).then(J); if (f.done) break; await new Promise((ok) => setTimeout(ok, 100)); }
+  assert.equal(f.done, true); assert.match(f.error, /does not describe footage to generate/, 'the scene has no footage description: said so, nothing spent');
+});
+
 let ready = true; try { tools.chrome; tools.ffmpeg; tools.ffprobe; } catch { ready = false; }
 test('every project gets a poster of its opening scene', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
   let h;

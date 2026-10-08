@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fitTable, limitOf, shownLength, tooLong } from '../src/fit.mjs';
-import { inventedFacts, parseReply, systemPrompt, unreadable, userPrompt, writeSpec } from '../src/write.mjs';
+import { inventedFacts, parseReply, rewriteScene, systemPrompt, unreadable, userPrompt, writeSpec } from '../src/write.mjs';
 import { SCENES, STYLES, validate } from '../src/spec.mjs';
 import { ROOT } from '../src/util.mjs';
 
@@ -129,4 +129,23 @@ test('media in the project is offered to the model, and a logo is wired in', asy
   const m = scripted(withPhone), r = await writeSpec(dir, BRIEF, { ask: m.ask });
   assert.ok(m.asked[0].prompt.includes('- media/man-hinh.png (image'), 'the screenshot is listed'); assert.ok(!m.asked[0].prompt.includes('logo.svg'), 'the logo is not footage');
   assert.deepEqual(r.spec.brand.logo, { mark: 'media/logo.svg' }); assert.deepEqual(r.left, []);
+});
+
+test('one scene is rewritten on request: checked against the video it belongs to, and nothing is saved', async () => {
+  const dir = fresh('rewrite'); fs.writeFileSync(path.join(dir, 'video.json'), JSON.stringify({ format: 'tall', style: 'soft', ...GOOD }));
+  const before = fs.readFileSync(path.join(dir, 'video.json'), 'utf8');
+  const better = { type: 'list', say: 'Ba lý do để ghé Mộc.', title: ['Ba lý do', 'ghé Mộc'], items: [{ icon: 'number', text: 'Rang mỗi sáng' }, { icon: 'number', text: 'Mở cửa từ 6 giờ' }, { icon: 'number', text: 'Giao miễn phí trong khu' }] };
+  const m = scripted(better), r = await rewriteScene(dir, 0, 'Đổi thành ba lý do, đánh số.', { ask: m.ask });
+  assert.deepEqual(r.scene, better); assert.equal(r.rounds, 1); assert.deepEqual(r.left, []);
+  assert.ok(m.asked[0].system.includes('REWRITING ONE SCENE') && m.asked[0].prompt.includes('REWRITE SCENE 1 OF 4') && m.asked[0].prompt.includes('Đổi thành ba lý do') && m.asked[0].prompt.includes('[[rang mộc]]'));
+  assert.equal(fs.readFileSync(path.join(dir, 'video.json'), 'utf8'), before, 'the file is the editor\'s to change');
+  // a number that is neither in the video nor in the request goes back; one given in the request is fine
+  const invented = { ...better, items: [{ icon: 'star', text: 'Hơn 500 khách mỗi ngày' }] }, m2 = scripted(invented, better), r2 = await rewriteScene(dir, 1, 'Viết lại cho gọn.', { ask: m2.ask });
+  assert.equal(r2.rounds, 2); assert.ok(m2.asked[1].prompt.includes('500') && m2.asked[1].prompt.includes('scenes[1]') && m2.asked[1].prompt.includes('the video or the request'));
+  assert.deepEqual((await rewriteScene(dir, 1, 'Thêm ý: hơn 500 khách mỗi ngày.', { ask: scripted(invented).ask })).left, []);
+  // a whole file in reply: the scene that was asked for is taken from it
+  assert.deepEqual((await rewriteScene(dir, 3, 'Gọn hơn.', { ask: scripted({ ...GOOD, scenes: GOOD.scenes.map((s, i) => (i === 3 ? { type: 'end', say: 'Mộc.', cta: 'Nhắn Zalo' } : s)) }).ask })).scene, { type: 'end', say: 'Mộc.', cta: 'Nhắn Zalo' });
+  await assert.rejects(rewriteScene(dir, 0, 'Gọn hơn.', { ask: scripted({ type: 'poster' }).ask }), /did not come out valid after 2 tries/);
+  await assert.rejects(rewriteScene(dir, 9, 'Gọn hơn.', { ask: m.ask }), /no such scene/); await assert.rejects(rewriteScene(dir, 0, ' ', { ask: m.ask }), /Say what should change/);
+  await assert.rejects(rewriteScene(dir, 0, 'Gọn hơn.', { env: {} }), /needs a key/);
 });

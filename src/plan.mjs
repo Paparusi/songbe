@@ -23,6 +23,23 @@ function sizeOf(file) {
   } catch { return null; }
 }
 const url = (f) => pathToFileURL(f).href;
+// the frame of a video and the shape generated footage is made in
+const frameOf = (spec, format) => { const size = (format && FORMATS[format]) || spec.size || FORMATS[spec.format] || FORMATS.tall; return { size, aspect: size[0] / size[1] > 1.3 ? '16:9' : size[0] / size[1] < .7 ? '9:16' : '1:1' }; };
+// where the generated picture and clip of a scene are kept: by what was asked for, so asking again costs nothing
+const generated = (cache, g) => { const id = sha(['gen', g]); return { still: path.join(cache, `gen-${id}.jpg`), clip: path.join(cache, `gen-${id}.mp4`) }; };
+
+// Makes the generated footage of one scene now (a picture, then a clip when motion is described) without planning or drawing
+// anything else. Returns { still, clip, made }: `made` lists what was newly generated — nothing, when it was already there.
+export async function generateFootage(dir, index, opts = {}) {
+  let spec; try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
+  const g0 = spec.scenes?.[index]?.media?.generate;
+  if (!g0 || typeof g0.image !== 'string' || !g0.image.trim()) throw new Error(`scene ${index + 1} does not describe footage to generate`);
+  if (!fal.available()) throw new Error('FAL_KEY is not set: generating footage needs your fal.ai key');
+  const cache = mkdir(path.join(dir, '.songbe', 'cache')), g = { aspect: frameOf(spec, opts.format).aspect, ...g0 }, { still, clip } = generated(cache, g), made = [];
+  if (!exists(still) || opts.force) { log('  image:', g.image.slice(0, 70) + '…'); await fal.image(g.image, g, still); made.push('picture'); }
+  if (g.motion && (!exists(clip) || opts.force)) { log('  clip:', g.motion.slice(0, 70) + '…'); await fal.animate(still, g.motion, g, clip); made.push('clip'); }
+  return { still, clip: g.motion ? clip : null, made };
+}
 
 export async function makePlan(dir, opts = {}) {
   let spec = opts.spec;      // a draft that is not on disk yet can be planned too
@@ -31,8 +48,7 @@ export async function makePlan(dir, opts = {}) {
   if (errs.length) throw new Error(`video.json has ${errs.length} problem${errs.length > 1 ? 's' : ''}:\n  - ` + errs.join('\n  - '));
   const work = mkdir(path.join(dir, '.songbe')), cache = mkdir(path.join(work, 'cache'));
   // the frame: --format on the command line, else "size" or "format" in the spec, else the vertical 9:16
-  const size = (opts.format && FORMATS[opts.format]) || spec.size || FORMATS[spec.format] || FORMATS.tall, fps = spec.fps || 30;
-  const aspect = size[0] / size[1] > 1.3 ? '16:9' : size[0] / size[1] < .7 ? '9:16' : '1:1';
+  const { size, aspect } = frameOf(spec, opts.format), fps = spec.fps || 30;
   const notes = [];
 
   // ---- voice: one clip per sentence, silence trimmed ----
@@ -99,8 +115,7 @@ export async function makePlan(dir, opts = {}) {
   for (const sc of scenes) {
     let src = sc.media;
     if (src && typeof src === 'object' && src.generate) {
-      const g = { aspect, ...src.generate }, id = sha(['gen', g]);      // generated footage is made in the frame's shape
-      const still = path.join(cache, `gen-${id}.jpg`), clip = path.join(cache, `gen-${id}.mp4`);
+      const g = { aspect, ...src.generate }, { still, clip } = generated(cache, g);      // generated footage is made in the frame's shape
       if (canGen) {
         if (!exists(still)) { log('  image:', g.image.slice(0, 70) + '…'); await fal.image(g.image, g, still); }
         if (g.motion && !exists(clip)) { log('  clip:', g.motion.slice(0, 70) + '…'); await fal.animate(still, g.motion, g, clip); }
