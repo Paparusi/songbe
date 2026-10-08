@@ -1,14 +1,14 @@
-// Framewright scene kit — three scene types that cover a short vertical ad:
+// Songbe scene kit — three scene types that cover a short vertical ad:
 //   footage  full-bleed footage or image with a headline on top
 //   card     light page: headline, a media card (proof shot) and a stat card
 //   chat     dark page: headline, a short chat exchange, a contact card and the brand footer
 // Each factory builds its DOM once and returns { layout?, cues, draw(u, t) } where u is seconds since the scene started.
 (() => {
-  const { lerp, seg, ease, spring, clamp, rich, esc, tf, reveal, pop, fit, PIN, mediaSrc, setImg } = FW;
+  const { lerp, seg, ease, spring, clamp, rich, esc, tf, reveal, pop, fit, PIN, mediaSrc, setImg } = SB;
   const $ = (el, sel) => el.querySelector(sel);
   const lines = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
-  FW.scenes.footage = (el, sc) => {
+  SB.scenes.footage = (el, sc) => {
     const pill = sc.labelStyle === 'pill', ts = lines(sc.title), top = pill ? 296 : 284;
     el.innerHTML = `
       ${sc.media ? '<img class="fill bg" style="filter:contrast(1.04) saturate(1.06)">' : '<div class="fill night"></div>'}
@@ -35,7 +35,7 @@
     };
   };
 
-  FW.scenes.card = (el, sc) => {
+  SB.scenes.card = (el, sc) => {
     const ts = lines(sc.title), m = sc.media, st = sc.stat, statTop = m ? 1226 : 660;
     el.classList.add('paper');
     el.innerHTML = `
@@ -80,7 +80,7 @@
     };
   };
 
-  FW.scenes.chat = (el, sc, plan) => {
+  SB.scenes.chat = (el, sc, plan) => {
     const msgs = sc.messages || [], them = msgs.find((x) => x.from === 'them'), us = msgs.find((x) => x.from === 'us');
     const c = sc.contact, f = sc.footer || {}, logo = plan.brand.logo || {}, ts = lines(sc.title);
     el.classList.add('night');

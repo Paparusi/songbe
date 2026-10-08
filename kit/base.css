@@ -1,4 +1,4 @@
-/* Framewright scene kit — base styles. Brand colours arrive as CSS variables set by the runtime. */
+/* Songbe scene kit — base styles. Brand colours arrive as CSS variables set by the runtime. */
 :root { --ink: #0A1B31; --primary: #004DFC; --accent: #4FE0D6; --paper: #F2F6FC; --muted: #51627A; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }

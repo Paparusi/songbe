@@ -1,4 +1,4 @@
-// Framewright browser runtime. Every frame is a pure function of time: FW.draw(t) lays the whole stage out for second t,
+// Songbe browser runtime. Every frame is a pure function of time: SB.draw(t) lays the whole stage out for second t,
 // so the renderer can ask for any frame in any order and always get the same pixels.
 (() => {
   const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -49,36 +49,36 @@
     if (src && el.getAttribute('src') !== src) { el.setAttribute('src', src); await el.decode().catch(() => {}); }
   }
 
-  const FW = { clamp, lerp, seg, ease, spring, esc, rich, tf, reveal, pop, fit, PIN, mediaSrc, setImg, scenes: {}, live: [], cues: [] };
+  const SB = { clamp, lerp, seg, ease, spring, esc, rich, tf, reveal, pop, fit, PIN, mediaSrc, setImg, scenes: {}, live: [], cues: [] };
 
-  FW.mount = async function (plan) {
-    FW.plan = plan;
+  SB.mount = async function (plan) {
+    SB.plan = plan;
     const root = document.documentElement.style, b = plan.brand;
     for (const [k, v] of Object.entries({ ink: b.ink, primary: b.primary, accent: b.accent, paper: b.paper, muted: b.muted })) if (v) root.setProperty('--' + k, v);
     const stage = document.getElementById('stage');
     plan.scenes.forEach((sc, i) => {
       const el = document.createElement('div'); el.className = 'scene'; el.id = 's' + i; stage.appendChild(el);
-      const inst = FW.scenes[sc.type](el, sc, plan, i);
-      FW.live.push({ el, sc, inst });
+      const inst = SB.scenes[sc.type](el, sc, plan, i);
+      SB.live.push({ el, sc, inst });
     });
     stage.insertAdjacentHTML('beforeend',
       `<div id="wipe"><div id="w1" style="width:1900px;background:var(--primary)"></div><div id="w2" style="width:130px;background:var(--accent)"></div><div id="w3" style="width:30px;background:#fff"></div></div>
        <div id="notice"></div><div id="vignette"></div><canvas id="grain" width="540" height="960"></canvas>`);
     await document.fonts.ready;
     await Promise.all([...document.images].map((im) => im.decode().catch(() => 0)));
-    for (const s of FW.live) if (s.inst.layout) s.inst.layout();
+    for (const s of SB.live) if (s.inst.layout) s.inst.layout();
     // sound cues come from the same code that animates, so picture and sound cannot drift apart
-    FW.cues = [];
-    for (const c of plan.cuts) FW.cues.push({ t: c - .32, kind: 'whoosh' });
-    for (const s of FW.live) for (const c of (s.inst.cues || [])) FW.cues.push({ t: s.sc.start + c.t, kind: c.kind, gain: c.gain });
-    FW.cues.sort((a, b) => a.t - b.t);
-    await FW.draw(0);
+    SB.cues = [];
+    for (const c of plan.cuts) SB.cues.push({ t: c - .32, kind: 'whoosh' });
+    for (const s of SB.live) for (const c of (s.inst.cues || [])) SB.cues.push({ t: s.sc.start + c.t, kind: c.kind, gain: c.gain });
+    SB.cues.sort((a, b) => a.t - b.t);
+    await SB.draw(0);
     return document.fonts.size;
   };
 
-  FW.draw = async function (t) {
-    const plan = FW.plan;
-    for (const s of FW.live) {
+  SB.draw = async function (t) {
+    const plan = SB.plan;
+    for (const s of SB.live) {
       const on = t >= s.sc.start && t < s.sc.end;
       s.el.style.visibility = on ? 'visible' : 'hidden';
       if (on) await s.inst.draw(t - s.sc.start, t);
@@ -95,7 +95,7 @@
       }
     }
     document.getElementById('wipe').style.visibility = sweeping ? 'visible' : 'hidden';
-    const cur = FW.live.find((s) => t >= s.sc.start && t < s.sc.end), n = document.getElementById('notice');
+    const cur = SB.live.find((s) => t >= s.sc.start && t < s.sc.end), n = document.getElementById('notice');
     n.style.visibility = cur && cur.sc.notice ? 'visible' : 'hidden'; if (cur && cur.sc.notice) n.textContent = cur.sc.notice;
     // light film grain, reseeded per output frame
     const cv = document.getElementById('grain'), cx = cv.getContext('2d'), im = cx.createImageData(540, 960);
@@ -105,19 +105,19 @@
   };
 
   // Preview in a normal browser: scale to the window and add a scrubber. The renderer opens the page with #render and never sees this.
-  FW.preview = function () {
-    const plan = FW.plan, stage = document.getElementById('stage');
+  SB.preview = function () {
+    const plan = SB.plan, stage = document.getElementById('stage');
     const scale = () => { const k = Math.min(innerWidth / plan.size[0], (innerHeight - 56) / plan.size[1]); stage.style.transform = `scale(${k})`; stage.style.left = (innerWidth - plan.size[0] * k) / 2 + 'px'; };
     scale(); addEventListener('resize', scale);
     document.body.insertAdjacentHTML('beforeend', `<div id="player"><button id="pp">Play</button><input id="sk" type="range" min="0" max="${plan.duration}" step="0.01" value="0"><span id="tt">0.00</span></div>`);
     const sk = document.getElementById('sk'), pp = document.getElementById('pp'), tt = document.getElementById('tt');
     const audio = plan.previewAudio ? new Audio(plan.previewAudio) : null;
     let playing = false, t0 = 0, base = 0, busy = false;
-    const show = async (t) => { if (busy) return; busy = true; sk.value = t; tt.textContent = t.toFixed(2); await FW.draw(t); busy = false; };
+    const show = async (t) => { if (busy) return; busy = true; sk.value = t; tt.textContent = t.toFixed(2); await SB.draw(t); busy = false; };
     const tick = () => { if (!playing) return; const t = base + (performance.now() - t0) / 1000; if (t >= plan.duration) { playing = false; pp.textContent = 'Play'; if (audio) audio.pause(); return; } show(t); requestAnimationFrame(tick); };
     pp.onclick = () => { playing = !playing; pp.textContent = playing ? 'Pause' : 'Play'; base = +sk.value >= plan.duration - .05 ? 0 : +sk.value; t0 = performance.now(); if (audio) { audio.currentTime = base; playing ? audio.play() : audio.pause(); } tick(); };
     sk.oninput = () => { playing = false; pp.textContent = 'Play'; if (audio) audio.pause(); show(+sk.value); };
   };
 
-  window.FW = FW;
+  window.SB = SB;
 })();

@@ -1,4 +1,4 @@
-// fw — command line for Framewright.
+// songbe — command line for Songbe.
 import fs from 'node:fs';
 import path from 'node:path';
 import { makePlan } from './plan.mjs';
@@ -7,14 +7,14 @@ import { makeAudio, mux } from './audio.mjs';
 import { check } from './check.mjs';
 import { tools, loadDotEnv, exists, log } from './util.mjs';
 
-const HELP = `Framewright — short ads from a single video.json
+const HELP = `Songbe — short ads from a single video.json
 
-  fw doctor                   check that ffmpeg, ffprobe and Chrome are found and which keys are set
-  fw init <dir>               start a project from the example
-  fw frames <dir> [t1,t2,…]   render a few stills to out/frames (default: two per scene) — review before a full build
-  fw build <dir> [--force]    voice → timeline → footage → picture → sound → out/video.mp4, then self-check
-  fw check <dir>              re-run the self-check on out/video.mp4
-  fw preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
+  songbe doctor                   check that ffmpeg, ffprobe and Chrome are found and which keys are set
+  songbe init <dir>               start a project from the example
+  songbe frames <dir> [t1,t2,…]   render a few stills to out/frames (default: two per scene) — review before a full build
+  songbe build <dir> [--force]    voice → timeline → footage → picture → sound → out/video.mp4, then self-check
+  songbe check <dir>              re-run the self-check on out/video.mp4
+  songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
 
 Keys are read from the environment or <dir>/.env: FAL_KEY (voice, music, generated footage), GROQ_API_KEY (optional transcript check).
 Without keys the build still works: no voice, no music, plain backgrounds where footage would be generated.`;
@@ -45,12 +45,12 @@ export async function main(argv) {
   const dir = path.resolve(target);
   if (cmd === 'init') {
     if (exists(path.join(dir, 'video.json'))) throw new Error(`${dir} already has a video.json`);
-    fs.cpSync(path.join(ROOT, 'examples', 'recruitment-vi'), dir, { recursive: true, filter: (f) => !/[\\/](\.fw|out)([\\/]|$)/.test(f) });
-    return log(`created ${dir}\nnext: fw frames ${target}   then   fw build ${target}`);
+    fs.cpSync(path.join(ROOT, 'examples', 'recruitment-vi'), dir, { recursive: true, filter: (f) => !/[\\/](\.songbe|out)([\\/]|$)/.test(f) });
+    return log(`created ${dir}\nnext: songbe frames ${target}   then   songbe build ${target}`);
   }
   if (!exists(path.join(dir, 'video.json'))) throw new Error(`no video.json in ${dir}`);
   loadDotEnv(dir);
-  if (cmd === 'check') return report(await check(dir, JSON.parse(fs.readFileSync(path.join(dir, '.fw', 'plan.json'), 'utf8'))));
+  if (cmd === 'check') return report(await check(dir, JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'plan.json'), 'utf8'))));
 
   log('plan…'); const plan = await makePlan(dir, { force: flags.has('--force') });
   log(`  ${plan.duration} s, ${plan.scenes.length} scenes: ` + plan.scenes.map((s) => `${s.type} ${s.start}–${s.end}`).join(' | '));

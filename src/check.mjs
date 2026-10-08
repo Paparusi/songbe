@@ -20,7 +20,7 @@ export async function check(dir, plan) {
   }
 
   // two frames per scene (35 % and 85 % through) tiled into one sheet
-  const tmp = mkdir(path.join(dir, '.fw', 'sheet')); for (const f of fs.readdirSync(tmp)) fs.rmSync(path.join(tmp, f));
+  const tmp = mkdir(path.join(dir, '.songbe', 'sheet')); for (const f of fs.readdirSync(tmp)) fs.rmSync(path.join(tmp, f));
   const times = plan.scenes.flatMap((s) => [s.start + (s.end - s.start) * .35, s.start + (s.end - s.start) * .85]).map((t) => Math.min(t, dur - .05));
   times.forEach((t, i) => run(tools.ffmpeg, ['-v', 'error', '-y', '-ss', t.toFixed(2), '-i', video, '-frames:v', '1', '-vf', 'scale=360:-1', '-q:v', '3', path.join(tmp, `${String(i).padStart(3, '0')}.jpg`)]));
   const cols = Math.min(times.length, 6), sheet = path.join(out, 'sheet.jpg');
@@ -31,7 +31,7 @@ export async function check(dir, plan) {
   const spoken = plan.scenes.flatMap((s) => s.say).filter((s) => s.file).map((s) => s.text);
   if (a && spoken.length && process.env.GROQ_API_KEY) {
     try {
-      const mp3 = path.join(dir, '.fw', 'check.mp3');
+      const mp3 = path.join(dir, '.songbe', 'check.mp3');
       run(tools.ffmpeg, ['-v', 'error', '-y', '-i', video, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', mp3]);
       const body = new FormData();
       body.append('file', new Blob([fs.readFileSync(mp3)]), 'check.mp3'); body.append('model', 'whisper-large-v3');

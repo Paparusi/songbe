@@ -44,7 +44,7 @@ function effects(cues, total, file) {
 }
 
 export async function makeAudio(dir, plan) {
-  const work = path.join(dir, '.fw'), cache = mkdir(path.join(work, 'cache')), out = mkdir(path.join(dir, 'out')), D = plan.duration;
+  const work = path.join(dir, '.songbe'), cache = mkdir(path.join(work, 'cache')), out = mkdir(path.join(dir, 'out')), D = plan.duration;
   const cues = JSON.parse(fs.readFileSync(path.join(work, 'cues.json'), 'utf8'));
   const sfx = path.join(work, 'effects.wav'); effects(cues, D, sfx);
 
@@ -79,7 +79,7 @@ export async function makeAudio(dir, plan) {
 
 export function mux(dir, plan) {
   const out = path.join(dir, 'out', 'video.mp4');
-  run(tools.ffmpeg, ['-v', 'error', '-y', '-i', path.join(dir, '.fw', 'picture.mp4'), '-i', path.join(dir, 'out', 'audio.wav'), '-map', '0:v', '-map', '1:a',
+  run(tools.ffmpeg, ['-v', 'error', '-y', '-i', path.join(dir, '.songbe', 'picture.mp4'), '-i', path.join(dir, 'out', 'audio.wav'), '-map', '0:v', '-map', '1:a',
     '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', String(SR), '-ac', '2', '-t', String(plan.duration), '-movflags', '+faststart', out]);
   return out;
 }

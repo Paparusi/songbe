@@ -11,19 +11,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function writePage(dir, plan) {
   const k = (f) => pathToFileURL(path.join(KIT, f)).href;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${plan.brand?.name || 'Framewright'}</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${plan.brand?.name || 'Songbe'}</title>
 <link rel="stylesheet" href="${k('fonts/fonts.css')}"><link rel="stylesheet" href="${k('base.css')}"></head>
 <body><div id="stage"></div><script src="${k('runtime.js')}"></script><script src="${k('scenes.js')}"></script>
-<script>window.ready = FW.mount(${JSON.stringify(plan).replace(/</g, '\\u003c')}).then((n) => { if (!location.hash.includes('render')) FW.preview(); return n; });</script>
+<script>window.ready = SB.mount(${JSON.stringify(plan).replace(/</g, '\\u003c')}).then((n) => { if (!location.hash.includes('render')) SB.preview(); return n; });</script>
 </body></html>`;
-  const file = path.join(mkdir(path.join(dir, '.fw')), 'index.html');
+  const file = path.join(mkdir(path.join(dir, '.songbe')), 'index.html');
   fs.writeFileSync(file, html);
   return file;
 }
 
 // Minimal DevTools-protocol session against a private headless Chrome.
 async function openPage(pageFile, [w, h]) {
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'fw-chrome-'));
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-chrome-'));
   const chrome = spawn(tools.chrome, ['--headless', '--disable-gpu', '--no-sandbox', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--allow-file-access-from-files', '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-lcd-text', 'about:blank'], { stdio: 'ignore' });
   let ws;
@@ -51,7 +51,7 @@ async function openPage(pageFile, [w, h]) {
   for (let i = 0; i < 150; i++) { if (await evaluate('typeof window.ready !== "undefined"').catch(() => false)) break; await sleep(100); }
   const fonts = await evaluate('window.ready');
   const shot = async (t, quality = 93) => {
-    await evaluate(`FW.draw(${t}).then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))`);
+    await evaluate(`SB.draw(${t}).then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))`);
     return Buffer.from((await send('Page.captureScreenshot', { format: 'jpeg', quality })).result.data, 'base64');
   };
   const close = () => { try { sock.close(); } catch {} chrome.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true }); };
@@ -69,9 +69,9 @@ export async function stills(dir, plan, times) {
 }
 
 export async function renderVideo(dir, plan) {
-  const work = path.join(dir, '.fw'), page = await openPage(writePage(dir, plan), plan.size);
+  const work = path.join(dir, '.songbe'), page = await openPage(writePage(dir, plan), plan.size);
   try {
-    fs.writeFileSync(path.join(work, 'cues.json'), await page.evaluate('JSON.stringify(FW.cues)'));
+    fs.writeFileSync(path.join(work, 'cues.json'), await page.evaluate('JSON.stringify(SB.cues)'));
     const { fps } = plan, frames = Math.round(plan.duration * fps), blur = plan.motionBlur, out = path.join(work, 'picture.mp4');
     const filter = blur ? ['-vf', `tmix=frames=2:weights='1 1',select='mod(n\\,2)',setpts=N/(${fps}*TB)`] : [];
     const ff = spawn(tools.ffmpeg, ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(blur ? fps * 2 : fps), '-c:v', 'mjpeg', '-i', '-', ...filter,

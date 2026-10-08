@@ -41,13 +41,13 @@ function find(label, envVar, names, extra, arg) {
 const glob1 = (dir, re) => { try { return fs.readdirSync(dir).filter((n) => re.test(n)).sort().reverse().map((n) => path.join(dir, n)); } catch { return []; } };
 
 export const tools = {
-  get ffmpeg() { return this._ff ??= find('ffmpeg', 'FW_FFMPEG', ['ffmpeg'], glob1(path.join(os.homedir(), '.local/bin'), /^ffmpeg/), '-version'); },
-  get ffprobe() { return this._fp ??= find('ffprobe', 'FW_FFPROBE', ['ffprobe'], [], '-version'); },
+  get ffmpeg() { return this._ff ??= find('ffmpeg', 'SONGBE_FFMPEG', ['ffmpeg'], glob1(path.join(os.homedir(), '.local/bin'), /^ffmpeg/), '-version'); },
+  get ffprobe() { return this._fp ??= find('ffprobe', 'SONGBE_FFPROBE', ['ffprobe'], [], '-version'); },
   get chrome() {
     const pw = path.join(os.homedir(), '.cache/ms-playwright');
     const cached = [...glob1(pw, /^chromium_headless_shell-/).map((d) => path.join(d, 'chrome-headless-shell-linux64/chrome-headless-shell')),
       ...glob1(pw, /^chromium-\d/).map((d) => path.join(d, 'chrome-linux64/chrome')), ...glob1(pw, /^chromium-\d/).map((d) => path.join(d, 'chrome-linux/chrome'))];
-    return this._ch ??= find('Chrome / Chromium', 'FW_CHROME', ['chrome-headless-shell', 'google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'],
+    return this._ch ??= find('Chrome / Chromium', 'SONGBE_CHROME', ['chrome-headless-shell', 'google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'],
       [...cached, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'], '--version');
   },
 };

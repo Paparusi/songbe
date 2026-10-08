@@ -1,5 +1,5 @@
 // video.json → plan: generate the voice, lay scenes out on a timeline that follows the spoken lines, and prepare footage.
-// Everything generated is cached under <project>/.fw/cache by a hash of its inputs, so editing one line only redoes that line.
+// Everything generated is cached under <project>/.songbe/cache by a hash of its inputs, so editing one line only redoes that line.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -14,7 +14,7 @@ const url = (f) => pathToFileURL(f).href;
 
 export async function makePlan(dir, opts = {}) {
   const spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8'));
-  const work = mkdir(path.join(dir, '.fw')), cache = mkdir(path.join(work, 'cache'));
+  const work = mkdir(path.join(dir, '.songbe')), cache = mkdir(path.join(work, 'cache'));
   const size = spec.size || [1080, 1920], fps = spec.fps || 30;
   const notes = [];
 
