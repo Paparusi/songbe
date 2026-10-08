@@ -79,7 +79,7 @@ export async function makeAudio(dir, plan) {
 }
 
 export function mux(dir, plan) {
-  const out = path.join(dir, 'out', 'video.mp4');
+  const out = path.join(dir, 'out', `video${plan.tag || ''}.mp4`);
   run(tools.ffmpeg, ['-v', 'error', '-y', '-i', path.join(dir, '.songbe', 'picture.mp4'), '-i', path.join(dir, 'out', 'audio.wav'), '-map', '0:v', '-map', '1:a',
     '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', String(SR), '-ac', '2', '-t', String(plan.duration), '-movflags', '+faststart', out]);
   return out;

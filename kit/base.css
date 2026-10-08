@@ -15,12 +15,14 @@
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-#stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: #000; transform-origin: 0 0; }
+#stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: #000; transform-origin: 0 0; }   /* sized from the plan at mount */
 .scene { position: absolute; inset: 0; overflow: hidden; visibility: hidden; }
 .a { position: absolute; transform-origin: 50% 50%; will-change: transform, opacity; }
-.fill { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
-.shade-top { position: absolute; left: 0; top: 0; width: 1080px; height: 980px; background: linear-gradient(180deg, rgba(6,14,28,.78) 0%, rgba(6,14,28,.46) 42%, rgba(6,14,28,0) 100%); }
-.shade-bottom { position: absolute; left: 0; bottom: 0; width: 1080px; height: 640px; background: linear-gradient(0deg, rgba(6,14,28,.62) 0%, rgba(6,14,28,0) 100%); }
+.fill { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+/* a block: a layer whose children keep their 1080×1920 design coordinates; scenes move and scale whole blocks for other frames */
+.blk { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0; }
+.shade-top { position: absolute; left: 0; top: 0; width: 100%; height: 980px; background: linear-gradient(180deg, rgba(6,14,28,.78) 0%, rgba(6,14,28,.46) 42%, rgba(6,14,28,0) 100%); }
+.shade-bottom { position: absolute; left: 0; bottom: 0; width: 100%; height: 640px; background: linear-gradient(0deg, rgba(6,14,28,.62) 0%, rgba(6,14,28,0) 100%); }
 
 /* a line of text revealed from behind a mask */
 .mask { position: absolute; overflow: hidden; white-space: nowrap; padding: 0 0 .14em; }
@@ -71,11 +73,23 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .phone .island { position: absolute; left: 50%; top: 24px; width: 150px; height: 42px; margin-left: -75px; border-radius: 21px; background: #000; z-index: 5; }
 
 #wipe { position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: 50; }
-#wipe div { position: absolute; top: -400px; height: 2720px; }
-#w1 { width: 1900px; background: var(--primary); } #w2 { width: 130px; background: var(--accent); } #w3 { width: 30px; background: #fff; }
+#wipe div { position: absolute; }      /* sized by the runtime from the frame */
+#w1 { background: var(--primary); } #w2 { background: var(--accent); } #w3 { background: #fff; }
 #notice { position: absolute; left: 56px; top: 1452px; z-index: 40; font-size: 23px; font-weight: 600; color: rgba(255,255,255,.88); padding: 7px 16px; border-radius: 12px; background: rgba(0,0,0,.30); visibility: hidden; letter-spacing: .2px; }
 #vignette { position: absolute; inset: 0; z-index: 59; pointer-events: none; background: radial-gradient(120% 90% at 50% 46%, rgba(0,0,0,0) 62%, rgba(0,0,0,.20) 100%); }
-#grain { position: absolute; left: -60px; top: -60px; width: 1200px; height: 2134px; z-index: 60; opacity: .05; pointer-events: none; mix-blend-mode: overlay; }
+#grain { position: absolute; left: -60px; top: -60px; z-index: 60; opacity: .05; pointer-events: none; mix-blend-mode: overlay; }
+
+/* a portrait clip shown whole at the side of a wide frame, over a blurred copy of itself */
+.blurred { filter: blur(46px) brightness(.55) saturate(1.15); }
+.sideframe { overflow: hidden; border-radius: var(--r-card); border: var(--edge) solid var(--edge-colour); box-shadow: 0 40px 90px rgba(0,0,0,.45); }
+
+/* other frames */
+[data-format="square"] .shade-top { height: 640px; }
+[data-format="square"] .shade-bottom { height: 380px; }
+[data-format="wide"] .shade-top { width: 64%; height: 100%; background: linear-gradient(90deg, rgba(6,14,28,.80) 0%, rgba(6,14,28,.50) 46%, rgba(6,14,28,0) 100%); }
+[data-format="wide"] .shade-bottom { height: 340px; }
+[data-format="square"] #notice { left: auto; top: auto; right: 48px; bottom: 48px; }
+[data-format="wide"] #notice { left: auto; top: auto; right: 128px; bottom: 88px; }      /* inside the side frame when there is one */
 
 /* preview player (never present while rendering) */
 #player { position: fixed; left: 0; right: 0; bottom: 0; height: 56px; display: flex; gap: 12px; align-items: center; padding: 0 16px; background: #111; color: #ddd; font: 14px system-ui, sans-serif; z-index: 99; }

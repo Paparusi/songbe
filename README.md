@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.4): six scene types, two looks, a local studio, vertical 1080×1920, tested on Linux / WSL only.
+> Early version (0.5): six scene types, two looks, three frames (9:16, 1:1, 16:9), a local studio. Tested on Linux / WSL only.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -71,6 +71,21 @@ The table above is a summary; `songbe schema` prints the exact shape and `songbe
 `media` is a path to a video or image, or `{ "generate": { "image": "prompt", "motion": "prompt" } }` to create footage with the configured provider.
 Set `notice` (for example "Illustration generated with AI") on scenes that use generated people or places.
 
+## Frames
+
+One spec, several frames. `"format"` is `tall` (1080×1920, the default), `square` (1080×1080) or `wide` (1920×1080);
+`"size": [w, h]` sets anything else.
+
+```bash
+node bin/songbe.mjs build my-ad --format=wide                 # out/video-wide.mp4, same voice and music
+node bin/songbe.mjs build my-ad --formats=tall,square,wide    # all three, one after another
+```
+
+Every scene is designed once, for the tall frame, as a few blocks (heading, media, rows, phone…). For the other frames the blocks are
+moved and scaled as wholes: in a wide frame the heading goes left and the rest right; in a square one the same stack is tightened.
+Footage is cropped to cover the frame, leaning upward in a square; a portrait clip in a wide frame is not cropped but shown whole at
+the side, over a blurred copy of itself. Voice, music and timing are identical across frames, so extra frames cost nothing to generate.
+
 ## Looks
 
 `"style"` at the top of the spec picks the look; the brand colours stay yours.
@@ -114,7 +129,7 @@ project's `media/` folder from the form. The server listens on 127.0.0.1 only an
 
 - Six scene types and two looks. Scene types live in `kit/scenes.js`, looks in `kit/styles/`.
 - One provider (fal.ai) for voice, images, image-to-video and music.
-- Vertical 1080×1920 is the only layout that has been tested.
+- Frames other than the three named ones use the nearest layout family and have not been tuned.
 - The studio edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
 
 ## License

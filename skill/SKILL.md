@@ -1,6 +1,6 @@
 ---
 name: songbe
-description: Make a short vertical ad video (9:16, 15–30 s) from a brief with the Songbe CLI. Writes video.json, renders stills for review, builds the MP4 with voice, music and sound effects, then reads the self-check. Use when the user asks for an ad, promo, recruitment, product or app-launch video.
+description: Make a short ad video (15–30 s; vertical 9:16, square or wide 16:9) from a brief with the Songbe CLI. Writes video.json, renders stills for review, builds the MP4 with voice, music and sound effects, then reads the self-check. Use when the user asks for an ad, promo, recruitment, product or app-launch video.
 ---
 
 # Making a video with Songbe
@@ -42,6 +42,8 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
   ("Vi Síp hai" rather than "VSIP 2") and keep the proper spelling in the on-screen text.
 - Pick the look with `"style"`: `soft` (rounded, friendly: apps, services) or `bold` (condensed capitals, flat colour: promotions, recruitment, retail).
   Compare both cheaply with `songbe frames <dir> --style=bold` before deciding.
+- The frame is `"format"`: `tall` (TikTok, Reels, Shorts), `square` (feeds) or `wide` (YouTube, screens). Write the spec once and
+  build the others with `songbe build <dir> --formats=tall,square,wide`; the voice and music are reused, so they cost nothing more.
 - Brand colours go in `brand`: `ink` (dark), `primary`, `accent` (bright), `paper` (light background), `muted` (secondary text).
 - Use only facts the user gave you. Never invent prices, salaries, phone numbers, addresses or benefits; ask instead.
 - Do not put another company's logo in the video unless the user says they may use it.

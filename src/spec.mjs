@@ -32,8 +32,10 @@ export const TEMPLATES = {
 };
 
 export const STYLES = ['soft', 'bold'];
+// named frames; "size": [w, h] in the spec overrides them for anything else (4:5 and the like use the square layouts)
+export const FORMATS = { tall: [1080, 1920], square: [1080, 1080], wide: [1920, 1080] };
 export const TOP = {
-  style: STYLES, size: ['num'], fps: 'num', tail: 'num', motionBlur: 'bool',
+  style: STYLES, format: Object.keys(FORMATS), size: ['num'], fps: 'num', tail: 'num', motionBlur: 'bool',
   'brand!': { name: 'str', ink: COLOUR, primary: COLOUR, accent: COLOUR, paper: COLOUR, muted: COLOUR, logo: { mark: 'str', word: 'str' } },
   voice: { model: 'str', voice: 'str', language: 'str', speed: 'num', emotion: 'str' },
   music: { prompt: 'str', file: 'str', volume: 'num', avoid: 'str', model: 'str', seed: 'num' },

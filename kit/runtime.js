@@ -65,9 +65,14 @@
     SB.plan = plan;
     SB.style = STYLES[plan.style] || STYLES.soft;
     document.documentElement.dataset.style = STYLES[plan.style] ? plan.style : 'soft';
+    // the frame: its size and which family of layouts applies (tall 9:16, square 1:1 or 4:5, wide 16:9)
+    const [W, H] = plan.size, ratio = W / H;
+    SB.frame = { W, H, kind: ratio < .7 ? 'tall' : ratio > 1.3 ? 'wide' : 'square' };
+    document.documentElement.dataset.format = SB.frame.kind;
     const root = document.documentElement.style, b = plan.brand;
     for (const [k, v] of Object.entries({ ink: b.ink, primary: b.primary, accent: b.accent, paper: b.paper, muted: b.muted })) if (v) root.setProperty('--' + k, v);
     const stage = document.getElementById('stage');
+    stage.style.width = W + 'px'; stage.style.height = H + 'px';
     plan.scenes.forEach((sc, i) => {
       const el = document.createElement('div'); el.className = 'scene'; el.id = 's' + i; stage.appendChild(el);
       const inst = SB.scenes[sc.type](el, sc, plan, i);
@@ -75,7 +80,12 @@
     });
     stage.insertAdjacentHTML('beforeend',
       `<div id="wipe"><div id="w1"></div><div id="w2"></div><div id="w3"></div></div>
-       <div id="notice"></div><div id="vignette"></div><canvas id="grain" width="540" height="960"></canvas>`);
+       <div id="notice"></div><div id="vignette"></div><canvas id="grain" width="${Math.round(W / 2)}" height="${Math.round(H / 2)}"></canvas>`);
+    // the cut cover and the grain are sized from the frame (the numbers are the 1080×1920 design, scaled)
+    const sx = W / 1080, sy = H / 1920, band = (i) => document.getElementById('w' + i).style;
+    if (SB.style.wipe === 'curtain') [2600, 160, 40].forEach((h, i) => Object.assign(band(i + 1), { left: '0', top: '0', width: W + 'px', height: h * sy + 'px' }));
+    else [1900, 130, 30].forEach((w, i) => Object.assign(band(i + 1), { top: '-400px', height: H + 800 + 'px', width: w * sx + 'px' }));
+    Object.assign(document.getElementById('grain').style, { width: Math.round(1200 * sx) + 'px', height: Math.round(2134 * sy) + 'px' });
     await document.fonts.ready;
     await Promise.all([...document.images].map((im) => im.decode().catch(() => 0)));
     for (const s of SB.live) if (s.inst.layout) s.inst.layout();
@@ -101,10 +111,11 @@
       const k = seg(t, c - .30, c + .34);
       if (k > 0 && k < 1) {
         sweeping = true; const e = ease.inOut(k), w = (i) => document.getElementById('w' + i).style;
+        const sx = SB.frame.W / 1080, sy = SB.frame.H / 1920;
         if (SB.style.wipe === 'curtain') {          // a flat band drops through the frame
-          const y = lerp(-2760, 1960, e); w(1).transform = `translateY(${y}px)`; w(2).transform = `translateY(${y + 2600}px)`; w(3).transform = `translateY(${y + 2760}px)`;
+          const y = lerp(-2760, 1960, e) * sy; w(1).transform = `translateY(${y}px)`; w(2).transform = `translateY(${y + 2600 * sy}px)`; w(3).transform = `translateY(${y + 2760 * sy}px)`;
         } else {                                    // a slanted slab of brand colour sweeps across
-          const x = lerp(-2300, 1300, e); w(1).transform = `translateX(${x}px) skewX(-14deg)`; w(2).transform = `translateX(${x + 1930}px) skewX(-14deg)`; w(3).transform = `translateX(${x + 2090}px) skewX(-14deg)`;
+          const x = lerp(-2300, 1300, e) * sx; w(1).transform = `translateX(${x}px) skewX(-14deg)`; w(2).transform = `translateX(${x + 1930 * sx}px) skewX(-14deg)`; w(3).transform = `translateX(${x + 2090 * sx}px) skewX(-14deg)`;
         }
       }
     }
@@ -112,7 +123,7 @@
     const cur = SB.live.find((s) => t >= s.sc.start && t < s.sc.end), n = document.getElementById('notice');
     n.style.visibility = cur && cur.sc.notice ? 'visible' : 'hidden'; if (cur && cur.sc.notice) n.textContent = cur.sc.notice;
     // light film grain, reseeded per output frame
-    const cv = document.getElementById('grain'), cx = cv.getContext('2d'), im = cx.createImageData(540, 960);
+    const cv = document.getElementById('grain'), cx = cv.getContext('2d'), im = cx.createImageData(cv.width, cv.height);
     let sd = (Math.floor(t * plan.fps) * 9301 + 49297) % 233280;
     for (let i = 0; i < im.data.length; i += 4) { sd = (sd * 9301 + 49297) % 233280; im.data[i] = im.data[i + 1] = im.data[i + 2] = sd / 233280 * 255; im.data[i + 3] = 255; }
     cx.putImageData(im, 0, 0);

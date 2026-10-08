@@ -15,9 +15,9 @@
 [data-style="bold"] .glow, [data-style="bold"] .dots { display: none; }
 [data-style="bold"] .paper { background: var(--paper); }
 [data-style="bold"] .night { background: var(--primary); }
-[data-style="bold"] .scene.paper::before { content: ''; position: absolute; right: -330px; top: 1010px; width: 1000px; height: 1000px; border-radius: 50%; background: var(--accent); }
-[data-style="bold"] .scene.paper::after { content: ''; position: absolute; left: 0; top: 0; width: 1080px; height: 26px; background: var(--ink); }
-[data-style="bold"] .scene.night::before { content: ''; position: absolute; left: -360px; top: 1180px; width: 1040px; height: 1040px; border-radius: 50%; background: var(--ink); }
+[data-style="bold"] .scene.paper::before { content: ''; position: absolute; right: -330px; top: calc(100% * 1010 / 1920); width: 1000px; height: 1000px; border-radius: 50%; background: var(--accent); }
+[data-style="bold"] .scene.paper::after { content: ''; position: absolute; left: 0; top: 0; width: 100%; height: 26px; background: var(--ink); }
+[data-style="bold"] .scene.night::before { content: ''; position: absolute; left: -360px; top: calc(100% * 1180 / 1920); width: 1040px; height: 1040px; border-radius: 50%; background: var(--ink); }
 [data-style="bold"] .scene.night::after { content: ''; position: absolute; right: 70px; top: 96px; width: 190px; height: 26px; background: repeating-linear-gradient(90deg, var(--accent) 0 26px, transparent 26px 52px); }
 [data-style="bold"] #vignette { display: none; }
 
@@ -56,9 +56,9 @@
 [data-style="bold"] .logo-fallback { border: 6px solid var(--ink); box-shadow: 14px 14px 0 var(--ink); background: var(--accent); color: var(--ink); font-family: var(--font-title); }
 [data-style="bold"] .phone { box-shadow: 22px 22px 0 var(--ink), inset 0 0 0 3px #2A2F3A; }
 [data-style="bold"] #notice { border-radius: 0; background: var(--ink); }
+[data-style="bold"] .sideframe { box-shadow: 22px 22px 0 var(--ink); border-width: 6px; }
 
-/* cuts: a flat band drops through the frame */
-[data-style="bold"] #wipe div { left: 0; top: 0; width: 1080px; }
-[data-style="bold"] #w1 { height: 2600px; background: var(--ink); }
-[data-style="bold"] #w2 { height: 160px; background: var(--accent); }
-[data-style="bold"] #w3 { height: 40px; background: #fff; }
+/* cuts: a flat band drops through the frame (sized by the runtime) */
+[data-style="bold"] #w1 { background: var(--ink); }
+[data-style="bold"] #w2 { background: var(--accent); }
+[data-style="bold"] #w3 { background: #fff; }

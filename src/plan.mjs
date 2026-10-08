@@ -5,12 +5,20 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as fal from './providers/fal.mjs';
 import { run, sha, mkdir, exists, tools, duration, log } from './util.mjs';
-import { validate } from './spec.mjs';
+import { validate, FORMATS } from './spec.mjs';
 
 const GAP = 0.35;          // pause between sentences
 const LEAD = 0.25;         // silence before the first word
 const VIDEO = /\.(mp4|mov|webm|mkv)$/i;
 const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+// pixel size of a video or image as it is displayed (phone clips carry a rotation flag), or null when it cannot be read
+function sizeOf(file) {
+  try {
+    const st = JSON.parse(run(tools.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:stream_side_data=rotation', '-of', 'json', file])).streams[0];
+    const turned = Math.abs((st.side_data_list || [])[0]?.rotation || 0) % 180 === 90;
+    return turned ? [st.height, st.width] : [st.width, st.height];
+  } catch { return null; }
+}
 const url = (f) => pathToFileURL(f).href;
 
 export async function makePlan(dir, opts = {}) {
@@ -19,7 +27,9 @@ export async function makePlan(dir, opts = {}) {
   const errs = validate(spec, dir);
   if (errs.length) throw new Error(`video.json has ${errs.length} problem${errs.length > 1 ? 's' : ''}:\n  - ` + errs.join('\n  - '));
   const work = mkdir(path.join(dir, '.songbe')), cache = mkdir(path.join(work, 'cache'));
-  const size = spec.size || [1080, 1920], fps = spec.fps || 30;
+  // the frame: --format on the command line, else "size" or "format" in the spec, else the vertical 9:16
+  const size = (opts.format && FORMATS[opts.format]) || spec.size || FORMATS[spec.format] || FORMATS.tall, fps = spec.fps || 30;
+  const aspect = size[0] / size[1] > 1.3 ? '16:9' : size[0] / size[1] < .7 ? '9:16' : '1:1';
   const notes = [];
 
   // ---- voice: one clip per sentence, silence trimmed ----
@@ -66,7 +76,7 @@ export async function makePlan(dir, opts = {}) {
   for (const sc of scenes) {
     let src = sc.media;
     if (src && typeof src === 'object' && src.generate) {
-      const g = src.generate, id = sha(['gen', g]);
+      const g = { aspect, ...src.generate }, id = sha(['gen', g]);      // generated footage is made in the frame's shape
       const still = path.join(cache, `gen-${id}.jpg`), clip = path.join(cache, `gen-${id}.mp4`);
       if (canGen) {
         if (!exists(still)) { log('  image:', g.image.slice(0, 70) + '…'); await fal.image(g.image, g, still); }
@@ -79,23 +89,28 @@ export async function makePlan(dir, opts = {}) {
     if (!src) { sc.media = null; continue; }
     if (!exists(src)) throw new Error(`media not found: ${src}`);
     const [w, h] = sc.type === 'card' ? [1024, 576] : size;
+    // How full-bleed footage meets the frame. A portrait clip in a wide frame would lose most of the picture to a centre crop, so it is
+    // kept whole and shown at the side over a blurred copy of itself; in a square frame the crop leans upward, where faces usually are.
+    const dims = sizeOf(src), ratio = dims ? dims[0] / dims[1] : null, frame = size[0] / size[1];
+    const fit = sc.type === 'footage' && ratio && frame > 1.3 && ratio < .9 ? 'side' : 'cover';
+    const lean = sc.type === 'footage' && ratio && frame >= .7 && frame <= 1.3 && ratio < .8 ? .28 : .5;
     if (VIDEO.test(src)) {
       const len = +(sc.end - sc.start + 0.6).toFixed(2), off = sc.mediaOffset || 0;
-      const out = path.join(work, 'frames', sha(['fr', src, fs.statSync(src).mtimeMs, w, h, fps, off, len]));
+      const out = path.join(work, 'frames', sha(['fr', src, fs.statSync(src).mtimeMs, w, h, fps, off, len, fit, lean]));
       if (!exists(out)) {
         mkdir(out);
-        run(tools.ffmpeg, ['-v', 'error', '-y', '-ss', String(off), '-t', String(len), '-i', src, '-vf',
-          `fps=${fps},scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`, '-q:v', '2', path.join(out, '%04d.jpg')]);
+        const shape = fit === 'side' ? `scale=-2:${h}:flags=lanczos` : `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}:(iw-${w})/2:(ih-${h})*${lean}`;
+        run(tools.ffmpeg, ['-v', 'error', '-y', '-ss', String(off), '-t', String(len), '-i', src, '-vf', `fps=${fps},${shape}`, '-q:v', '2', path.join(out, '%04d.jpg')]);
       }
-      sc.media = { kind: 'frames', dir: url(out), count: fs.readdirSync(out).length, fps, offset: 0 };
-    } else sc.media = { kind: 'image', src: url(src) };
+      sc.media = { kind: 'frames', dir: url(out), count: fs.readdirSync(out).length, fps, offset: 0, fit, ratio };
+    } else sc.media = { kind: 'image', src: url(src), fit, ratio, lean };
   }
 
   for (const sc of scenes) if (sc.screens) sc.screens = list(sc.screens).map((p) => url(path.resolve(dir, p)));
   const brand = { ...spec.brand };
   if (brand.logo) brand.logo = Object.fromEntries(Object.entries(brand.logo).map(([k, v]) => [k, url(path.resolve(dir, v))]));
   const plan = {
-    size, fps, duration: total, brand, style: opts.style || spec.style || 'soft', motionBlur: spec.motionBlur !== false, music: spec.music || null,
+    size, fps, duration: total, brand, style: opts.style || spec.style || 'soft', tag: opts.format ? '-' + opts.format : '', motionBlur: spec.motionBlur !== false, music: spec.music || null,
     cuts: scenes.slice(1).map((s) => s.start),
     scenes: scenes.map(({ minDuration, mediaOffset, ...sc }) => sc),
     previewAudio: url(path.join(dir, 'out', 'audio.wav')), notes,
