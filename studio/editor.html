@@ -39,6 +39,7 @@ textarea { resize: vertical; min-height: 38px; } input[type=color] { width: 38px
 <header class="bar">
   <a class="logo" href="/home" title="All your videos"><img src="/studio/icon.svg" alt=""><b>Song<span>be</span></b></a>
   <a class="crumb" href="/home">Videos</a><span class="sep">/</span><div class="proj" id="proj"></div><div class="gap"></div>
+  <button class="btn small quiet" id="undo" title="Undo (Ctrl+Z)" disabled>↶</button><button class="btn small quiet" id="redo" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
   <span class="tag" id="saved">loading…</span><a class="tag" id="kfal" href="/home#settings" title="Keys are set on the Videos page">voice · music</a>
   <button class="btn quiet" id="folder" title="Show this project's folder">Folder</button>
   <select id="frames" title="Which frames to build" style="width:auto;padding:7px 10px;border-radius:10px;background:var(--raise)"><option value="">This frame</option><option value="all">All three frames</option></select>
@@ -76,7 +77,16 @@ const clean = (k) => k.replace(/!$/, '');
 
 let S = null, spec = null, tab = 'scenes', open = 0, timer = null, lastT = 0, plan = null, undo = null, making = null;
 
-function changed() { clearTimeout(timer); $('#saved').textContent = 'editing…'; timer = setTimeout(save, 450); }
+function changed() { clearTimeout(timer); $('#saved').textContent = 'editing…'; timer = setTimeout(() => { remember(); save(); }, 450); }
+// ---- undo and redo: every saved state of the spec, and where we are among them ----
+const past = []; let now = -1;
+function remember() { const snap = JSON.stringify(spec); if (past[now] === snap) return; past.splice(now + 1); past.push(snap); if (past.length > 200) past.shift(); now = past.length - 1; marks(); }
+function marks() { $('#undo').disabled = now <= 0; $('#redo').disabled = now >= past.length - 1; }
+function step(by) { if (now + by < 0 || now + by >= past.length) return; clearTimeout(timer); now += by; spec = JSON.parse(past[now]); open = Math.min(open, spec.scenes.length - 1); marks(); draw(); save(); }
+$('#undo').onclick = () => step(-1); $('#redo').onclick = () => step(1);
+addEventListener('keydown', (e) => { if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' && e.key.toLowerCase() !== 'y') return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) return;      // inside a box the keys undo typing, as everywhere
+  e.preventDefault(); step(e.key.toLowerCase() === 'y' || e.shiftKey ? 1 : -1); });
 async function save() {
   const r = await (await api('api/spec', { method: 'PUT', body: JSON.stringify(spec) })).json();
   $('#saved').textContent = r.saved ? 'saved' : 'not saved'; $('#saved').classList.toggle('on', !!r.saved);
@@ -95,12 +105,29 @@ function strip() {
 function seek(i) { if (!plan || !plan.scenes[i]) return; const sc = plan.scenes[i]; lastT = sc.start + (sc.end - sc.start) * .6; $('#pv').contentWindow?.postMessage({ sbSeek: lastT }, '*'); }
 addEventListener('message', (e) => {
   if (e.data && typeof e.data.sbTime === 'number') lastT = e.data.sbTime;
+  if (e.data && e.data.sbPick) pickField(e.data.sbPick.scene, e.data.sbPick.text);
   if (e.data && Array.isArray(e.data.sbLint)) {            // the preview's own layout check
     for (const old of document.querySelectorAll('.msg.lay')) old.remove();
     const keep = $('#build'), rows = e.data.sbLint.map((f) => el('div', { className: 'msg lay ' + (f.level === 'problem' ? 'bad' : 'note'), textContent: `${f.level === 'problem' ? '✕' : '·'} scene ${f.scene} (${f.type}): ${f.message}` }));
     keep ? keep.before(...rows) : $('#foot').append(...rows);
   }
 });
+
+// ---- a click on the preview: find the field those words come from, open its scene and put the cursor there ----
+const shownOf = (s) => String(s).replace(/\{[^{}|]*\|([^{}]*)\}/g, '$1').replace(/\[\[|\]\]|\*\*/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+function pickField(i, text) {
+  const sc = spec.scenes[i], want = shownOf(text); if (!sc) return;
+  let best = null;      // the shortest text that contains what was clicked: the most specific field
+  const look = (v, path) => { if (typeof v === 'string') { const t = shownOf(v); if (want && t.includes(want) && (!best || t.length < best.len)) best = { path, len: t.length }; }
+    else if (Array.isArray(v)) v.forEach((x, n) => look(x, typeof x === 'string' ? path : [...path, n])); else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) if (k !== 'say' && k !== 'type') look(x, [...path, k]); };
+  look(sc, []);
+  if (tab !== 'scenes' || open !== i) { tab = 'scenes'; open = i; draw(); strip(); }
+  const f = best && document.querySelector(`.card.open [data-path="${best.path.join('.')}"]`), box = f && f.querySelector('textarea, input[type=text], input:not([type])');
+  if (!box) return;
+  box.focus(); f.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (box.tagName === 'TEXTAREA') { const at = box.value.toLowerCase().indexOf(want); if (at >= 0) box.setSelectionRange(at, at + want.length); }      // a headline line: select the words that were clicked
+  f.animate([{ background: 'color-mix(in srgb, var(--accent) 22%, transparent)' }, { background: 'transparent' }], { duration: 900 });
+}
 
 // ---- form builder driven by the same table the validator uses ----
 function field(key, shape, get, set) {
@@ -146,19 +173,23 @@ function field(key, shape, get, set) {
   }
   if (Array.isArray(shape)) {                                                 // list of objects
     const g = el('div', { className: 'group' }), head = el('div', { className: 'gh' }, el('span', { textContent: (LABEL[k] || k).replace(/<[^>]+>/g, '') })), add = el('button', { className: 'btn small', textContent: '+ add' });
+    const at = [...here];
     head.append(add); const paint = () => { g.replaceChildren(head); (get() || []).forEach((it, i) => {
       const row = el('div', { className: 'item' }), x = el('button', { className: 'btn small x', textContent: '✕' }); x.onclick = () => { const a = get(); a.splice(i, 1); set(a.length ? a : undefined); paint(); changed(); };
-      row.append(x, ...fields(shape[0], it)); g.append(row); }); };
+      const keep = here; here = [...at, i]; row.append(x, ...fields(shape[0], it)); here = keep; g.append(row); }); };
     add.onclick = () => { const a = get() || []; a.push({}); set(a); paint(); changed(); }; paint(); return g;
   }
   // nested object
   const g = el('div', { className: 'group' }), head = el('div', { className: 'gh' }, el('span', { textContent: (LABEL[k] || k).replace(/<[^>]+>/g, '') })), tog = el('button', { className: 'btn small' });
-  head.append(tog); const paint = () => { const cur = get(); tog.textContent = cur ? 'remove' : '+ add'; g.replaceChildren(head, ...(cur ? fields(shape, cur) : [])); };
+  const at = [...here];
+  head.append(tog); const paint = () => { const cur = get(), keep = here; here = [...at]; tog.textContent = cur ? 'remove' : '+ add'; g.replaceChildren(head, ...(cur ? fields(shape, cur) : [])); here = keep; };
   tog.onclick = () => { set(get() ? undefined : {}); paint(); changed(); }; paint(); return g;
 }
 const LAST = ['notice', 'mediaOffset', 'duration', 'minDuration'], HIDE = new Set(['size']);
 const order = (keys) => [...keys.filter((k) => !LAST.includes(clean(k)) && !HIDE.has(clean(k))), ...keys.filter((k) => LAST.includes(clean(k)))];
-const fields = (shape, obj) => order(Object.keys(shape)).map((key) => field(key, shape[key], () => obj[clean(key)], (v) => { if (v === undefined) delete obj[clean(key)]; else obj[clean(key)] = v; }));
+// every field carries its place in the scene ("items.0.sub"), so that a click on the preview can find it
+let here = [];
+const fields = (shape, obj) => order(Object.keys(shape)).map((key) => { here.push(clean(key)); const f = field(key, shape[key], () => obj[clean(key)], (v) => { if (v === undefined) delete obj[clean(key)]; else obj[clean(key)] = v; }); if (!f.dataset.path) f.dataset.path = here.join('.'); here.pop(); return f; });
 function upload(done, text = 'Upload') {
   const b = el('button', { className: 'btn small', textContent: text }), i = el('input', { type: 'file', hidden: true });
   b.onclick = () => i.click(); i.onchange = async () => { const f = i.files[0]; if (!f) return; b.textContent = '…'; const r = await (await api('api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })).json(); b.textContent = text; if (r.path) done(r.path); else alertBox(r.error); };
@@ -269,7 +300,7 @@ function watch() {
   $('#saved').textContent = 'saved'; $('#saved').classList.add('on');
   if (!spec) { $('#pane').append(el('div', { className: 'msg bad', textContent: S.errors[0] })); return; }
   if (S.plan) { const sc = S.plan.scenes[0]; lastT = sc.start + (sc.end - sc.start) * .6; }
-  draw(); show(S); if (S.building) { setBuilding(true); watch(); }
+  remember(); draw(); show(S); if (S.building) { setBuilding(true); watch(); }
   fetch('api/footage').then((r) => r.json()).then((j) => { if (!j.done) { making = { i: j.scene, text: 'Working…' }; draw(); watchFootage(); } }).catch(() => {});      // one was under way when the page was opened
   if (!S.tools.ready) missing();
   // straight from "Write it for me": say what the checks still found, and that the claims are the person's to verify

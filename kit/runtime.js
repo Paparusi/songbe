@@ -254,6 +254,11 @@
     if (at > 0) show(Math.min(at, plan.duration - .04));
     addEventListener('message', (e) => { if (e.data && typeof e.data.sbSeek === 'number') { playing = false; pp.textContent = 'Play'; if (audio) audio.pause(); show(Math.min(e.data.sbSeek, plan.duration - .04)); } });
     if (parent !== window) setInterval(() => parent.postMessage({ sbTime: +sk.value }, '*'), 250);
+    // inside the studio a click on some words asks the editor for the field they come from
+    if (parent !== window) { stage.style.cursor = 'pointer'; stage.addEventListener('click', (e) => {
+      const scene = SB.live.findIndex((s) => s.el.style.visibility !== 'hidden' && s.el.contains(e.target)); if (scene < 0) return;
+      let el = e.target; while (el && el !== SB.live[scene].el && !(el.textContent || '').trim()) el = el.parentElement;
+      const text = el && el !== SB.live[scene].el ? el.textContent.replace(/\s+/g, ' ').trim() : ''; parent.postMessage({ sbPick: { scene, text } }, '*'); }); }
     // tell the studio what the layout check found, then return to where the editor was
     if (parent !== window) SB.lint().then((found) => { parent.postMessage({ sbLint: found }, '*'); show(at > 0 ? Math.min(at, plan.duration - .04) : 0); });
   };

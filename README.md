@@ -11,7 +11,7 @@ motion graphics, captions, music and sound effects, and then checks its own work
 line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
 people who would rather click than type.
 
-> Version 0.16. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.17. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux / WSL and Windows 11; macOS
 > has not been tried. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 
@@ -245,7 +245,8 @@ node bin/songbe.mjs studio my-ad        # the editor for one project: http://127
 
 For people who would rather not edit JSON. The **home screen** lists your videos, each with a poster of its opening scene and
 whether its video is up to date; *New video* writes one from your description, or starts from an example or from blank;
-*Settings* holds your keys and shows what is installed. The **editor** has scenes and their fields on the left and the video on the right, updating as you type. The preview
+*Settings* holds your keys and shows what is installed. The **editor** has scenes and their fields on the left and the video on the right, updating as you type; click
+any words in the video and the cursor lands in the field they come from, and every change can be undone and redone. The preview
 is free — it reuses voice clips that already exist and estimates the timing of new sentences — and **Build video** runs the full
 build and shows the result with its self-check. Images and clips are added to the project's `media/` folder from the form.
 With a key, every scene also has **Rewrite this scene** (say what should change; the new scene is checked against the rest of the

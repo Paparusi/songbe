@@ -44,8 +44,10 @@ function sweep() {
 }
 
 // Minimal DevTools-protocol session against a private headless browser. `scale` draws the same frame smaller (for posters).
-// Returns { evaluate(expression), shot(t), close(), fonts }.
+// Returns { evaluate(expression), shot(t), close(), fonts }. Given an http address instead of a scene page's file it simply opens
+// that page (the app's own pages are tested this way).
 export async function openPage(pageFile, [w, h], scale = 1) {
+  const web = /^https?:\/\//.test(pageFile);
   sweep();
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-chrome-'));
   const chrome = spawn(tools.chrome, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore', windowsHide: true });
@@ -70,9 +72,9 @@ export async function openPage(pageFile, [w, h], scale = 1) {
   };
   await send('Page.enable'); await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: scale, mobile: false });
-  await send('Page.navigate', { url: pathToFileURL(pageFile).href + '#render' });
-  for (let i = 0; i < 150; i++) { if (await evaluate('typeof window.ready !== "undefined"').catch(() => false)) break; await sleep(100); }
-  const fonts = await evaluate('window.ready');
+  await send('Page.navigate', { url: web ? pageFile : pathToFileURL(pageFile).href + '#render' });
+  for (let i = 0; i < 150 && !web; i++) { if (await evaluate('typeof window.ready !== "undefined"').catch(() => false)) break; await sleep(100); }
+  const fonts = web ? null : await evaluate('window.ready');
   const shot = async (t, quality = 93) => {
     await evaluate(`SB.draw(${t}).then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))`);
     return Buffer.from((await send('Page.captureScreenshot', { format: 'jpeg', quality })).result.data, 'base64');

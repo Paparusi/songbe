@@ -227,3 +227,30 @@ test('every project gets a poster of its opening scene', { skip: !ready && 'Chro
     const b = Buffer.from(await r.arrayBuffer()); assert.ok(b.length > 4000 && b[0] === 0xff && b[1] === 0xd8, `${p.name}: a real picture`);
   }
 });
+
+// The editor itself, in a real browser: what a person does with the mouse.
+test('clicking words in the preview puts the cursor in their field; undo and redo walk the saved states', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
+  const { openPage } = await import('../src/render.mjs');
+  const { id } = await post('/api/projects', { name: 'Bấm để sửa', starter: 'sale-vi' }).then(J);
+  const page = await openPage(`${u}/p/${id}/`, [1440, 900]), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const until = async (what, expr) => { for (let i = 0; i < 80; i++) { if (await page.evaluate(expr).catch(() => false)) return; await wait(150); } assert.fail('never happened: ' + what); };
+  try {
+    await until('the preview is drawn', `!!document.querySelector('#pv')?.contentDocument?.querySelector('#s0 .hl') && !!document.querySelector('#strip div')`);
+    // the highlighted words of the first scene's headline
+    await page.evaluate(`document.querySelector('#pv').contentDocument.querySelector('#s0 .hl').click()`);
+    await until('the headline box has the cursor', `document.activeElement?.tagName === 'TEXTAREA' && document.activeElement.closest('[data-path]')?.dataset.path === 'title'`);
+    assert.equal(await page.evaluate(`document.activeElement.value.slice(document.activeElement.selectionStart, document.activeElement.selectionEnd)`), 'có ngay', 'and the clicked words are selected');
+    // a scene that is not open: show it, click its price
+    await page.evaluate(`document.querySelectorAll('#strip div')[1].click()`); await wait(700);
+    await page.evaluate(`document.querySelector('#pv').contentDocument.querySelector('#s1 .pr span').click()`);
+    await until('the price box of scene 2 has the cursor', `document.activeElement?.closest('[data-path]')?.dataset.path === 'price' && document.querySelector('.card.open .n').textContent === '2'`);
+    // change it, wait for the save, undo, redo
+    await page.evaluate(`(() => { const b = document.activeElement; b.value = '19k'; b.dispatchEvent(new Event('input', { bubbles: true })); b.blur(); })()`);
+    const saved = () => JSON.parse(fs.readFileSync(path.join(process.env.SONGBE_HOME, 'Bấm để sửa', 'video.json'), 'utf8')).scenes[1].price;
+    for (let i = 0; i < 60 && saved() !== '19k'; i++) await wait(100); assert.equal(saved(), '19k');
+    assert.equal(await page.evaluate(`document.querySelector('#undo').disabled`), false);
+    await page.evaluate(`document.querySelector('#undo').click()`); for (let i = 0; i < 60 && saved() !== '25k'; i++) await wait(100); assert.equal(saved(), '25k', 'undo restores the file');
+    await page.evaluate(`document.querySelector('#redo').click()`); for (let i = 0; i < 60 && saved() !== '19k'; i++) await wait(100); assert.equal(saved(), '19k', 'redo brings the change back');
+    assert.equal(await page.evaluate(`document.querySelector('#redo').disabled`), true);
+  } finally { await page.close(); }
+});

@@ -2,6 +2,10 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.17
+- The editor: click words in the preview to edit the field they come from; undo and redo.
+- The test and release workflows can be started by hand for one system at a time.
+
 ## 0.16
 - **Any model on fal.ai** for pictures, clips and music (`imageModel`, `videoModel`, the music's `model`): requests are shaped
   from fal's own description of each model. The clip model no longer follows the picture model by accident.

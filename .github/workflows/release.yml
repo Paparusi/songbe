@@ -1,17 +1,20 @@
 # Installers for a tagged release: a setup program for Windows, an AppImage and a .deb for Linux, a disk image for macOS, attached
-# to the GitHub release of that tag. Skipped while the repository is private (macOS minutes cost ten times the others); run it by
-# hand from the Actions tab to try it earlier. Not run yet: expect to adjust it on its first real run. Nothing is code-signed.
+# to the GitHub release of that tag. Skipped while the repository is private (macOS minutes cost ten times the others); it can be
+# started by hand from the Actions tab for one system at a time. Nothing is code-signed.
 name: release
 on:
   push: { tags: ['v*'] }
   workflow_dispatch:
+    inputs:
+      os: { description: 'Which system', type: choice, options: [ubuntu-22.04, windows-latest, macos-latest], default: ubuntu-22.04 }
 jobs:
   build:
     if: ${{ github.event_name == 'workflow_dispatch' || !github.event.repository.private }}
     permissions: { contents: write }
     strategy:
       fail-fast: false
-      matrix: { os: [ubuntu-22.04, windows-latest, macos-latest] }
+      matrix:
+        os: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.os)) || fromJSON('["ubuntu-22.04","windows-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
