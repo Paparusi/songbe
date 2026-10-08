@@ -18,6 +18,7 @@ const HELP = `Songbe — short ads from a single video.json
   songbe build <dir> [--force]    voice → timeline → footage → picture → sound → out/video.mp4, then self-check
   songbe check <dir>              re-run the self-check on out/video.mp4
   songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
+  songbe studio <dir> [--port=N]  edit in the browser with a live preview and a Build button (http://127.0.0.1:4173)
 
 Keys are read from the environment or <dir>/.env: FAL_KEY (voice, music, generated footage), GROQ_API_KEY (optional transcript check).
 Without keys the build still works: no voice, no music, plain backgrounds where footage would be generated.`;
@@ -54,6 +55,10 @@ export async function main(argv) {
   }
   if (!exists(path.join(dir, 'video.json'))) throw new Error(`no video.json in ${dir}`);
   loadDotEnv(dir);
+  if (cmd === 'studio') {
+    const { studio } = await import('./studio.mjs'), p = rest.find((x) => x.startsWith('--port='));
+    await studio(dir, p ? +p.split('=')[1] : 4173); return;
+  }
   if (cmd === 'validate') {
     let spec; try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
     const errs = validate(spec, dir);

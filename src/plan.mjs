@@ -23,27 +23,32 @@ export async function makePlan(dir, opts = {}) {
   const notes = [];
 
   // ---- voice: one clip per sentence, silence trimmed ----
-  const useVoice = spec.voice !== false && fal.available();
-  if (spec.voice !== false && !fal.available()) notes.push('FAL_KEY not set: built without voice-over, sentence lengths are estimated from the text.');
+  // offline (studio preview): never call a provider; use what is cached and estimate the rest from the text
+  const wantVoice = spec.voice !== false, canGen = fal.available() && !opts.offline;
+  let pending = 0;
   const scenes = [];
   for (const sc of spec.scenes) {
     const say = [];
     for (const text of list(sc.say)) {
       let file = null, dur = Math.max(1.6, text.length / 15);
-      if (useVoice) {
+      if (wantVoice) {
         const v = spec.voice || {}, id = sha(['vo', text, v]);
-        const raw = path.join(cache, `vo-${id}.mp3`); file = path.join(cache, `vo-${id}.wav`);
-        if (!exists(raw) || opts.force) { log('  voice:', text); await fal.speak(text, v, raw); }
-        if (!exists(file) || opts.force) {
-          const trim = 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03';
-          run(tools.ffmpeg, ['-v', 'error', '-y', '-i', raw, '-af', `${trim},areverse,${trim},areverse`, '-ar', '48000', '-ac', '2', file]);
-        }
-        dur = duration(file);
+        const raw = path.join(cache, `vo-${id}.mp3`), wav = path.join(cache, `vo-${id}.wav`);
+        if (canGen && (!exists(raw) || opts.force)) { log('  voice:', text); await fal.speak(text, v, raw); }
+        if (exists(raw)) {
+          if (!exists(wav) || opts.force) {
+            const trim = 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03';
+            run(tools.ffmpeg, ['-v', 'error', '-y', '-i', raw, '-af', `${trim},areverse,${trim},areverse`, '-ar', '48000', '-ac', '2', wav]);
+          }
+          file = wav; dur = duration(wav);
+        } else pending++;
       }
       say.push({ text, file, dur });
     }
     scenes.push({ ...sc, say });
   }
+  if (pending) notes.push(opts.offline ? `${pending} voice line${pending > 1 ? 's' : ''} not generated yet: timing is estimated until the next build.`
+    : `FAL_KEY not set: ${pending} line${pending > 1 ? 's' : ''} built without voice-over, lengths estimated from the text.`);
 
   // ---- timeline: each scene opens just before its first sentence ----
   let t = LEAD, talkEnd = 0;
@@ -61,14 +66,15 @@ export async function makePlan(dir, opts = {}) {
   for (const sc of scenes) {
     let src = sc.media;
     if (src && typeof src === 'object' && src.generate) {
-      if (!fal.available()) { notes.push(`Scene "${sc.type}" asks for generated footage but FAL_KEY is not set: using the plain background.`); src = null; }
-      else {
-        const g = src.generate, id = sha(['gen', g]);
-        const still = path.join(cache, `gen-${id}.jpg`), clip = path.join(cache, `gen-${id}.mp4`);
+      const g = src.generate, id = sha(['gen', g]);
+      const still = path.join(cache, `gen-${id}.jpg`), clip = path.join(cache, `gen-${id}.mp4`);
+      if (canGen) {
         if (!exists(still)) { log('  image:', g.image.slice(0, 70) + '…'); await fal.image(g.image, g, still); }
         if (g.motion && !exists(clip)) { log('  clip:', g.motion.slice(0, 70) + '…'); await fal.animate(still, g.motion, g, clip); }
-        src = g.motion ? clip : still;
       }
+      src = g.motion && exists(clip) ? clip : exists(still) ? still : null;
+      if (!src) notes.push(opts.offline ? `Scene "${sc.type}": footage not generated yet, showing the plain background.`
+        : `Scene "${sc.type}" asks for generated footage but FAL_KEY is not set: using the plain background.`);
     } else if (typeof src === 'string') src = path.resolve(dir, src);
     if (!src) { sc.media = null; continue; }
     if (!exists(src)) throw new Error(`media not found: ${src}`);

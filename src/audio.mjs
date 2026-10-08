@@ -51,9 +51,10 @@ export async function makeAudio(dir, plan) {
   const voice = plan.scenes.flatMap((s) => s.say).filter((s) => s.file);
   let music = null;
   if (plan.music?.file) music = path.resolve(dir, plan.music.file);
-  else if (plan.music?.prompt && fal.available()) {
-    music = path.join(cache, `music-${sha(['music', plan.music])}.wav`);
-    if (!exists(music)) { log('  music:', plan.music.prompt.slice(0, 70) + '…'); await fal.music(plan.music.prompt, plan.music, music); }
+  else if (plan.music?.prompt) {                       // reuse a cached track even when no key is set
+    const file = path.join(cache, `music-${sha(['music', plan.music])}.wav`);
+    if (!exists(file) && fal.available()) { log('  music:', plan.music.prompt.slice(0, 70) + '…'); await fal.music(plan.music.prompt, plan.music, file); }
+    if (exists(file)) music = file;
   }
 
   const inputs = ['-i', sfx], f = []; let idx = 1, mix = [];

@@ -13,10 +13,22 @@ export const SCENES = {
   footage: { ...common, media: 'media', mediaOffset: 'num', label: 'str', labelStyle: ['plain', 'pill'], pin: 'bool', 'title!': 'text', sub: 'str', chip: 'str' },
   card: { ...common, label: 'str', 'title!': 'text', media: 'media', mediaOffset: 'num', caption: 'str', stat: { 'badge!': 'str', 'heading!': 'str', sub: 'str' } },
   list: { ...common, tone: ['light', 'dark'], label: 'str', 'title!': 'text', 'items!': [{ 'text!': 'str', sub: 'str', icon: 'str' }] },
-  phone: { ...common, tone: ['dark', 'light'], label: 'str', 'title!': 'text', 'screens!': 'text', callouts: [{ 'text!': 'str', side: ['left', 'right'], y: 'num' }] },
+  phone: { ...common, tone: ['dark', 'light'], label: 'str', 'title!': 'text', screens: 'text', callouts: [{ 'text!': 'str', side: ['left', 'right'], y: 'num' }] },
   chat: { ...common, label: 'str', 'title!': 'text', messages: [{ 'from!': ['them', 'us'], 'text!': 'str' }],
     contact: { kicker: 'str', button: 'str', 'number!': 'text', sub: 'str' }, footer: { name: 'str', line: 'str' } },
   end: { ...common, tone: ['dark', 'light'], name: 'str', tagline: 'str', cta: 'str', badges: ['str'], url: 'str' },
+};
+
+// A minimal valid scene of each type: what `songbe studio` inserts when you add a scene, and a starting point for agents.
+export const TEMPLATES = {
+  footage: { type: 'footage', say: 'Open with one short question or promise.', label: 'Small label', title: ['Two short', 'headline lines'] },
+  card: { type: 'card', say: 'Back the claim with one number.', label: 'Why it matters', title: ['A claim', 'worth showing'], stat: { badge: '24h', heading: 'One number', sub: 'and what it means' } },
+  list: { type: 'list', say: 'Name three benefits, in the order they appear.', label: 'What you get', title: ['Three things', 'that matter'],
+    items: [{ icon: 'check', text: 'First benefit', sub: 'A few words more' }, { icon: 'bolt', text: 'Second benefit', sub: 'A few words more' }, { icon: 'heart', text: 'Third benefit', sub: 'A few words more' }] },
+  phone: { type: 'phone', say: 'Show the product being used.', label: 'In the app', title: ['See it', 'in action'], callouts: [{ text: 'A short callout', side: 'right', y: 0.3 }] },
+  chat: { type: 'chat', say: ['Tell people how to reach you.', 'Zero nine hundred, zero zero zero, zero zero zero.'], label: 'Get in touch', title: 'Message us',
+    messages: [{ from: 'them', text: 'Hi, I am interested' }, { from: 'us', text: 'Hello! Happy to help.' }], contact: { kicker: 'Phone', button: 'Message', number: ['0900', '000', '000'], sub: 'Replies within the day' } },
+  end: { type: 'end', say: 'Close with the call to action.', tagline: 'One line that sums it up', cta: 'Get started' },
 };
 
 export const TOP = {

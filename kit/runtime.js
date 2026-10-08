@@ -115,8 +115,13 @@
     let playing = false, t0 = 0, base = 0, busy = false;
     const show = async (t) => { if (busy) return; busy = true; sk.value = t; tt.textContent = t.toFixed(2); await SB.draw(t); busy = false; };
     const tick = () => { if (!playing) return; const t = base + (performance.now() - t0) / 1000; if (t >= plan.duration) { playing = false; pp.textContent = 'Play'; if (audio) audio.pause(); return; } show(t); requestAnimationFrame(tick); };
-    pp.onclick = () => { playing = !playing; pp.textContent = playing ? 'Pause' : 'Play'; base = +sk.value >= plan.duration - .05 ? 0 : +sk.value; t0 = performance.now(); if (audio) { audio.currentTime = base; playing ? audio.play() : audio.pause(); } tick(); };
+    pp.onclick = () => { playing = !playing; pp.textContent = playing ? 'Pause' : 'Play'; base = +sk.value >= plan.duration - .05 ? 0 : +sk.value; t0 = performance.now(); if (audio) { audio.currentTime = base; playing ? audio.play().catch(() => {}) : audio.pause(); } tick(); };
     sk.oninput = () => { playing = false; pp.textContent = 'Play'; if (audio) audio.pause(); show(+sk.value); };
+    // inside the studio: start where the editor left off, follow its seeks, tell it where we are
+    const at = parseFloat((location.hash.match(/t=([\d.]+)/) || [])[1]);
+    if (at > 0) show(Math.min(at, plan.duration - .04));
+    addEventListener('message', (e) => { if (e.data && typeof e.data.sbSeek === 'number') { playing = false; pp.textContent = 'Play'; if (audio) audio.pause(); show(Math.min(e.data.sbSeek, plan.duration - .04)); } });
+    if (parent !== window) setInterval(() => parent.postMessage({ sbTime: +sk.value }, '*'), 250);
   };
 
   window.SB = SB;

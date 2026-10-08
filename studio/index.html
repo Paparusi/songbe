@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Songbe Studio</title>
+<style>
+:root { --bg: #0D1117; --panel: #151B23; --raise: #1C2430; --line: #2A3441; --text: #E7ECF2; --soft: #9AA7B6; --accent: #4FE0D6; --blue: #3B82F6; --bad: #FF6B6B; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+header { height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header .logo { font-weight: 800; font-size: 17px; letter-spacing: -.3px; } header .logo span { color: var(--accent); }
+header .proj { color: var(--soft); font-weight: 500; } header .gap { flex: 1; }
+.tag { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--raise); color: var(--soft); border: 1px solid var(--line); }
+.tag.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.btn { border: 1px solid var(--line); background: var(--raise); border-radius: 10px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+.btn:hover { border-color: var(--soft); } .btn.small { padding: 4px 9px; font-size: 12px; border-radius: 8px; }
+.btn.go { background: var(--accent); color: #06221F; border-color: var(--accent); font-weight: 800; } .btn.go[disabled] { opacity: .5; cursor: default; }
+main { display: grid; grid-template-columns: minmax(380px, 460px) 1fr; height: calc(100% - 56px); }
+#left { border-right: 1px solid var(--line); overflow: auto; padding: 14px 14px 80px; }
+#right { display: grid; grid-template-rows: 1fr auto auto; min-height: 0; }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; position: sticky; top: -14px; background: var(--bg); padding: 14px 0 8px; z-index: 3; }
+.tabs button { flex: 1; } .tabs button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; overflow: hidden; }
+.card.sel { border-color: var(--accent); }
+.card > .head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; }
+.card > .head .n { width: 24px; height: 24px; border-radius: 8px; background: var(--raise); color: var(--soft); font-weight: 700; font-size: 12px; display: grid; place-items: center; flex: none; }
+.card > .head .ty { font-weight: 700; } .card > .head .pv { color: var(--soft); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card > .body { padding: 4px 12px 12px; display: none; } .card.open > .body { display: block; }
+.f { margin-top: 10px; } .f > label { display: block; font-size: 12px; font-weight: 600; color: var(--soft); margin-bottom: 4px; } .f > label b { color: var(--accent); font-weight: 600; }
+input[type=text], input[type=number], textarea, select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; outline: none; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+textarea { resize: vertical; min-height: 38px; } input[type=color] { width: 38px; height: 36px; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; flex: none; }
+.rowf { display: flex; gap: 8px; align-items: center; } .rowf > * { min-width: 0; }
+.group { border: 1px solid var(--line); border-radius: 11px; padding: 2px 10px 10px; margin-top: 10px; background: color-mix(in srgb, var(--raise) 55%, transparent); }
+.group > .gh { display: flex; align-items: center; justify-content: space-between; padding-top: 8px; font-size: 12px; font-weight: 700; color: var(--soft); text-transform: uppercase; letter-spacing: .6px; }
+.item { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 2px; position: relative; } .item > .x { position: absolute; right: 0; top: 8px; }
+.adds { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; } .hint { color: var(--soft); font-size: 12px; margin-top: 10px; }
+#stagewrap { min-height: 0; position: relative; background: #05070A; } #pv { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+#strip { display: flex; gap: 3px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--line); }
+#strip div { height: 30px; border-radius: 7px; background: var(--raise); border: 1px solid var(--line); font-size: 11px; font-weight: 700; color: var(--soft); display: grid; place-items: center; cursor: pointer; overflow: hidden; white-space: nowrap; min-width: 0; }
+#strip div.on { border-color: var(--accent); color: var(--accent); }
+#foot { max-height: 34vh; overflow: auto; border-top: 1px solid var(--line); background: var(--panel); padding: 10px 14px; }
+#foot:empty { display: none; }
+.msg { font-size: 13px; padding: 3px 0; } .msg.bad { color: var(--bad); } .msg.note { color: var(--soft); }
+#build { display: grid; grid-template-columns: 200px 1fr; gap: 14px; margin-top: 6px; } #build video { width: 200px; border-radius: 10px; background: #000; }
+#log { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--soft); white-space: pre-wrap; max-height: 150px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
+.sum { font-weight: 600; margin-bottom: 6px; } .sum.ok { color: var(--accent); } .sum.bad { color: var(--bad); }
+#json { min-height: 60vh; font: 12.5px/1.5 ui-monospace, Menlo, monospace; white-space: pre; }
+</style></head>
+<body>
+<header>
+  <div class="logo">Song<span>be</span> Studio</div><div class="proj" id="proj"></div><div class="gap"></div>
+  <span class="tag" id="saved">loading…</span><span class="tag" id="kfal">voice · music</span>
+  <button class="btn go" id="go">Build video</button>
+</header>
+<main>
+  <aside id="left">
+    <div class="tabs"><button class="btn on" data-tab="scenes">Scenes</button><button class="btn" data-tab="brand">Settings</button><button class="btn" data-tab="json">JSON</button></div>
+    <div id="pane"></div>
+  </aside>
+  <section id="right">
+    <div id="stagewrap"><iframe id="pv" title="preview"></iframe></div>
+    <div id="strip"></div>
+    <div id="foot"></div>
+  </section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); for (const k of kids) e.append(k); return e; };
+const LABEL = { say: 'Voice-over <b>· one sentence per line</b>', title: 'Headline <b>· one row per line</b>', sub: 'Supporting line', label: 'Small label', labelStyle: 'Label style', pin: 'Location pin before the label',
+  chip: 'Bottom chip', notice: 'Notice <b>· e.g. AI disclosure</b>', media: 'Footage or image', mediaOffset: 'Start footage at (seconds)', caption: 'Caption on the media', stat: 'Stat card', badge: 'Badge <b>· 2–4 characters</b>',
+  heading: 'Heading', items: 'Rows', icon: 'Icon', text: 'Text', tone: 'Tone', screens: 'Screenshots <b>· one path per line</b>', callouts: 'Callouts', side: 'Side', y: 'Height on the phone (0–1)', messages: 'Chat messages',
+  from: 'From', contact: 'Contact card', kicker: 'Kicker', button: 'Button', number: 'Number <b>· one group per line</b>', footer: 'Footer', name: 'Name', line: 'Line', tagline: 'Tagline', cta: 'Button text',
+  badges: 'Badges <b>· one per line</b>', url: 'Address', duration: 'Duration when silent (seconds)', minDuration: 'Minimum duration (seconds)', size: 'Size', fps: 'Frames per second', tail: 'Hold after the last word (seconds)',
+  motionBlur: 'Motion blur', brand: 'Brand', voice: 'Voice', music: 'Music', ink: 'Ink (dark)', primary: 'Primary', accent: 'Accent (bright)', paper: 'Paper (light background)', muted: 'Muted text', logo: 'Logo',
+  mark: 'Logo mark', word: 'Wordmark (for dark backgrounds)', model: 'Model', language: 'Language', speed: 'Speed', emotion: 'Emotion', prompt: 'Describe the music', file: 'Or use a file', volume: 'Volume (0–1)', avoid: 'Avoid', seed: 'Seed' };
+const COLOURS = new Set(['ink', 'primary', 'accent', 'paper', 'muted']), FILES = new Set(['mark', 'word', 'file']), ICONS = ['check', 'star', 'bolt', 'heart', 'shield', 'drop', 'clock', 'bell', 'sun', 'pin', 'number'];
+const BASIC = ['str', 'num', 'bool', 'text', 'media'];
+const isEnum = (s) => Array.isArray(s) && (s.length > 1 || (typeof s[0] === 'string' && !BASIC.includes(s[0])));
+const clean = (k) => k.replace(/!$/, '');
+
+let S = null, spec = null, tab = 'scenes', open = 0, timer = null, lastT = 0, plan = null;
+
+function changed() { clearTimeout(timer); $('#saved').textContent = 'editing…'; timer = setTimeout(save, 450); }
+async function save() {
+  const r = await (await fetch('/api/spec', { method: 'PUT', body: JSON.stringify(spec) })).json();
+  $('#saved').textContent = r.saved ? 'saved' : 'not saved'; $('#saved').classList.toggle('on', !!r.saved);
+  show(r);
+}
+function show(r) {
+  plan = r.plan || plan;
+  const msgs = [...(r.errors || []).map((m) => ['bad', m]), ...((r.plan && r.plan.notes) || []).map((m) => ['note', m])];
+  const keep = $('#build'); $('#foot').replaceChildren(...msgs.map(([c, m]) => el('div', { className: 'msg ' + c, textContent: (c === 'bad' ? '✕ ' : '· ') + m })), ...(keep ? [keep] : []));
+  if (r.plan) { $('#pv').src = '/preview?v=' + Date.now() + '#t=' + lastT.toFixed(2); strip(); }
+}
+function strip() {
+  if (!plan) return;
+  $('#strip').replaceChildren(...plan.scenes.map((sc, i) => { const d = el('div', { textContent: `${i + 1} · ${sc.type} · ${(sc.end - sc.start).toFixed(1)}s`, className: i === open ? 'on' : '' }); d.style.flex = (sc.end - sc.start) + ' 1 0'; d.onclick = () => { open = i; seek(i); draw(); }; return d; }));
+}
+function seek(i) { if (!plan || !plan.scenes[i]) return; const sc = plan.scenes[i]; lastT = sc.start + (sc.end - sc.start) * .6; $('#pv').contentWindow?.postMessage({ sbSeek: lastT }, '*'); }
+addEventListener('message', (e) => { if (e.data && typeof e.data.sbTime === 'number') lastT = e.data.sbTime; });
+
+// ---- form builder driven by the same table the validator uses ----
+function field(key, shape, get, set) {
+  const k = clean(key), wrap = el('div', { className: 'f' }), lab = el('label'); lab.innerHTML = LABEL[k] || k; let v = get();
+  if (shape === 'bool') { const c = el('input', { type: 'checkbox', checked: !!v }); c.onchange = () => { set(c.checked || undefined); changed(); }; lab.prepend(c, ' '); wrap.append(lab); return wrap; }
+  wrap.append(lab);
+  if (isEnum(shape) || k === 'icon') {
+    const sel = el('select'); for (const o of ['', ...(k === 'icon' ? ICONS : shape)]) sel.append(el('option', { value: o, textContent: o || '(default)', selected: (v ?? '') === o }));
+    sel.onchange = () => { set(sel.value || undefined); changed(); }; wrap.append(sel); return wrap;
+  }
+  if (shape === 'num') { const i = el('input', { type: 'number', step: 'any', value: v ?? '' }); i.oninput = () => { set(i.value === '' ? undefined : +i.value); changed(); }; wrap.append(i); return wrap; }
+  if (shape === 'str' && COLOURS.has(k)) {
+    const c = el('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(v || '') ? v : '#000000' }), t = el('input', { type: 'text', value: v ?? '' });
+    c.oninput = () => { t.value = c.value; set(c.value); changed(); }; t.oninput = () => { if (/^#[0-9a-f]{6}$/i.test(t.value)) c.value = t.value; set(t.value || undefined); changed(); };
+    wrap.append(el('div', { className: 'rowf' }, c, t)); return wrap;
+  }
+  if (shape === 'str') {
+    const t = el('input', { type: 'text', value: v ?? '' }); t.oninput = () => { set(t.value === '' ? undefined : t.value); changed(); };
+    if (FILES.has(k)) { wrap.append(el('div', { className: 'rowf' }, t, upload((p) => { t.value = p; set(p); changed(); }))); return wrap; }
+    wrap.append(t); return wrap;
+  }
+  if (shape === 'text' || (Array.isArray(shape) && shape[0] === 'str')) {      // one entry per line
+    const many = Array.isArray(shape), t = el('textarea', { rows: Math.max(2, [].concat(v || []).length), value: [].concat(v || []).join('\n') });
+    t.oninput = () => { const ls = t.value.split('\n').map((x) => x.trim()).filter(Boolean); set(!ls.length ? undefined : many || ls.length > 1 ? ls : ls[0]); changed(); };
+    if (k === 'screens') { wrap.append(t, el('div', { className: 'rowf', style: 'margin-top:6px' }, upload((p) => { t.value = (t.value.trim() ? t.value.trim() + '\n' : '') + p; t.oninput(); }, 'Add screenshot'))); return wrap; }
+    wrap.append(t); return wrap;
+  }
+  if (shape === 'media') {
+    const gen = v && typeof v === 'object', mode = el('select'); for (const [val, txt] of [['', 'None (plain background)'], ['file', 'A file'], ['gen', 'Generate with AI']]) mode.append(el('option', { value: val, textContent: txt, selected: (gen ? 'gen' : v ? 'file' : '') === val }));
+    const box = el('div', { style: 'margin-top:6px' }), paint = () => {
+      box.replaceChildren(); const cur = get();
+      if (mode.value === 'file') { const t = el('input', { type: 'text', value: typeof cur === 'string' ? cur : '', placeholder: 'media/clip.mp4' }); t.oninput = () => { set(t.value || undefined); changed(); }; box.append(el('div', { className: 'rowf' }, t, upload((p) => { t.value = p; set(p); changed(); }))); }
+      if (mode.value === 'gen') { const g = (cur && cur.generate) || { image: '', motion: '' };
+        const a = el('textarea', { rows: 3, value: g.image || '', placeholder: 'Describe the still image' }), b = el('textarea', { rows: 2, value: g.motion || '', placeholder: 'Describe the motion (leave empty for a still)' });
+        const put = () => { set({ generate: { image: a.value, ...(b.value ? { motion: b.value } : {}) } }); changed(); }; a.oninput = put; b.oninput = put; box.append(a, el('div', { style: 'height:6px' }), b); }
+    };
+    mode.onchange = () => { set(mode.value === 'gen' ? { generate: { image: '' } } : undefined); paint(); changed(); }; paint(); wrap.append(mode, box); return wrap;
+  }
+  if (Array.isArray(shape)) {                                                 // list of objects
+    const g = el('div', { className: 'group' }), head = el('div', { className: 'gh' }, el('span', { textContent: (LABEL[k] || k).replace(/<[^>]+>/g, '') })), add = el('button', { className: 'btn small', textContent: '+ add' });
+    head.append(add); const paint = () => { g.replaceChildren(head); (get() || []).forEach((it, i) => {
+      const row = el('div', { className: 'item' }), x = el('button', { className: 'btn small x', textContent: '✕' }); x.onclick = () => { const a = get(); a.splice(i, 1); set(a.length ? a : undefined); paint(); changed(); };
+      row.append(x, ...fields(shape[0], it)); g.append(row); }); };
+    add.onclick = () => { const a = get() || []; a.push({}); set(a); paint(); changed(); }; paint(); return g;
+  }
+  // nested object
+  const g = el('div', { className: 'group' }), head = el('div', { className: 'gh' }, el('span', { textContent: (LABEL[k] || k).replace(/<[^>]+>/g, '') })), tog = el('button', { className: 'btn small' });
+  head.append(tog); const paint = () => { const cur = get(); tog.textContent = cur ? 'remove' : '+ add'; g.replaceChildren(head, ...(cur ? fields(shape, cur) : [])); };
+  tog.onclick = () => { set(get() ? undefined : {}); paint(); changed(); }; paint(); return g;
+}
+const LAST = ['notice', 'mediaOffset', 'duration', 'minDuration'], HIDE = new Set(['size']);
+const order = (keys) => [...keys.filter((k) => !LAST.includes(clean(k)) && !HIDE.has(clean(k))), ...keys.filter((k) => LAST.includes(clean(k)))];
+const fields = (shape, obj) => order(Object.keys(shape)).map((key) => field(key, shape[key], () => obj[clean(key)], (v) => { if (v === undefined) delete obj[clean(key)]; else obj[clean(key)] = v; }));
+function upload(done, text = 'Upload') {
+  const b = el('button', { className: 'btn small', textContent: text }), i = el('input', { type: 'file', hidden: true });
+  b.onclick = () => i.click(); i.onchange = async () => { const f = i.files[0]; if (!f) return; b.textContent = '…'; const r = await (await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })).json(); b.textContent = text; if (r.path) done(r.path); else alertBox(r.error); };
+  const s = el('span', { style: 'flex:none' }); s.append(b, i); return s;
+}
+const alertBox = (m) => $('#foot').prepend(el('div', { className: 'msg bad', textContent: '✕ ' + m }));
+
+function draw() {
+  for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
+  const pane = $('#pane'); pane.replaceChildren();
+  if (tab === 'json') { const t = el('textarea', { id: 'json', spellcheck: false, value: JSON.stringify(spec, null, 2) }); t.oninput = () => { try { spec = JSON.parse(t.value); changed(); } catch { $('#saved').textContent = 'JSON not valid yet'; } }; pane.append(t); return; }
+  if (tab === 'brand') { const { scenes, ...top } = spec; pane.append(...order(Object.keys(S.table.TOP)).map((key) => field(key, S.table.TOP[key], () => spec[clean(key)], (v) => { if (v === undefined) delete spec[clean(key)]; else spec[clean(key)] = v; })));
+    pane.append(el('div', { className: 'hint', textContent: 'Voice, music and generated footage are created when you press Build, with your own FAL_KEY.' })); return; }
+  spec.scenes.forEach((sc, i) => {
+    const card = el('div', { className: 'card' + (i === open ? ' open sel' : '') }), head = el('div', { className: 'head' });
+    const btn = (t, fn) => { const b = el('button', { className: 'btn small', textContent: t }); b.onclick = (e) => { e.stopPropagation(); fn(); draw(); changed(); }; return b; };
+    head.append(el('div', { className: 'n', textContent: i + 1 }), el('div', { className: 'ty', textContent: sc.type }), el('div', { className: 'pv', textContent: [].concat(sc.title || sc.name || sc.tagline || '').join(' ').replace(/\[\[|\]\]|\*\*/g, '') }),
+      btn('↑', () => { if (i) { spec.scenes.splice(i - 1, 0, spec.scenes.splice(i, 1)[0]); open = i - 1; } }), btn('↓', () => { if (i < spec.scenes.length - 1) { spec.scenes.splice(i + 1, 0, spec.scenes.splice(i, 1)[0]); open = i + 1; } }),
+      btn('✕', () => { if (spec.scenes.length > 1) { spec.scenes.splice(i, 1); open = Math.max(0, open - (i <= open ? 1 : 0)); } }));
+    head.onclick = () => { open = open === i ? -1 : i; draw(); strip(); seek(i); };
+    const body = el('div', { className: 'body' }); if (i === open) body.append(...fields(S.table.SCENES[sc.type], sc));
+    card.append(head, body); pane.append(card);
+  });
+  const adds = el('div', { className: 'adds' }); adds.append(el('span', { className: 'hint', style: 'margin:6px 4px 0 0', textContent: 'Add a scene:' }));
+  for (const t of Object.keys(S.templates)) { const b = el('button', { className: 'btn small', textContent: '+ ' + t }); b.onclick = () => { spec.scenes.push(structuredClone(S.templates[t])); open = spec.scenes.length - 1; draw(); changed(); }; adds.append(b); }
+  pane.append(adds);
+}
+for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { tab = b.dataset.tab; draw(); };
+
+// ---- build ----
+$('#go').onclick = async () => {
+  clearTimeout(timer); await save();
+  const r = await fetch('/api/build', { method: 'POST' }); if (!r.ok) return alertBox((await r.json()).error);
+  $('#go').disabled = true; $('#go').textContent = 'Building…'; watch();
+};
+function watch() {
+  $('#build')?.remove(); const box = el('div', { id: 'build' }), side = el('div'), log = el('div', { id: 'log' }), vid = el('div');
+  side.append(el('div', { className: 'sum', textContent: 'Building…', id: 'sum' }), log); box.append(vid, side); $('#foot').append(box); $('#foot').scrollTop = 1e6;
+  const es = new EventSource('/api/build/events');
+  es.addEventListener('line', (e) => { log.textContent += JSON.parse(e.data) + '\n'; log.scrollTop = 1e6; });
+  es.addEventListener('done', (e) => { es.close(); $('#go').disabled = false; $('#go').textContent = 'Build video'; const r = JSON.parse(e.data), c = r.check, sum = $('#sum');
+    if (!c) { sum.textContent = 'Build failed — see the log'; sum.className = 'sum bad'; return; }
+    sum.className = 'sum ' + (c.ok ? 'ok' : 'bad'); sum.textContent = `${c.ok ? 'Done' : 'Built with problems'} · ${c.duration.toFixed(1)} s · ${c.audio ? 'sound ' + (c.loudness ? c.loudness.mean + ' dB' : '') : 'NO SOUND'} · ${c.sizeMB} MB`;
+    for (const p of c.problems) side.insertBefore(el('div', { className: 'msg bad', textContent: '✕ ' + p }), log);
+    if (c.heard) side.insertBefore(el('div', { className: 'msg note', textContent: 'Heard: ' + c.heard }), log);
+    const v = el('video', { src: c.video, controls: true, playsInline: true }); vid.append(v, el('a', { href: c.video, download: 'video.mp4', className: 'btn small', textContent: 'Download', style: 'display:inline-block;margin-top:8px;text-decoration:none' }));
+    $('#foot').scrollTop = 1e6; });
+}
+
+(async () => {
+  S = await (await fetch('/api/state')).json(); spec = S.spec; $('#proj').textContent = S.name;
+  document.head.append(el('link', { rel: 'stylesheet', href: S.fonts }));
+  $('#kfal').textContent = S.keys.fal ? 'voice · music ready' : 'no FAL_KEY: silent builds'; $('#kfal').classList.toggle('on', S.keys.fal);
+  $('#saved').textContent = 'saved'; $('#saved').classList.add('on');
+  if (!spec) { $('#pane').append(el('div', { className: 'msg bad', textContent: S.errors[0] })); return; }
+  if (S.plan) { const sc = S.plan.scenes[0]; lastT = sc.start + (sc.end - sc.start) * .6; }
+  draw(); show(S); if (S.building) { $('#go').disabled = true; $('#go').textContent = 'Building…'; watch(); }
+})();
+</script>
+</body></html>

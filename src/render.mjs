@@ -9,15 +9,19 @@ import { KIT, tools, mkdir, log } from './util.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function writePage(dir, plan) {
-  const k = (f) => pathToFileURL(path.join(KIT, f)).href;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${plan.brand?.name || 'Songbe'}</title>
+// The scene page. `link` turns an absolute path into an address the page can load (file:// for rendering, /file?p= in the studio).
+export function pageHtml(plan, link) {
+  const k = (f) => link(path.join(KIT, f));
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${plan.brand?.name || 'Songbe'}</title>
 <link rel="stylesheet" href="${k('fonts/fonts.css')}"><link rel="stylesheet" href="${k('base.css')}"></head>
 <body><div id="stage"></div><script src="${k('runtime.js')}"></script><script src="${k('scenes.js')}"></script>
 <script>window.ready = SB.mount(${JSON.stringify(plan).replace(/</g, '\\u003c')}).then((n) => { if (!location.hash.includes('render')) SB.preview(); return n; });</script>
 </body></html>`;
+}
+
+export function writePage(dir, plan) {
   const file = path.join(mkdir(path.join(dir, '.songbe')), 'index.html');
-  fs.writeFileSync(file, html);
+  fs.writeFileSync(file, pageHtml(plan, (f) => pathToFileURL(f).href));
   return file;
 }
 

@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.2): six scene types, vertical 1080×1920, tested on Linux / WSL only.
+> Early version (0.3): six scene types, a local studio, vertical 1080×1920, tested on Linux / WSL only.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -80,6 +80,17 @@ Set `notice` (for example "Illustration generated with AI") on scenes that use g
 
 Generated assets are cached in `.songbe/cache` by a hash of their inputs: editing one sentence regenerates one voice clip, nothing else.
 
+## Studio
+
+```bash
+node bin/songbe.mjs studio my-ad        # then open http://127.0.0.1:4173
+```
+
+A local page for people who would rather not edit JSON: scenes and their fields on the left, the video on the right, updating as
+you type. The preview is free — it reuses voice clips that already exist and estimates the timing of new sentences — and the
+**Build video** button runs the full build and shows the result with its self-check. Images and clips can be uploaded into the
+project's `media/` folder from the form. The server listens on 127.0.0.1 only and serves nothing outside the project and the kit.
+
 ## Using it from an AI agent
 
 `AGENTS.md` describes the loop for any coding agent. For Claude Code there is a ready-made skill: copy `skill/` to
@@ -90,7 +101,7 @@ Generated assets are cached in `.songbe/cache` by a hash of their inputs: editin
 - Six scene types and one visual style. The scene kit (`kit/scenes.js`) is the place to add more.
 - One provider (fal.ai) for voice, images, image-to-video and music.
 - Vertical 1080×1920 is the only layout that has been tested.
-- No timeline editor yet; `songbe preview` gives a scrubber and playback only.
+- The studio edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
 
 ## License
 
