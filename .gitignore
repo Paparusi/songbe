@@ -1,0 +1,5 @@
+.fw/
+out/
+.env
+node_modules/
+*.log

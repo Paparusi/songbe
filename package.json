@@ -1,0 +1,11 @@
+{
+  "name": "framewright",
+  "version": "0.1.0",
+  "description": "Short vertical ads from a single video.json: voice, footage, motion graphics, music and a self-check, driven from the command line or by an AI agent.",
+  "type": "module",
+  "bin": { "fw": "bin/fw.mjs" },
+  "engines": { "node": ">=22" },
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": { "example": "node bin/fw.mjs build examples/recruitment-vi" }
+}
