@@ -40,6 +40,8 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
 - Few words on screen. Sentence case, not capitals. A small `label`, a strong `title`, at most one supporting line.
 - One or two short sentences per scene in `say`. Spell numbers and odd names the way they should be pronounced
   ("Vi Síp hai" rather than "VSIP 2") and keep the proper spelling in the on-screen text.
+- Pick the look with `"style"`: `soft` (rounded, friendly: apps, services) or `bold` (condensed capitals, flat colour: promotions, recruitment, retail).
+  Compare both cheaply with `songbe frames <dir> --style=bold` before deciding.
 - Brand colours go in `brand`: `ink` (dark), `primary`, `accent` (bright), `paper` (light background), `muted` (secondary text).
 - Use only facts the user gave you. Never invent prices, salaries, phone numbers, addresses or benefits; ask instead.
 - Do not put another company's logo in the video unless the user says they may use it.

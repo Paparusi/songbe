@@ -1,6 +1,6 @@
 # Songbe
 
-> Early version (0.3): six scene types, a local studio, vertical 1080×1920, tested on Linux / WSL only.
+> Early version (0.4): six scene types, two looks, a local studio, vertical 1080×1920, tested on Linux / WSL only.
 >
 > Songbe is named after the Sông Bé, a river in southern Vietnam.
 
@@ -71,6 +71,20 @@ The table above is a summary; `songbe schema` prints the exact shape and `songbe
 `media` is a path to a video or image, or `{ "generate": { "image": "prompt", "motion": "prompt" } }` to create footage with the configured provider.
 Set `notice` (for example "Illustration generated with AI") on scenes that use generated people or places.
 
+## Looks
+
+`"style"` at the top of the spec picks the look; the brand colours stay yours.
+
+| Style | What it looks like |
+| --- | --- |
+| `soft` (default) | Rounded cards, soft shadows and glows, lines that rise from behind a mask, a slanted colour sweep at each cut |
+| `bold` | Condensed capitals (Anton), flat colour fields, square corners with ink outlines and hard shadows, headlines on ink blocks over footage, a flat band dropping through each cut |
+
+Try a look without touching the spec: `songbe frames my-ad --style=bold`, `songbe build my-ad --style=bold`.
+
+A style is a style sheet of token overrides (`kit/styles/<name>.css`) plus a few numbers in `kit/runtime.js` (headline scale and
+leading, how lines arrive, how cuts are covered). Scenes set geometry only, so a new look does not touch scene code.
+
 ## How a build runs
 
 1. **Plan** — one voice clip per sentence, silence trimmed; scenes are laid on a timeline that follows the speech; footage is cut into frames.
@@ -98,11 +112,11 @@ project's `media/` folder from the form. The server listens on 127.0.0.1 only an
 
 ## Limits today
 
-- Six scene types and one visual style. The scene kit (`kit/scenes.js`) is the place to add more.
+- Six scene types and two looks. Scene types live in `kit/scenes.js`, looks in `kit/styles/`.
 - One provider (fal.ai) for voice, images, image-to-video and music.
 - Vertical 1080×1920 is the only layout that has been tested.
 - The studio edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
 
 ## License
 
-Apache-2.0. The bundled font is Be Vietnam Pro (SIL OFL 1.1). See `NOTICE`.
+Apache-2.0. The bundled fonts are Be Vietnam Pro and Anton (both SIL OFL 1.1). See `NOTICE`.

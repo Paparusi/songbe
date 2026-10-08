@@ -20,9 +20,13 @@
     el.style.transform = `translate(${o.x || 0}px,${o.y || 0}px) rotate(${o.r || 0}deg) scale(${o.s == null ? 1 : o.s})`;
     if (o.o != null) el.style.opacity = o.o;
   }
-  // masked line slides up into place at t0
+  // a masked line arrives at t0: it rises from below (soft) or is wiped in from the left (bold)
   function reveal(el, t, t0, dur = .62) {
-    el.firstElementChild.style.transform = `translateY(${lerp(112, 0, ease.outQuint(seg(t, t0, t0 + dur)))}%)`;
+    const st = el.firstElementChild.style;
+    if (SB.style.reveal === 'wipe') {
+      const k = ease.outQuint(seg(t, t0, t0 + dur * .8));
+      st.transform = `translateX(${lerp(-46, 0, k)}px)`; st.clipPath = `inset(-45% ${((1 - k) * 100).toFixed(2)}% -35% -2%)`;
+    } else st.transform = `translateY(${lerp(112, 0, ease.outQuint(seg(t, t0, t0 + dur)))}%)`;
   }
   // element pops in with a spring at t0
   function pop(el, t, t0, o = {}) {
@@ -49,10 +53,18 @@
     if (src && el.getAttribute('src') !== src) { el.setAttribute('src', src); await el.decode().catch(() => {}); }
   }
 
-  const SB = { clamp, lerp, seg, ease, spring, esc, rich, tf, reveal, pop, fit, PIN, mediaSrc, setImg, scenes: {}, live: [], cues: [] };
+  // What a style changes besides its style sheet (kit/styles/<name>.css): headline scale and leading, how lines arrive, how cuts are covered.
+  const STYLES = {
+    soft: { title: { scale: 1, lead: 0 }, reveal: 'rise', wipe: 'slab' },
+    bold: { title: { scale: 1.34, lead: 1.2, boxLead: 1.38 }, reveal: 'wipe', wipe: 'curtain' },   // leading leaves room for stacked Vietnamese accents
+  };
+
+  const SB = { clamp, lerp, seg, ease, spring, esc, rich, tf, reveal, pop, fit, PIN, mediaSrc, setImg, scenes: {}, live: [], cues: [], styles: STYLES, style: STYLES.soft };
 
   SB.mount = async function (plan) {
     SB.plan = plan;
+    SB.style = STYLES[plan.style] || STYLES.soft;
+    document.documentElement.dataset.style = STYLES[plan.style] ? plan.style : 'soft';
     const root = document.documentElement.style, b = plan.brand;
     for (const [k, v] of Object.entries({ ink: b.ink, primary: b.primary, accent: b.accent, paper: b.paper, muted: b.muted })) if (v) root.setProperty('--' + k, v);
     const stage = document.getElementById('stage');
@@ -62,7 +74,7 @@
       SB.live.push({ el, sc, inst });
     });
     stage.insertAdjacentHTML('beforeend',
-      `<div id="wipe"><div id="w1" style="width:1900px;background:var(--primary)"></div><div id="w2" style="width:130px;background:var(--accent)"></div><div id="w3" style="width:30px;background:#fff"></div></div>
+      `<div id="wipe"><div id="w1"></div><div id="w2"></div><div id="w3"></div></div>
        <div id="notice"></div><div id="vignette"></div><canvas id="grain" width="540" height="960"></canvas>`);
     await document.fonts.ready;
     await Promise.all([...document.images].map((im) => im.decode().catch(() => 0)));
@@ -88,10 +100,12 @@
     for (const c of plan.cuts) {
       const k = seg(t, c - .30, c + .34);
       if (k > 0 && k < 1) {
-        sweeping = true; const x = lerp(-2300, 1300, ease.inOut(k));
-        document.getElementById('w1').style.transform = `translateX(${x}px) skewX(-14deg)`;
-        document.getElementById('w2').style.transform = `translateX(${x + 1930}px) skewX(-14deg)`;
-        document.getElementById('w3').style.transform = `translateX(${x + 2090}px) skewX(-14deg)`;
+        sweeping = true; const e = ease.inOut(k), w = (i) => document.getElementById('w' + i).style;
+        if (SB.style.wipe === 'curtain') {          // a flat band drops through the frame
+          const y = lerp(-2760, 1960, e); w(1).transform = `translateY(${y}px)`; w(2).transform = `translateY(${y + 2600}px)`; w(3).transform = `translateY(${y + 2760}px)`;
+        } else {                                    // a slanted slab of brand colour sweeps across
+          const x = lerp(-2300, 1300, e); w(1).transform = `translateX(${x}px) skewX(-14deg)`; w(2).transform = `translateX(${x + 1930}px) skewX(-14deg)`; w(3).transform = `translateX(${x + 2090}px) skewX(-14deg)`;
+        }
       }
     }
     document.getElementById('wipe').style.visibility = sweeping ? 'visible' : 'hidden';

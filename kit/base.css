@@ -1,5 +1,18 @@
-/* Songbe scene kit — base styles. Brand colours arrive as CSS variables set by the runtime. */
-:root { --ink: #0A1B31; --primary: #004DFC; --accent: #4FE0D6; --paper: #F2F6FC; --muted: #51627A; }
+/* Songbe scene kit — structure plus the default look ("soft"). A style is a set of token overrides in kit/styles/<name>.css.
+   Brand colours arrive as CSS variables set by the runtime. */
+:root {
+  --ink: #0A1B31; --primary: #004DFC; --accent: #4FE0D6; --paper: #F2F6FC; --muted: #51627A;
+  /* type */
+  --font-title: 'Be Vietnam Pro', system-ui, sans-serif; --title-weight: 800; --title-tracking: -2.5px; --title-lh: 1.08; --title-case: none;
+  --label-tracking: 5px;
+  /* corners */
+  --r-card: 44px; --r-stat: 40px; --r-contact: 48px; --r-frame: 32px; --r-row: 38px; --r-pill: 999px; --r-hl: 22px; --r-badge: 36px; --r-icon: 30px;
+  --r-bubble: 38px; --r-store: 22px; --r-cap: 14px; --r-logo: 60px;
+  /* edges and depth */
+  --edge: 0px; --edge-colour: var(--ink);
+  --shadow-card: 0 30px 70px rgba(10,27,49,.16); --shadow-row: 0 22px 50px rgba(10,27,49,.12); --shadow-chip: 0 18px 44px rgba(0,0,0,.28);
+  --shadow-contact: 0 40px 90px rgba(0,0,0,.45); --shadow-cta: 0 24px 54px rgba(0,0,0,.28); --shadow-callout: 0 20px 48px rgba(0,0,0,.30);
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 #stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: #000; transform-origin: 0 0; }
@@ -9,31 +22,57 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .shade-top { position: absolute; left: 0; top: 0; width: 1080px; height: 980px; background: linear-gradient(180deg, rgba(6,14,28,.78) 0%, rgba(6,14,28,.46) 42%, rgba(6,14,28,0) 100%); }
 .shade-bottom { position: absolute; left: 0; bottom: 0; width: 1080px; height: 640px; background: linear-gradient(0deg, rgba(6,14,28,.62) 0%, rgba(6,14,28,0) 100%); }
 
-/* a line of text that slides up from behind a mask */
+/* a line of text revealed from behind a mask */
 .mask { position: absolute; overflow: hidden; white-space: nowrap; padding: 0 0 .14em; }
 .mask > span { display: inline-block; will-change: transform; }
-.label { font-weight: 700; font-size: 30px; letter-spacing: 5px; text-transform: uppercase; }
-.title { font-weight: 800; letter-spacing: -2.5px; line-height: 1.08; }
+.label { font-weight: 700; font-size: 30px; letter-spacing: var(--label-tracking); text-transform: uppercase; }
+.title { font-family: var(--font-title); font-weight: var(--title-weight); letter-spacing: var(--title-tracking); line-height: var(--title-lh); text-transform: var(--title-case); }
 .sub { font-weight: 600; letter-spacing: -.3px; }
 .on-dark { color: #fff; }
-.hl { background: var(--accent); color: var(--ink); border-radius: 22px; padding: 0 24px 6px; }
+.hl { background: var(--accent); color: var(--ink); border-radius: var(--r-hl); padding: 0 24px 6px; }
 .ac { font-weight: 800; color: var(--accent); }
-.pill { border-radius: 999px; }
-.card { background: #fff; border-radius: 44px; box-shadow: 0 30px 70px rgba(10,27,49,.16); }
+
+/* themed parts: geometry is set inline by the scenes, the look lives here */
+.pill { border-radius: var(--r-pill); }
+.tag { background: var(--primary); color: #fff; border: var(--edge) solid var(--edge-colour); }
+.chip { background: rgba(255,255,255,.96); color: var(--ink); box-shadow: var(--shadow-chip); border: var(--edge) solid var(--edge-colour); }
+.card { background: #fff; border-radius: var(--r-card); box-shadow: var(--shadow-card); border: var(--edge) solid var(--edge-colour); }
+.card.stat { border-radius: var(--r-stat); }
+.card.contact { border-radius: var(--r-contact); box-shadow: var(--shadow-contact); }
+.frame { border-radius: var(--r-frame); overflow: hidden; background: #dfe7f2; }
+.cap { background: color-mix(in srgb, var(--ink) 86%, transparent); color: #fff; border-radius: var(--r-cap); }
+.badge { border-radius: var(--r-badge); background: var(--ink); color: var(--accent); }
+.row { border-radius: var(--r-row); background: #fff; box-shadow: var(--shadow-row); border: var(--edge) solid var(--edge-colour); }
+.row .rh { color: var(--ink); } .row .rs { color: var(--muted); }
+.row.dark { background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.14); }
+.row.dark .rh { color: #fff; } .row.dark .rs { color: rgba(255,255,255,.72); }
+.iconb { border-radius: var(--r-icon); background: var(--ink); color: var(--accent); }
+.row.dark .iconb { background: var(--accent); color: var(--ink); }
+.bubble { position: absolute; font-size: 40px; font-weight: 500; line-height: 1.3; padding: 26px 34px; border-radius: var(--r-bubble); border: var(--edge) solid var(--edge-colour); }
+.bubble.them { background: var(--primary); color: #fff; border-bottom-right-radius: 10px; }
+.bubble.us { background: #fff; color: var(--ink); border-bottom-left-radius: 10px; }
+.kicker { color: var(--primary); } .ghost { color: #fff; background: var(--ink); }
+.callout { background: #fff; color: var(--ink); box-shadow: var(--shadow-callout); border: var(--edge) solid var(--edge-colour); }
+.callout i { background: var(--primary); }
+.cta { background: var(--accent); color: var(--ink); box-shadow: var(--shadow-cta); border: var(--edge) solid var(--edge-colour); }
+.store { border-radius: var(--r-store); background: rgba(255,255,255,.12); color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22); }
+.store.light { background: var(--ink); color: #fff; box-shadow: none; }
+.logo-fallback { border-radius: var(--r-logo); background: var(--primary); color: #fff; }
 
 .paper { background: var(--paper); }
 .dots { position: absolute; inset: -60px; opacity: .5; background-image: radial-gradient(color-mix(in srgb, var(--primary) 16%, transparent) 2px, transparent 2.4px); background-size: 44px 44px; }
 .glow { position: absolute; border-radius: 50%; filter: blur(70px); }
 .night { background: linear-gradient(170deg, color-mix(in srgb, var(--ink) 78%, var(--primary)) 0%, var(--ink) 46%, color-mix(in srgb, var(--ink) 70%, #000) 100%); }
-.bubble { position: absolute; font-size: 40px; font-weight: 500; line-height: 1.3; padding: 26px 34px; border-radius: 38px; }
 
 .phone { position: absolute; inset: 0; border-radius: 88px; background: #0B0D12; padding: 15px; box-shadow: 0 50px 90px rgba(0,0,0,.42), inset 0 0 0 3px #2A2F3A; }
+.phone.light { box-shadow: 0 50px 90px rgba(10,27,49,.26), inset 0 0 0 3px #2A2F3A; }
 .phone .scr { position: relative; width: 100%; height: 100%; border-radius: 74px; overflow: hidden; background: #fff; }
 .phone .scr img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
 .phone .island { position: absolute; left: 50%; top: 24px; width: 150px; height: 42px; margin-left: -75px; border-radius: 21px; background: #000; z-index: 5; }
 
 #wipe { position: absolute; inset: 0; pointer-events: none; visibility: hidden; z-index: 50; }
 #wipe div { position: absolute; top: -400px; height: 2720px; }
+#w1 { width: 1900px; background: var(--primary); } #w2 { width: 130px; background: var(--accent); } #w3 { width: 30px; background: #fff; }
 #notice { position: absolute; left: 56px; top: 1452px; z-index: 40; font-size: 23px; font-weight: 600; color: rgba(255,255,255,.88); padding: 7px 16px; border-radius: 12px; background: rgba(0,0,0,.30); visibility: hidden; letter-spacing: .2px; }
 #vignette { position: absolute; inset: 0; z-index: 59; pointer-events: none; background: radial-gradient(120% 90% at 50% 46%, rgba(0,0,0,0) 62%, rgba(0,0,0,.20) 100%); }
 #grain { position: absolute; left: -60px; top: -60px; width: 1200px; height: 2134px; z-index: 60; opacity: .05; pointer-events: none; mix-blend-mode: overlay; }

@@ -95,7 +95,7 @@ export async function makePlan(dir, opts = {}) {
   const brand = { ...spec.brand };
   if (brand.logo) brand.logo = Object.fromEntries(Object.entries(brand.logo).map(([k, v]) => [k, url(path.resolve(dir, v))]));
   const plan = {
-    size, fps, duration: total, brand, motionBlur: spec.motionBlur !== false, music: spec.music || null,
+    size, fps, duration: total, brand, style: opts.style || spec.style || 'soft', motionBlur: spec.motionBlur !== false, music: spec.music || null,
     cuts: scenes.slice(1).map((s) => s.start),
     scenes: scenes.map(({ minDuration, mediaOffset, ...sc }) => sc),
     previewAudio: url(path.join(dir, 'out', 'audio.wav')), notes,

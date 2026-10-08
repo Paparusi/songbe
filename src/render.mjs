@@ -1,5 +1,5 @@
 // plan → picture. Writes the scene page, drives headless Chrome over the DevTools protocol (no browser library needed),
-// asks the page for each frame and pipes the screenshots straight into ffmpeg. Two samples per frame give real motion blur.
+// asks the page for each frame and pipes the screenshots straight into ffmpeg. Several samples per frame give real motion blur.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,7 +13,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function pageHtml(plan, link) {
   const k = (f) => link(path.join(KIT, f));
   return `<!doctype html><html><head><meta charset="utf-8"><title>${plan.brand?.name || 'Songbe'}</title>
-<link rel="stylesheet" href="${k('fonts/fonts.css')}"><link rel="stylesheet" href="${k('base.css')}"></head>
+<link rel="stylesheet" href="${k('fonts/fonts.css')}"><link rel="stylesheet" href="${k('base.css')}">${plan.style && plan.style !== 'soft' ? `<link rel="stylesheet" href="${k(`styles/${plan.style}.css`)}">` : ''}</head>
 <body><div id="stage"></div><script src="${k('runtime.js')}"></script><script src="${k('scenes.js')}"></script>
 <script>window.ready = SB.mount(${JSON.stringify(plan).replace(/</g, '\\u003c')}).then((n) => { if (!location.hash.includes('render')) SB.preview(); return n; });</script>
 </body></html>`;
@@ -77,16 +77,20 @@ export async function renderVideo(dir, plan) {
   try {
     fs.writeFileSync(path.join(work, 'cues.json'), await page.evaluate('JSON.stringify(SB.cues)'));
     const { fps } = plan, frames = Math.round(plan.duration * fps), blur = plan.motionBlur, out = path.join(work, 'picture.mp4');
-    const filter = blur ? ['-vf', `tmix=frames=2:weights='1 1',select='mod(n\\,2)',setpts=N/(${fps}*TB)`] : [];
-    const ff = spawn(tools.ffmpeg, ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(blur ? fps * 2 : fps), '-c:v', 'mjpeg', '-i', '-', ...filter,
+    // Motion blur = four samples per frame across a 180° shutter, averaged by ffmpeg. Outside the cuts two real samples are enough
+    // (each is sent twice); around a cut, where a colour field crosses the whole frame, all four are drawn so its edge stays smooth.
+    const filter = blur ? ['-vf', `tmix=frames=4:weights='1 1 1 1',select='eq(mod(n\\,4)\\,3)',setpts=N/(${fps}*TB)`] : [];
+    const ff = spawn(tools.ffmpeg, ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(blur ? fps * 4 : fps), '-c:v', 'mjpeg', '-i', '-', ...filter,
       '-r', String(fps), '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'inherit', 'inherit'] });
     const done = new Promise((res, rej) => ff.on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg exited with ' + c)))));
+    const put = async (buf) => { if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r)); };
+    const nearCut = (t) => plan.cuts.some((c) => t > c - .36 && t < c + .40);
     const t0 = Date.now();
     for (let f = 0; f < frames; f++) {
-      for (const sub of blur ? [0, 0.25] : [0]) {          // second sample a quarter-frame later = 180° shutter
-        const buf = await page.shot((f + sub) / fps);
-        if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r));
-      }
+      const t = f / fps;
+      if (!blur) await put(await page.shot(t));
+      else if (nearCut(t)) for (const sub of [0, .125, .25, .375]) await put(await page.shot((f + sub) / fps));
+      else for (const sub of [0, .25]) { const buf = await page.shot((f + sub) / fps); await put(buf); await put(buf); }
       if (f % (fps * 5) === 0) log(`  frame ${f}/${frames} · ${Math.round((Date.now() - t0) / 1000)}s`);
     }
     ff.stdin.end(); await done;

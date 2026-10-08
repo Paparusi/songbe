@@ -1,0 +1,64 @@
+/* Songbe style "bold": condensed capitals, flat colour fields, square corners, ink outlines and hard shadows. */
+@import url(../fonts/anton.css);
+
+[data-style="bold"] {
+  --font-title: 'Anton', 'Be Vietnam Pro', sans-serif; --title-weight: 400; --title-tracking: .5px; --title-lh: 1.02; --title-case: uppercase;
+  --label-tracking: 6px;
+  --r-card: 0px; --r-stat: 0px; --r-contact: 0px; --r-frame: 0px; --r-row: 0px; --r-pill: 0px; --r-hl: 0px; --r-badge: 0px; --r-icon: 0px;
+  --r-bubble: 0px; --r-store: 0px; --r-cap: 0px; --r-logo: 0px;
+  --edge: 5px;
+  --shadow-card: 16px 16px 0 var(--ink); --shadow-row: 12px 12px 0 var(--ink); --shadow-chip: 10px 10px 0 var(--ink);
+  --shadow-contact: 18px 18px 0 var(--ink); --shadow-cta: 12px 12px 0 var(--ink); --shadow-callout: 9px 9px 0 var(--ink);
+}
+
+/* flat fields instead of glows */
+[data-style="bold"] .glow, [data-style="bold"] .dots { display: none; }
+[data-style="bold"] .paper { background: var(--paper); }
+[data-style="bold"] .night { background: var(--primary); }
+[data-style="bold"] .scene.paper::before { content: ''; position: absolute; right: -330px; top: 1010px; width: 1000px; height: 1000px; border-radius: 50%; background: var(--accent); }
+[data-style="bold"] .scene.paper::after { content: ''; position: absolute; left: 0; top: 0; width: 1080px; height: 26px; background: var(--ink); }
+[data-style="bold"] .scene.night::before { content: ''; position: absolute; left: -360px; top: 1180px; width: 1040px; height: 1040px; border-radius: 50%; background: var(--ink); }
+[data-style="bold"] .scene.night::after { content: ''; position: absolute; right: 70px; top: 96px; width: 190px; height: 26px; background: repeating-linear-gradient(90deg, var(--accent) 0 26px, transparent 26px 52px); }
+[data-style="bold"] #vignette { display: none; }
+
+/* type */
+[data-style="bold"] .label { font-weight: 800; }
+[data-style="bold"] .mask.label > span { background: var(--ink); color: #fff; padding: 6px 18px 6px 20px; }
+[data-style="bold"] .scene.night .mask.label > span, [data-style="bold"] .over-footage .mask.label > span { background: var(--accent); color: var(--ink); }
+[data-style="bold"] .mask.label svg path { fill: currentColor; }
+[data-style="bold"] .title .hl { display: inline-block; line-height: 1.02; padding: .08em 18px .06em; }
+[data-style="bold"] .sub { font-weight: 700; }
+/* lines are wiped in with a clip path, so the masks need not clip: tall capitals with stacked accents stay whole */
+[data-style="bold"] .mask.title, [data-style="bold"] .mask.label, [data-style="bold"] .mask.sub { overflow: visible; }
+/* headlines over footage sit on ink blocks so they read on any picture; the blocks leave room above and below for accents */
+[data-style="bold"] .over-footage .title > span { background: var(--ink); padding: .24em 22px .12em; }
+[data-style="bold"] .over-footage .title .hl { padding: .24em 16px .12em; margin: -.24em -6px -.12em; }   /* exactly as tall as the ink block */
+[data-style="bold"] .over-footage .sub > span { background: #fff; color: var(--ink); padding: 4px 16px; }
+[data-style="bold"] .over-footage .sub .ac { color: var(--primary); }
+[data-style="bold"] .shade-top { opacity: .45; }
+
+/* parts */
+[data-style="bold"] .tag { background: var(--accent); color: var(--ink); box-shadow: 8px 8px 0 var(--ink); }
+[data-style="bold"] .chip { background: #fff; }
+[data-style="bold"] .frame { border: 4px solid var(--ink); }
+[data-style="bold"] .cap { background: var(--ink); }
+[data-style="bold"] .badge { background: var(--primary); color: #fff; }
+[data-style="bold"] .row.dark { background: #fff; box-shadow: var(--shadow-row); }
+[data-style="bold"] .row.dark .rh { color: var(--ink); } [data-style="bold"] .row.dark .rs { color: var(--muted); }
+[data-style="bold"] .iconb, [data-style="bold"] .row.dark .iconb { background: var(--accent); color: var(--ink); border: 4px solid var(--ink); }
+[data-style="bold"] .bubble { box-shadow: 9px 9px 0 var(--ink); }
+[data-style="bold"] .bubble.them { background: var(--ink); border-color: #fff; border-bottom-right-radius: 0; box-shadow: 9px 9px 0 var(--accent); }
+[data-style="bold"] .bubble.us { border-bottom-left-radius: 0; }
+[data-style="bold"] .kicker { color: var(--ink); }
+[data-style="bold"] .ghost { background: var(--primary); }
+[data-style="bold"] .store, [data-style="bold"] .store.light { background: var(--ink); color: #fff; box-shadow: none; border: 4px solid #fff; }
+[data-style="bold"] .store.light { border-color: var(--ink); }
+[data-style="bold"] .logo-fallback { border: 6px solid var(--ink); box-shadow: 14px 14px 0 var(--ink); background: var(--accent); color: var(--ink); font-family: var(--font-title); }
+[data-style="bold"] .phone { box-shadow: 22px 22px 0 var(--ink), inset 0 0 0 3px #2A2F3A; }
+[data-style="bold"] #notice { border-radius: 0; background: var(--ink); }
+
+/* cuts: a flat band drops through the frame */
+[data-style="bold"] #wipe div { left: 0; top: 0; width: 1080px; }
+[data-style="bold"] #w1 { height: 2600px; background: var(--ink); }
+[data-style="bold"] #w2 { height: 160px; background: var(--accent); }
+[data-style="bold"] #w3 { height: 40px; background: #fff; }

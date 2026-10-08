@@ -6,7 +6,7 @@ import { renderVideo, stills, writePage } from './render.mjs';
 import { makeAudio, mux } from './audio.mjs';
 import { check } from './check.mjs';
 import { tools, loadDotEnv, exists, log } from './util.mjs';
-import { validate, jsonSchema } from './spec.mjs';
+import { validate, jsonSchema, STYLES } from './spec.mjs';
 
 const HELP = `Songbe — short ads from a single video.json
 
@@ -16,6 +16,7 @@ const HELP = `Songbe — short ads from a single video.json
   songbe schema                   print the JSON Schema of video.json
   songbe frames <dir> [t1,t2,…]   render a few stills to out/frames (default: two per scene) — review before a full build
   songbe build <dir> [--force]    voice → timeline → footage → picture → sound → out/video.mp4, then self-check
+                                  frames and build accept --style=soft|bold to try another look without editing the spec
   songbe check <dir>              re-run the self-check on out/video.mp4
   songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
   songbe studio <dir> [--port=N]  edit in the browser with a live preview and a Build button (http://127.0.0.1:4173)
@@ -67,7 +68,9 @@ export async function main(argv) {
   }
   if (cmd === 'check') return report(await check(dir, JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'plan.json'), 'utf8'))));
 
-  log('plan…'); const plan = await makePlan(dir, { force: flags.has('--force') });
+  const style = rest.find((x) => x.startsWith('--style='))?.split('=')[1];          // try another look without editing the spec
+  if (style && !STYLES.includes(style)) throw new Error(`unknown style "${style}" — choose one of: ${STYLES.join(', ')}`);
+  log('plan…'); const plan = await makePlan(dir, { force: flags.has('--force'), style });
   log(`  ${plan.duration} s, ${plan.scenes.length} scenes: ` + plan.scenes.map((s) => `${s.type} ${s.start}–${s.end}`).join(' | '));
   if (cmd === 'preview') return log('open: file://' + writePage(dir, plan));
   if (cmd === 'frames') {

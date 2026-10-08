@@ -31,8 +31,9 @@ export const TEMPLATES = {
   end: { type: 'end', say: 'Close with the call to action.', tagline: 'One line that sums it up', cta: 'Get started' },
 };
 
+export const STYLES = ['soft', 'bold'];
 export const TOP = {
-  size: ['num'], fps: 'num', tail: 'num', motionBlur: 'bool',
+  style: STYLES, size: ['num'], fps: 'num', tail: 'num', motionBlur: 'bool',
   'brand!': { name: 'str', ink: COLOUR, primary: COLOUR, accent: COLOUR, paper: COLOUR, muted: COLOUR, logo: { mark: 'str', word: 'str' } },
   voice: { model: 'str', voice: 'str', language: 'str', speed: 'num', emotion: 'str' },
   music: { prompt: 'str', file: 'str', volume: 'num', avoid: 'str', model: 'str', seed: 'num' },
