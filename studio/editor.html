@@ -136,7 +136,11 @@ function field(key, shape, get, set) {
       if (mode.value === 'file') { const t = el('input', { type: 'text', value: typeof cur === 'string' ? cur : '', placeholder: 'media/clip.mp4' }); t.oninput = () => { set(t.value || undefined); changed(); }; box.append(el('div', { className: 'rowf' }, t, upload((p) => { t.value = p; set(p); changed(); }))); }
       if (mode.value === 'gen') { const g = (cur && cur.generate) || { image: '', motion: '' };
         const a = el('textarea', { rows: 3, value: g.image || '', placeholder: 'Describe the still image' }), b = el('textarea', { rows: 2, value: g.motion || '', placeholder: 'Describe the motion (leave empty for a still)' });
-        const put = () => { set({ generate: { image: a.value, ...(b.value ? { motion: b.value } : {}) } }); changed(); }; a.oninput = put; b.oninput = put; box.append(a, el('div', { style: 'height:6px' }), b); }
+        // which models make it: the defaults when left empty, a few known ones offered, any fal.ai endpoint accepted
+        const pick = (id, list, value, hint) => { const dl = el('datalist', { id }); for (const m of list) dl.append(el('option', { value: m })); const i = el('input', { type: 'text', value: value || '', placeholder: hint, spellcheck: false }); i.setAttribute('list', id); return [i, dl]; };
+        const [im, il] = pick('mimg', S.models.image, g.imageModel || g.model, 'Picture model: ' + S.models.defaults.image), [vm, vl] = pick('mvid', S.models.video, g.videoModel, 'Clip model: ' + S.models.defaults.video);
+        const put = () => { set({ generate: { ...Object.fromEntries(Object.entries(g).filter(([k]) => !['image', 'motion', 'imageModel', 'videoModel', 'model'].includes(k))), image: a.value, ...(b.value ? { motion: b.value } : {}), ...(im.value.trim() ? { imageModel: im.value.trim() } : {}), ...(vm.value.trim() ? { videoModel: vm.value.trim() } : {}) } }); changed(); };
+        for (const x of [a, b, im, vm]) x.oninput = put; box.append(a, el('div', { style: 'height:6px' }), b, el('div', { style: 'height:6px' }), im, il, el('div', { style: 'height:6px' }), vm, vl); }
     };
     mode.onchange = () => { set(mode.value === 'gen' ? { generate: { image: '' } } : undefined); paint(); changed(); }; paint(); wrap.append(mode, box); return wrap;
   }

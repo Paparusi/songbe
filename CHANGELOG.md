@@ -2,6 +2,10 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.16
+- **Any model on fal.ai** for pictures, clips and music (`imageModel`, `videoModel`, the music's `model`): requests are shaped
+  from fal's own description of each model. The clip model no longer follows the picture model by accident.
+
 ## 0.15
 - `songbe app` runs once per computer: a second start opens a window on the one already running. On Linux,
   `songbe app --add-launcher` puts Songbe in the applications menu, and it leaves when its window is closed.

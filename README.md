@@ -11,7 +11,7 @@ motion graphics, captions, music and sound effects, and then checks its own work
 line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
 people who would rather click than type.
 
-> Version 0.15. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.16. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux / WSL and Windows 11; macOS
 > has not been tried. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 
@@ -91,6 +91,20 @@ The table above is a summary; `songbe schema` prints the exact shape and `songbe
 
 `media` is a path to a video or image, or `{ "generate": { "image": "prompt", "motion": "prompt" } }` to create footage with the configured provider.
 Set `notice` (for example "Illustration generated with AI") on scenes that use generated people or places.
+
+**Any model on fal.ai.** The picture, the clip and the music each have a default model, and none is fixed: `"imageModel"` and
+`"videoModel"` inside `generate`, and `"model"` inside `music`, take any endpoint in fal.ai's catalogue.
+
+```json
+"media": { "generate": { "image": "A steaming bowl of pho at dawn…", "motion": "Steam rises, the camera pushes in",
+                         "imageModel": "fal-ai/bytedance/seedream/v4/text-to-image",
+                         "videoModel": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" } }
+```
+
+Songbe reads what each model takes from fal's own description of it and says what it has to say — the prompt, the picture to
+animate, the frame's shape, the length, the resolution, a seed — under that model's names and within its choices (a model without
+a 9:16 option gets the nearest shape; one that only does six seconds gets six). The editor offers a short list of models that
+were tried (`CATALOGUE` in `src/providers/fal.mjs`) and accepts any other id.
 
 ## Writing it for you
 
@@ -286,7 +300,7 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 ## Limits today
 
 - Nine scene types; three looks (two in the kit, one bundled as a pack). Scene types live in `kit/scenes.js` and cannot come from packs.
-- One provider (fal.ai) for voice, images, image-to-video and music; the writer also takes an Anthropic key.
+- One provider (fal.ai), though any of its picture, clip and music models can be used; the voice is one model (MiniMax). The writer also takes an Anthropic key.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
 - The installed app exists for Windows only so far, unsigned; on Linux `songbe app --add-launcher` puts the app in the

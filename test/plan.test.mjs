@@ -68,3 +68,23 @@ test('a broken spec stops planning with every problem listed', async () => {
   fs.writeFileSync(path.join(dir, 'video.json'), JSON.stringify({ brand: {}, scenes: [{ type: 'lst', say: 'x' }, { type: 'card', say: 'y' }] }));
   await assert.rejects(makePlan(dir, { offline: true }), (e) => e.message.includes('2 problems') && e.message.includes('"list"') && e.message.includes('scenes[1].title: required'));
 });
+
+// One adapter for every model on fal.ai: what Songbe wants to say, under the names and within the choices each model has.
+test('a request is shaped to what each model takes', async () => {
+  const { requestFor } = await import('../src/providers/fal.mjs');
+  const o = (...options) => ({ options, object: false }), any = { options: null, object: false };
+  const ultra = { prompt: any, seed: any, num_images: any, raw: any, aspect_ratio: o('21:9', '16:9', '1:1', '9:16'), output_format: o('jpeg', 'png') };
+  assert.deepEqual(requestFor(ultra, { kind: 'image', prompt: 'a bowl', aspect: '9:16', seed: 41 }), { prompt: 'a bowl', aspect_ratio: '9:16', seed: 41, num_images: 1, output_format: 'jpeg', raw: true });
+  const sized = { prompt: any, image_size: o('square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_16_9'), enable_safety_checker: any };
+  assert.equal(requestFor(sized, { kind: 'image', prompt: 'p', aspect: '9:16' }).image_size, 'portrait_16_9');
+  assert.equal(requestFor(sized, { kind: 'image', prompt: 'p', aspect: '1:1' }).image_size, 'square_hd', 'the larger of two equal shapes');
+  assert.equal(requestFor(sized, { kind: 'image', prompt: 'p', aspect: '16:9' }).image_size, 'landscape_16_9');
+  assert.equal(requestFor({ prompt: any, aspect_ratio: o('16:9', '4:3', '2:3', '3:4') }, { kind: 'image', prompt: 'p', aspect: '9:16' }).aspect_ratio, '2:3', 'the nearest shape there is');
+  const clip = { prompt: any, image_url: any, aspect_ratio: o('auto', '16:9', '9:16'), duration: o('4s', '6s', '8s'), resolution: o('720p', '1080p'), generate_audio: any, camera_fixed: any };
+  assert.deepEqual(requestFor(clip, { kind: 'video', prompt: 'steam rises', image: 'data:x', aspect: '1:1', seconds: 5, resolution: '1080p' }),
+    { prompt: 'steam rises', image_url: 'data:x', aspect_ratio: 'auto', duration: '6s', resolution: '1080p', camera_fixed: false, generate_audio: false }, 'the picture sets the shape, the shortest long-enough length, no sound of its own');
+  assert.equal(requestFor({ prompt: any, image_url: any, duration: o('5', '10'), resolution: o('512P', '768P') }, { kind: 'video', prompt: 'p', image: 'd', seconds: 12, resolution: '1080p' }).duration, '10', 'the longest when none is long enough');
+  assert.equal(requestFor({ prompt: any, image_url: any, resolution: o('512P', '768P') }, { kind: 'video', prompt: 'p', image: 'd', resolution: '1080p' }).resolution, '768P', 'the best below what was asked');
+  assert.deepEqual(requestFor({ prompt: any, duration: any }, { kind: 'music', prompt: 'guitar', avoid: 'vocals', seconds: 30 }), { prompt: 'guitar', duration: 30 });
+  assert.deepEqual(requestFor({ prompt: any, negative_prompt: any, seed: any }, { kind: 'music', prompt: 'guitar', avoid: 'vocals', seed: 808 }), { prompt: 'guitar', seed: 808, negative_prompt: 'vocals' });
+});

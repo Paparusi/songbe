@@ -9,6 +9,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { makePlan } from './plan.mjs';
+import { CATALOGUE, DEFAULTS } from './providers/fal.mjs';
 import { pageHtml } from './render.mjs';
 import { FFMPEG_WINDOWS, ffmpegAdvice, installFfmpeg } from './setup.mjs';
 import { installedPacksDir, listPacks, starterDir, starterList } from './packs.mjs';
@@ -217,7 +218,7 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     if (route === 'GET /poster') return serveFile(req, res, path.join(dir, '.songbe', 'poster.jpg'), roots);
     if (route === 'GET /api/state') {
       const spec = readJson(specFile);
-      return send(res, 200, { id, dir, name: path.basename(dir), version: VERSION, spec, table: { TOP, SCENES }, templates: TEMPLATES, keys: keysFor(dir), tools: toolState(), writer: ask ? 'custom' : writerFor({ ...keyEnv(), ...readDotEnv(path.join(dir, '.env')) }),
+      return send(res, 200, { id, dir, name: path.basename(dir), version: VERSION, spec, table: { TOP, SCENES }, templates: TEMPLATES, models: { ...CATALOGUE, defaults: DEFAULTS }, keys: keysFor(dir), tools: toolState(), writer: ask ? 'custom' : writerFor({ ...keyEnv(), ...readDotEnv(path.join(dir, '.env')) }),
         building: !!job && !job.done, ...(spec ? await state(spec) : { errors: ['video.json is not valid JSON. Fix it in a text editor, or start again from a copy.'], plan: null }) });
     }
     if (route === 'PUT /api/spec') {

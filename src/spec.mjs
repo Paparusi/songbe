@@ -127,7 +127,8 @@ function toSchema(shape) {
   if (shape === 'bool') return { type: 'boolean' };
   if (shape === 'text') return { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' }, minItems: 1 }] };
   if (shape === 'media') return { anyOf: [{ type: 'string', description: 'path to a video or image' },
-    { type: 'object', required: ['generate'], properties: { generate: { type: 'object', required: ['image'], properties: { image: { type: 'string' }, motion: { type: 'string' } } } } }] };
+    { type: 'object', required: ['generate'], properties: { generate: { type: 'object', required: ['image'], properties: { image: { type: 'string', description: 'the still picture, described' }, motion: { type: 'string', description: 'what moves; leave out for a still' },
+      imageModel: { type: 'string', description: 'any text-to-image endpoint on fal.ai' }, videoModel: { type: 'string', description: 'any image-to-video endpoint on fal.ai' }, seconds: { type: 'number' }, resolution: { type: 'string' }, seed: { type: 'number' } } } } }] };
   if (Array.isArray(shape)) {
     if (shape.length > 1 || (typeof shape[0] === 'string' && !['str', 'num', 'bool', 'text', 'media'].includes(shape[0]))) return { enum: shape };
     return { type: 'array', items: toSchema(shape[0]) };
