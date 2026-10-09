@@ -121,6 +121,13 @@ export async function makeVoice(r, w, file, env = process.env) {
   try { ff('-i', file, '-af', `${cut},areverse,${cut},areverse`, '-ar', '48000', '-ac', '1', tight); fs.renameSync(tight, file); } finally { fs.rmSync(tight, { force: true }); }
 }
 
+// What is said in a recording, in words — asked of a model that hears, when there is a key for one; null when there is none
+// (nothing is concluded from not being able to listen). A recorded line is listened to before a clip is acted to it.
+const HEARS = 'gemini-3.5-flash-lite';
+export async function listen(file, { language = null } = {}, env = process.env) {
+  return google.available(env) ? google.hear({ model: HEARS, file, language }, env) : null;
+}
+
 // { prompt } → instrumental music (mp3)
 export async function makeMusic(r, w, file, env = process.env) {
   if (r.door === 'google') { const s = await google.music({ model: r.id, prompt: w.prompt }, env); return keep(s.bytes, file, 'mp3'); }

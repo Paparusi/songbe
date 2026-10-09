@@ -10,9 +10,17 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
     long as on the reference sheet in every pose, and is seen spread beside the head of someone lying down;
   - a man seen small and from behind in a wide frame turned round with another face and a white shirt for his green one, and
     the woman beside him had her hair up. A shot that is not close (`wide`, `full`, `medium`, `two shot`, `over shoulder`)
-    now tells the clip model in words how its people look and what they wear, after everything else it is told. Filmed
-    again, he kept his shirt and she her hair, and she still did what the shot directs her to do.
+    now tells the clip model in words how its people are known from afar — their figure (age, build, hair: `figure`, a new
+    phrase on each person, written by the writer and shown in the script drawer) and what they wear — after everything else
+    it is told. Filmed again, he kept his shirt and she her hair, and she still did what the shot directs her to do. The
+    face is left out: told the whole look, with "a prominent mole", two clips painted a black coin on her cheek.
   Clips and pictures already on a canvas keep their words; `songbe film expand --rewrite=<node>` asks for the new ones.
+- **A recorded line is listened to.** A line was recorded so breathily that three hearings of it gave three other sentences,
+  and it was found only after a clip had been acted to it. When there is a key for a model that hears (Google's), each take
+  of a line is now listened to once: a line of three words or more of which almost nothing is heard is recorded again by the
+  run itself, a doubtful one is pointed at with what was heard, and what was heard is kept with the take. Tried on that
+  line: the take that could not be understood was heard as three other words and refused, the one recorded after it was heard
+  right. `"listen": false` in `series.json` turns it off.
 - **A filmed shot is made longer or shorter without being filmed again.** How long a shot is kept was fixed when its clip
   was filmed, so a new `seconds` did nothing until the clip was made again — and the last shot of an episode, a face held
   after a one-word line, was cut after a second. The cut now keeps what the clip says now: within the seconds the model made

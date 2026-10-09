@@ -72,6 +72,7 @@
       kids.push(el('div', { class: 'scard' }, el('div', { class: 'hd' }, el('b', { text: c.name || id }), el('span', { class: 'tag', text: id }), el('div', { class: 'gap' }), sure('Remove', () => { const used = usedIn('cast', id); if (used.length) return note(`${c.name || id} is in ${used.join('; ')}. Take them out of those shots first.`); delete s.cast[id]; render(); touch(); })),
         row(f('Name', inp(c, 'name')), f('Who they are in the story', inp(c, 'role')), f('', pick(c.gender || 'female', [['female', 'a woman'], ['male', 'a man']], (v) => { c.gender = v; render(); touch(); }), 'fix')),
         f('Face and body: age, build, skin, hair, and one thing that sets them apart', area(c, 'look', 2)), f('The one outfit they wear through the series', area(c, 'wardrobe', 2)),
+        f('Known from afar or from behind: age, build, hair — told to the clip model in wide shots (nothing of the face)', inp(c, 'figure', 'a slight woman of nineteen with straight shoulder-length black hair')),
         row(f('How they speak and carry themselves', inp(c, 'manner')), f('Voice', voices ? pick(c.voice.voice || '', voices, (v) => set(c.voice, 'voice', v), '—') : inp(c.voice, 'voice')), f('How the voice sounds', inp(c.voice, 'style', 'low, tired, slow')))));
     }
     kids.push(adder('A new person: their name', (name) => { const id = slug(name); if (!id) return 'Give them a name.'; if (s.cast?.[id] || s.places?.[id]) return 'That name is taken.'; (s.cast ||= {})[id] = { name: name.trim(), gender: 'female' }; }));

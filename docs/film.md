@@ -73,9 +73,11 @@ still to do.
 A clip model sees only its first frame: what that picture hides, the clip makes up. A first frame that hid the hair of
 someone lying down gave them a short crop when they sat up — so every picture with people in it is told that hair keeps the
 length of the reference sheet in every pose and is seen. A man small and seen from behind in a wide frame turned round as
-someone else in another shirt — so a shot that is not close tells the clip model in words how its people look and what they
-wear (the person's `look` and `wardrobe`, as `@name` puts them into any prompt). When a shot shows a person wrong, look at its
-first frame before the clip: a new take of the clip from the same frame makes the same thing up again.
+someone else in another shirt — so a shot that is not close tells the clip model in words how its people are known from afar:
+their `figure` (age, build, hair — one phrase on each person in `series.json`, which the writer writes) and their `wardrobe`.
+Not the face: told of "a prominent mole", a clip model painted a black coin on a cheek. A series written before there was a
+`figure` tells the wardrobe alone; add the phrase in the script drawer, under the person. When a shot shows a person wrong, look
+at its first frame before the clip: a new take of the clip from the same frame makes the same thing up again.
 
 `size` is one of `wide`, `full`, `medium`, `two shot`, `over shoulder`, `close`, `extreme close`, `insert`. A shot has at most one
 line, said by one person. When the speaker is in `who` they are seen saying it; when only the listener is, the voice is heard from
@@ -94,7 +96,7 @@ the order of mention. Write `@@` for a plain @.
 | Kind | Says | Result |
 |---|---|---|
 | `text` | `text` | none: words to be mentioned elsewhere |
-| `person` | `name`, `look`, `wardrobe`, `manner`, `voice: { voice, model, style, speed }` | none |
+| `person` | `name`, `look`, `figure`, `wardrobe`, `manner`, `voice: { voice, model, style, speed }` | none |
 | `place` | `name`, `look` | none |
 | `picture` | `prompt` (and `refs`, `aspect`, `model`, `options`) — or `file`, a picture of your own — or `grab: "@clip"`, `at: 2.5 \| "end"`, one frame of a clip | jpg |
 | `voice` | `text`, `who: "@person"`, `how` (and `voice`, `model`, `style`, `speed`); `fit: "@clip"` records it to the lips of that clip, after the clip is filmed — or `file` | wav |
@@ -166,6 +168,13 @@ that moment), a tag on the board, a line in `songbe flow`: a strong colour that 
 frame, a jump as if cut to another shot, a stretch of black, a clip that does not begin on its picture or is shorter than
 asked, a long pause inside a line, a line recorded to picture that had to be stretched hard to fit the lips, a picture in another shape, with plain bars, or of one flat colour.
 Takes made before Songbe did this are looked at once when the film is opened in the app, or by `songbe flow review`.
+
+**Listening to a line.** When there is a key for a model that hears (Google's), every take of a recorded line is also listened
+to once, and what was heard is kept with it. A line of three words or more of which almost nothing can be made out is recorded
+again by the run itself — before a clip is acted to it, which is what a take nobody understands used to cost. A line that is
+only doubtful is used and pointed at, with what the listener heard; a line of one or two words is never refused for it, and
+words are compared without their marks, because a listener often hears another tone. `"listen": false` in `series.json`
+turns it off. It costs a fraction of a cent for a whole film, and nothing is concluded when nobody can listen.
 
 Every result is a **take**, kept under a key made from everything it was made from — the words, the model, and the takes of the
 nodes it works from. So running again costs nothing, and changing one thing leaves exactly the nodes that work from it to be made

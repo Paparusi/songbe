@@ -31,6 +31,15 @@ export async function text({ model, system, prompt, maxTokens = 16000, json = fa
   return out;
 }
 
+// a recording (wav) → the words spoken in it, as the model wrote them down; '' when it makes out none
+export async function hear({ model, file, language }, env = process.env) {
+  const j = await call(`models/${model}:generateContent`, { contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'audio/wav', data: b64(file) } },
+    { text: `Write down the words spoken in this recording, exactly as they are said${language ? ` (the language is ${language})` : ''}. Do not correct them and do not guess at what was meant. Answer with those words only; if no words can be made out, answer with the single word NONE.` }] }],
+    generationConfig: { maxOutputTokens: 2000, temperature: 0 } }, { env, timeout: 60000 });
+  const out = partsOf(j).filter((p) => !p.thought).map((p) => p.text || '').join('').trim();
+  return /^none\.?$/i.test(out) ? '' : out;
+}
+
 // words (and pictures to work from, in the order the words refer to them) → one picture. Returns the bytes and what they are.
 export async function picture({ model, prompt, refs = [], aspect = '9:16', size }, env = process.env) {
   const j = await call(`models/${model}:generateContent`, { contents: [{ parts: [...refs.map((f) => ({ inlineData: { mimeType: mimeOf(f), data: b64(f) } })), { text: prompt }] }],

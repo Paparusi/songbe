@@ -92,6 +92,28 @@ export function reviewVoice(file, { text, language = null } = {}) {
   return found;
 }
 
+// ---- a line as a listener heard it ----
+// `heard` is what a speech recogniser wrote down for a take. A recogniser mishears — a tone, a short word, an accent — so words
+// are compared without their marks, a line of one or two words is never refused for it, and a longer line is refused only when
+// almost none of it is there. (A line was recorded so breathily that three hearings of it gave three other sentences, and the clip
+// acted to it had to be filmed again: this is that look, before the clip.)
+const unmarked = (s) => String(s || '').normalize('NFD').replace(/\p{M}+/gu, '').replace(/[đĐ]/g, 'd').toLowerCase();
+const wordsIn = (s) => unmarked(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean).flatMap((w) => (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u.test(w) ? [...w] : [w]));
+// the share of the line's words that are in what was heard, in their order
+export function heardShare(text, heard) {
+  const a = wordsIn(text), b = wordsIn(heard); if (!a.length) return 1;
+  let row = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) { const next = [0]; for (let j = 1; j <= b.length; j++) next[j] = a[i - 1] === b[j - 1] ? row[j - 1] + 1 : Math.max(row[j], next[j - 1]); row = next; }
+  return row[b.length] / a.length;
+}
+export function reviewHeard(text, heard) {
+  const n = wordsIn(text).length; if (!n || heard == null) return [];
+  const share = heardShare(text, heard), as = String(heard).trim() ? `"${String(heard).trim()}"` : 'nothing';
+  if (n >= 3 && share < .34) return [{ what: 'unheard', grave: true, says: `a listener heard ${as}: the line cannot be made out` }];
+  if (share < (n >= 3 ? .6 : .5)) return [{ what: 'unclear', says: `a listener heard ${as}: listen to it` }];
+  return [];
+}
+
 // ---- a line recorded to picture ----
 // `found` is what fitting it learnt: where each phrase went and how far it had to be stretched. Stretched as far as sounds right,
 // a line may no longer sit on the lips, and a fast one is harder to make out: worth listening to.

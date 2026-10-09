@@ -17,7 +17,7 @@ import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
 import { costOf, nameOf, secondsOf } from './models.mjs';
-import { grave, inWords, reviewClip, reviewFit, reviewPicture, reviewSound, reviewVoice } from './review.mjs';
+import { grave, inWords, reviewClip, reviewFit, reviewHeard, reviewPicture, reviewSound, reviewVoice } from './review.mjs';
 import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
 import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
@@ -28,7 +28,7 @@ const MENTION = /@(@|[a-z0-9]+(?:-[a-z0-9]+)*)/g;
 // what a node of each kind must say, what it may say, and the file its takes are (none: it is words, not a result)
 export const KINDS = {
   text: { must: ['text'], may: [] },
-  person: { must: ['name'], may: ['look', 'wardrobe', 'manner', 'voice'] },
+  person: { must: ['name'], may: ['look', 'figure', 'wardrobe', 'manner', 'voice'] },
   place: { must: ['name'], may: ['look'] },
   picture: { one: ['prompt', 'file', 'grab'], may: ['model', 'aspect', 'refs', 'at', 'options'], ext: 'jpg' },
   voice: { one: ['text', 'file'], may: ['who', 'how', 'voice', 'model', 'style', 'speed', 'fit', 'options'], ext: 'wav' },
@@ -105,6 +105,7 @@ export function checkFlow(flow, dir = null) {
   if (flow.format !== undefined && !FORMATS[flow.format]) bad.push(`format: "${flow.format}" is not one of ${Object.keys(FORMATS).join(', ')}`);
   if (flow.budget !== undefined && !(typeof flow.budget === 'number' && flow.budget >= 0)) bad.push('budget: what a run may spend, a number of dollars');
   if (flow.retakes !== undefined && !(Number.isInteger(flow.retakes) && flow.retakes >= 0 && flow.retakes <= 3)) bad.push('retakes: how many more takes a run may ask for by itself when a take cannot be used, 0 to 3');
+  if (flow.listen !== undefined && typeof flow.listen !== 'boolean') bad.push('listen: true or false — whether a recorded line is listened to by a model that hears, when there is a key for one');
   for (const [id, n] of Object.entries(nodes)) {
     if (!ID.test(id) || id.length > 48) bad.push(`${id}: a node's name is lower-case letters, digits and dashes (like "lan-sheet" or "e1-s3")`);
     const shape = KINDS[n?.kind];
@@ -210,7 +211,11 @@ function voice(c, id, n) {
     `Delivery: ${n.how || 'natural'}. A line of dialogue in a film, said to someone in the same room: conversational pace, not a narrator, not an announcer.`].filter(Boolean).join('\n') : set.style || null;
   const say = (how, file) => c.use.makeVoice(r, { text: n.text, voice: name, style: how, language: language || 'auto', speed: set.speed, options: n.options }, file, c.env);
   const spoken = String(n.text).length / 1000;      // thousands of characters, which is what voices are priced by
-  if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, units: spoken, make: (file) => say(style, file), review: (file) => reviewVoice(file, { text: n.text, language }) };
+  // when someone can listen (a key for a model that hears) a take is listened to once, and what was heard is kept with it: a line
+  // nobody can make out is recorded again before a clip is acted to it. (Not being able to listen says nothing about the take.)
+  const listens = c.flow.listen !== false && !!c.use.listen, heardIn = async (file) => { try { const heard = await c.use.listen(file, { language }, c.env); return typeof heard === 'string' ? { heard } : undefined; } catch { return undefined; } };
+  if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, units: spoken, make: listens ? async (file) => { await say(style, file); return heardIn(file); } : (file) => say(style, file),
+    review: (file, found) => [...reviewVoice(file, { text: n.text, language }), ...reviewHeard(n.text, found?.heard)] };
   // Recorded to picture, the way a line is dubbed: the clip was filmed first with the actor speaking in a voice of the model's
   // choosing; the line is now recorded in the person's own voice to last as long as the lips moved, and set exactly where they
   // moved. The result is as long as the clip.

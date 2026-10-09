@@ -24,14 +24,14 @@ Reply with one JSON object and nothing else: no explanation, no code fence.
 
 THE OBJECT
 { "title": "…", "logline": "…", "style": "…", "look": "…", "tone": "…", "accent": "…",
-  "cast": { "<id>": { "name": "…", "gender": "female" | "male", "role": "…", "look": "…", "wardrobe": "…", "manner": "…", "voice": { ${voices ? '"voice": "…", ' : ''}"style": "…" } } },
+  "cast": { "<id>": { "name": "…", "gender": "female" | "male", "role": "…", "look": "…", "figure": "…", "wardrobe": "…", "manner": "…", "voice": { ${voices ? '"voice": "…", ' : ''}"style": "…" } } },
   "places": { "<id>": { "name": "…", "look": "…" } },
   "sounds": { "<id>": { "name": "…", "prompt": "…", "seconds": 2 } },
   "episodes": [ { "title": "…", "summary": "…" } ] }
 
 LANGUAGES
 - In ${language}: title, logline, the names of people, places and sounds, role, and each episode's title and summary.
-- In English, because the picture models read English best: style, look, tone, accent, each look, wardrobe, manner and voice.style, and each sound's prompt.
+- In English, because the picture models read English best: style, look, tone, accent, each look, figure, wardrobe, manner and voice.style, and each sound's prompt.
 
 FIELDS
 - style: the medium, in a few words: "Photorealistic live action, natural skin, a still from a 35mm film", or "3D animation in the manner of a family feature film", or "Hand-drawn anime, clean line, flat shading". Nothing about light or mood.
@@ -40,6 +40,7 @@ FIELDS
 - accent: how the voices sound, for example "Southern Vietnamese (Saigon) accent"; "" when it does not matter.
 - cast: 2 to 4 people. The id is lower-case letters, digits and dashes ("lan", "ong-tu").
   look: face and body only — age, build, face shape, skin, hair (colour, length, how it is worn), and one feature that sets them apart (a mole, glasses, a scar, a grey streak). Concrete enough that two painters would paint the same person. No clothes here.
+  figure: how they are known from afar or from behind, in one short phrase — age, build, and the hair (colour, length, how it is worn): "a slight woman of nineteen with straight shoulder-length black hair worn loose". Nothing of the face and no clothes: it is told to the clip model in wide shots, and a face told in words comes out wrong.
   wardrobe: the one outfit they wear through the whole series: garments and colours, simple, unlike anyone else's.
   manner: how they speak and carry themselves, one sentence.
   voice.style: the sound of the voice in a few words (pitch, texture, pace).${voices ? `

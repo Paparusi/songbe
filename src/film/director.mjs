@@ -21,6 +21,12 @@ const sheets = (people) => people.map((p) => `@${p.id}-sheet is the reference sh
 // to make the hair up when they rise, and made a short crop of shoulder-length hair. So a picture is told that hair is seen.
 // the shots in which a face fills the frame: the first frame shows the clip model all it needs of the person
 const CLOSE = new Set(['close', 'extreme close', 'insert']);
+// the people of a shot as a clip model is told of them: [{ name, figure, wardrobe }] → a sentence ('' when there is nothing to tell)
+const plainly = (t) => String(t || '').trim().replace(/[.;,\s]+$/, '').replace(/^(An?|The)\b/, (w) => w.toLowerCase());
+function afar(people) {
+  const told = (people || []).map((p) => (typeof p === 'string' ? `@${p}` : (() => { const more = [plainly(p.figure), p.wardrobe ? `wearing ${plainly(p.wardrobe)}` : ''].filter(Boolean).join('; '); return more ? `${p.name} (${more})` : ''; })())).filter(Boolean);
+  return told.length ? ` How they look, for what the first frame does not show of them: ${told.join('; ')}.` : '';
+}
 const HAIR = 'Hair is as long as on the sheet in every pose: on someone lying down it is seen, spread loose beside the head.';
 export const shotId = (n, shot) => `e${n}-s${shot.id}`;
 
@@ -35,7 +41,7 @@ const WRITE = {
   // froze them (the picture of a whole episode moved half as much as that of a film made without those words). So it is also
   // told that the people are alive.
   keep: (x) => ({ kind: 'text', text: `${x.medium ? '@style ' : ''}The light and the colours stay as they are in the first frame, and everyone stays the same person, with the same hair and clothes. The acting is alive: people blink and breathe, their eyes move, and what they feel shows in the face and changes as the shot goes on.`, group: 'series', label: 'What every clip keeps from its first frame, and what it does not' }),
-  person: (x) => ({ kind: 'person', name: x.name, ...(x.look ? { look: x.look } : {}), ...(x.wardrobe ? { wardrobe: x.wardrobe } : {}), ...(x.manner ? { manner: x.manner } : {}), ...(x.voice ? { voice: x.voice } : {}), group: 'cast' }),
+  person: (x) => ({ kind: 'person', name: x.name, ...(x.look ? { look: x.look } : {}), ...(x.figure ? { figure: x.figure } : {}), ...(x.wardrobe ? { wardrobe: x.wardrobe } : {}), ...(x.manner ? { manner: x.manner } : {}), ...(x.voice ? { voice: x.voice } : {}), group: 'cast' }),
   // A face is who someone is: it is drawn from what they look like and never from what they wear, so that giving someone other
   // clothes leaves them the same person (their sheet is drawn again from the same face). Faces are drawn in the medium, in plain
   // light: the mood of the series is for scenes.
@@ -60,8 +66,9 @@ const WRITE = {
   clip: (x) => ({ kind: 'clip', frame: `@e${x.n}-s${x.shot}-frame`, ...(x.speech ? { voice: `@e${x.n}-s${x.shot}-line` } : {}), ...(x.speech === 'heard' ? { heard: true } : {}), ...(x.seconds ? { seconds: x.seconds } : {}), ...(x.model ? { model: x.model } : {}), ...(x.hear?.length ? { sounds: x.hear.map((h) => ({ sound: `@${h.sound}`, at: h.at ?? 0, ...(h.volume ? { volume: h.volume } : {}), ...(h.to ? { to: h.to } : {}) })) } : {}), group: `e${x.n}`, label: `Shot ${x.shot}`,
     // (a shot of a thing alone is told that nobody comes into it: a clip model was seen to walk someone through a wall insert)
     // (a clip model sees its first frame and nothing else of the people in it: someone small in a wide frame, or seen from behind, was
-    // given another face and other clothes as he turned and came closer. A shot that is not close is told in words how its people look.)
-    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.acting ? ` ${sentence(x.acting)}` : ''}${x.empty ? ' Nobody is in the frame and nobody enters it.' : ''}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep${x.people?.length ? ` How they look, for what the first frame does not show of them: ${x.people.map((p) => `@${p}`).join('; ')}.` : ''}` }),
+    // given another face and other clothes as he turned and came closer. A shot that is not close is told in words how its people are
+    // known from afar — their figure and what they wear. Not the face: told of "a prominent mole", a clip painted a black coin on a cheek.)
+    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.acting ? ` ${sentence(x.acting)}` : ''}${x.empty ? ' Nobody is in the frame and nobody enters it.' : ''}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep${afar(x.people)}` }),
   // a sound of the series: made once, the same every time it is heard
   sound: (x) => (x.file ? { kind: 'sound', file: x.file, group: 'series', label: x.name || 'A sound' } : { kind: 'sound', prompt: sentence(x.prompt), ...(x.seconds ? { seconds: x.seconds } : {}), group: 'series', label: x.name || 'A sound' }),
   music: (x) => ({ kind: 'music', prompt: `Instrumental film score, no vocals, no singing. ${x.music || 'Quiet and tense, sparse piano and low strings.'}`, group: `e${x.n}`, label: `Episode ${x.n}: music` }),
@@ -78,7 +85,7 @@ export function expand(series, scripts = {}) {
   put('look', 'look', { medium, look: series.look }); put('keep', 'keep', { medium });
   for (const [id, c] of Object.entries(cast)) {
     const own = [].concat(c.pictures ?? []);
-    put(id, 'person', { name: c.name, look: c.look, wardrobe: c.wardrobe, manner: c.manner, voice: c.voice });
+    put(id, 'person', { name: c.name, look: c.look, ...(c.figure ? { figure: c.figure } : {}), wardrobe: c.wardrobe, manner: c.manner, voice: c.voice });
     put(`${id}-face`, 'face', { id, name: c.name, own: own[0] || null, medium, look: c.look }, { id, name: c.name, own: own[0] || null, medium }); put(`${id}-sheet`, 'sheet', { id, name: c.name, own: own[1] || null, wardrobe: c.wardrobe });
   }
   for (const [id, s] of Object.entries(series.sounds || {})) put(id, 'sound', { name: s.name, prompt: s.prompt, seconds: s.seconds, file: s.file });
@@ -95,14 +102,16 @@ export function expand(series, scripts = {}) {
       const talks = KNOWN[model || series.models?.talk], toPicture = speech === 'seen' && !!talks?.speaks && !talks.acts;
       if (shot.line) put(`${id}-line`, 'line', { n, shot: shot.id, who: shot.line.who, name: cast[shot.line.who]?.name || shot.line.who, text: shot.line.text, how: shot.line.how, ...(toPicture ? { toPicture } : {}) });
       const facts = { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model, speech, ...(shot.hear?.length ? { hear: shot.hear } : {}), ...(shot.acting ? { acting: shot.acting } : {}) };      // (a shot nothing is set into, and nobody is directed in, is written from what it always was)
-      // nobody in the frame: said to the clip model. A shot that is not close: its people are described to the clip model. One written
-      // before either was said keeps its words.
-      if (!who.length) put(id, 'clip', { ...facts, empty: true }, facts); else if (CLOSE.has(shot.size)) put(id, 'clip', facts); else put(id, 'clip', { ...facts, people: who }, facts);
+      // nobody in the frame: said to the clip model. A shot that is not close: the clip model is told how its people are known from afar
+      // (their figure, what they wear). One written before either was said keeps its words.
+      // (for a short while its people were named and described whole, face and all: a clip written then keeps its words too)
+      if (!who.length) put(id, 'clip', { ...facts, empty: true }, facts); else if (CLOSE.has(shot.size)) put(id, 'clip', facts);
+      else put(id, 'clip', { ...facts, people: who.map((w) => ({ name: cast[w].name, ...(cast[w].figure ? { figure: cast[w].figure } : {}), ...(cast[w].wardrobe ? { wardrobe: cast[w].wardrobe } : {}) })) }, facts, { ...facts, people: who });
     });
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });
     put(`e${n}`, 'cut', { n, shots: all.map(({ shot }) => shot.id), title: ep.title, notice: series.notice ?? NOTICE[String(series.language || '').toLowerCase()] ?? NOTICE.english });
   }
-  const flow = { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), ...(typeof series.budget === 'number' ? { budget: series.budget } : {}), ...(Number.isInteger(series.retakes) ? { retakes: series.retakes } : {}), nodes };
+  const flow = { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), ...(typeof series.budget === 'number' ? { budget: series.budget } : {}), ...(Number.isInteger(series.retakes) ? { retakes: series.retakes } : {}), ...(typeof series.listen === 'boolean' ? { listen: series.listen } : {}), nodes };
   return Object.defineProperty(flow, 'was', { value: was });
 }
 
@@ -145,7 +154,7 @@ export function sync(dir, series, scripts = {}, { rewrite = false } = {}) {
   for (let again = true; again;) { again = false; for (const id of [...leaving]) if (Object.keys(flow.nodes).some((x) => !leaving.has(x) && needs(flow, x).includes(id))) { leaving.delete(id); kept.push(id); again = true; } }
   for (const id of leaving) { delete flow.nodes[id]; removed.push(id); }
   const { nodes, ...settings } = wanted;
-  for (const k of ['format', 'language', 'accent', 'resolution', 'models', 'budget', 'retakes']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
+  for (const k of ['format', 'language', 'accent', 'resolution', 'models', 'budget', 'retakes', 'listen']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
   writeFlow(dir, { ...Object.fromEntries(Object.entries(flow).filter(([k]) => k !== 'nodes')), nodes: flow.nodes });
   return { flow, added, updated, removed, kept, mended };
 }

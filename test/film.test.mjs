@@ -12,7 +12,7 @@ import { timeline } from '../src/film/cut.mjs';
 import { expand, stageNodes, sync } from '../src/film/director.mjs';
 import { checkFlow, estimate, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
 import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
-import { grave, inWords, reviewClip, reviewFit, reviewPicture, reviewVoice } from '../src/film/review.mjs';
+import { grave, heardShare, inWords, reviewClip, reviewFit, reviewHeard, reviewPicture, reviewVoice } from '../src/film/review.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, episodeFile, lengthOf, readEpisode, readSeries, seriesFile, speechSeconds, writeJson, written } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
@@ -252,7 +252,7 @@ test('a maker that answers that the money has run out is not asked again in that
 test('how long a shot is kept is what its clip says now: within what was filmed it is made longer or shorter without being filmed again', async () => {
   const dir = fresh('length'), flow = small(), use = standIns(); flow.nodes.film.shots = ['@s1', '@s2']; flow.nodes.s2.seconds = 2.4;      // the stand-in films whole seconds: 3 of them
   const parts = (r) => JSON.parse(fs.readFileSync(r.out.get('film').file.replace(/\.mp4$/, '.json'), 'utf8')).parts, filmed = () => use.asked.filter((x) => x.kind === 'clip').length;
-  const first = await runFlow(dir, flow, { use }), clips = filmed(); assert.deepEqual(first.failed, []); assert.equal(parts(first)[1].length, 2.4); assert.equal(use.asked.filter((x) => x.kind === 'clip').at(-1).seconds, 3);
+  const first = await runFlow(dir, flow, { use }), clips = filmed(); assert.deepEqual(first.failed, []); assert.equal(parts(first)[1].length, 2.4); assert.equal(use.asked.find((x) => x.kind === 'clip' && /room is empty/.test(x.prompt)).seconds, 3);
   flow.nodes.s2.seconds = 2.8; const longer = await runFlow(dir, flow, { use }); assert.equal(madeOf(longer), 'film'); assert.equal(filmed(), clips, 'not filmed again'); assert.equal(parts(longer)[1].length, 2.8);
   flow.nodes.s2.seconds = 2.2; const shorter = await runFlow(dir, flow, { use }); assert.equal(madeOf(shorter), 'film'); assert.equal(filmed(), clips); assert.equal(parts(shorter)[1].length, 2.2);
   flow.nodes.s2.seconds = 4; assert.equal(madeOf(await runFlow(dir, flow, { use })), 'film s2', 'longer than what was filmed: filmed again'); assert.equal(filmed(), clips + 1);
@@ -350,6 +350,24 @@ test('a take is looked at without asking any model: a clip that grows a colour, 
   assert.deepEqual(reviewPicture(pic('tall.jpg', 'testsrc2=s=180x320'), { aspect: '9:16' }), []); assert.match(inWords(reviewPicture(at('tall.jpg'), { aspect: '16:9' })), /^it came back 180×320, not the 16:9 that was asked for$/);
   assert.equal(what(reviewPicture(pic('flat.jpg', 'color=c=gray:s=180x320'), { aspect: '9:16' })), 'blank'); assert.match(inWords(reviewPicture(pic('bars.jpg', 'testsrc2=s=180x240', 'pad=180:320:0:40:black'), { aspect: '9:16' })), /^it has plain bars along its top and bottom edges$/);
   assert.deepEqual(reviewPicture(at('calm.jpg'), {}), [], 'a dark picture with a plain wall has no bars');
+});
+
+test('a recorded line is listened to when someone can: one nobody can make out is recorded again before a clip is acted to it', async () => {
+  const takes = (dir) => Object.values(JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat(), lines = (use) => use.asked.filter((x) => x.kind === 'voice').length;
+  // the listener makes nothing of the first take, and hears the second (with one word of it in another accent)
+  const dir = fresh('listen'), flow = small(), use = standIns(), events = []; let n = 0; use.listen = async () => (++n === 1 ? 'chết chóc hoang mang' : 'Anh dìa rồi à');
+  const r = await runFlow(dir, flow, { use, on: (e) => events.push(`${e.type} ${e.id}${e.why ? ': ' + e.why : ''}`) });
+  assert.deepEqual(r.failed, []); assert.equal(lines(use), 2, 'recorded once more, by the run itself'); assert.ok(events.includes('again s1-line: a listener heard "chết chóc hoang mang": the line cannot be made out'), events.join(' | '));
+  assert.equal(use.asked.filter((x) => x.kind === 'clip').length, 2, 'no clip was acted to the take that was refused');
+  assert.deepEqual(takes(dir).filter((t) => t.info?.heard !== undefined).map((t) => [t.n, !!t.bad, t.info.heard]), [[1, true, 'chết chóc hoang mang'], [2, false, 'Anh dìa rồi à']], 'what was heard is kept with each take');
+  // turned off, nobody listens; and from a listener that fails nothing is concluded
+  const off = standIns(); let asked = 0; off.listen = async () => { asked++; return ''; }; await runFlow(fresh('listen-off'), { ...small(), listen: false }, { use: off }); assert.equal(asked, 0); assert.equal(lines(off), 1);
+  const down = standIns(); down.listen = async () => { throw new Error('no answer'); }; assert.deepEqual((await runFlow(fresh('listen-down'), small(), { use: down })).failed, []); assert.equal(lines(down), 1);
+  assert.match(checkFlow({ ...small(), listen: 'yes' }).join(), /listen: true or false/); assert.match(checkSeries({ ...SERIES, listen: 1 }).join(), /listen: true or false/); assert.equal(expand({ ...SERIES, listen: false }, {}).listen, false); assert.equal(expand(SERIES, {}).listen, undefined);
+  // the measure: the share of the line's words that were heard, in their order and without their marks; a line of a word or two is never refused for it
+  assert.equal(heardShare('Rồi sao hả anh?', 'Gọi sao hả anh?'), .75); assert.equal(heardShare('Rồi sao hả anh?', 'Cô Sáu Hán'), 0); assert.equal(heardShare('你在哪里？', '你在那里'), .75);
+  assert.deepEqual(reviewHeard('Không...', 'Hãy subscribe cho kênh').map((f) => [f.what, !!f.grave]), [['unclear', false]]); assert.deepEqual(reviewHeard('Về phòng đi.', '').map((f) => [f.what, !!f.grave]), [['unheard', true]]);
+  assert.deepEqual(reviewHeard('Anh không biết.', undefined), [], 'not listened to: nothing is said'); assert.deepEqual(reviewHeard('Khuya mà nghe tiếng gì bên vách... tuyệt đối đừng gõ lại.', 'Khuya mà nghe tiếng dì bệnh giách, tuyệt đối đừng gõ lại.'), []);
 });
 
 test('a run looks at what it makes: a take that cannot be used is asked for again, the better one stands, and nothing is built on a node that has none', async () => {
@@ -474,11 +492,17 @@ test('the director fills the canvas: everyone a face and a sheet, every scene a 
   // someone lying down was drawn with the hair out of sight, and the clip made the hair up as they rose: a picture with people in it is told that hair is seen
   assert.match(n['e1-s1-frame'].prompt, /of their reference sheet\. Hair is as long as on the sheet in every pose: on someone lying down it is seen, spread loose beside the head\. @look/); assert.match(n['e1-scene1'].prompt, /of their reference sheet\. Hair is as long as on the sheet in every pose/);
   const played = structuredClone(EPISODE); played.scenes[0].shots[1].acting = 'Uneasy: he shifts his weight and glances over his shoulder'; const acted = expand(SERIES, { 1: played }).nodes;
-  assert.equal(acted['e1-s2'].prompt, 'Medium shot, from the waist up, slow push in. Minh stands with his back to the camera. Uneasy: he shifts his weight and glances over his shoulder. @keep How they look, for what the first frame does not show of them: @minh.');
+  assert.equal(acted['e1-s2'].prompt, 'Medium shot, from the waist up, slow push in. Minh stands with his back to the camera. Uneasy: he shifts his weight and glances over his shoulder. @keep How they look, for what the first frame does not show of them: Minh (wearing a navy shirt).');
   // a clip model sees only the first frame: in a shot that is not close its people are described in words, for what that frame does not show of them (a man seen small and
   // from behind was given another face and shirt as he turned); a close shot shows all it needs; a clip written before this was said keeps its words
-  assert.doesNotMatch(n['e1-s1'].prompt, /How they look/); assert.match(wordsOf(expand(SERIES, { 1: EPISODE }), n['e1-s2'].prompt, () => ({})).words, /How they look, for what the first frame does not show of them: Minh \(.+; wearing .+\)\.$/);
-  assert.deepEqual(expand(SERIES, { 1: EPISODE }).was['e1-s2'], [sha(['clip', { n: 1, shot: '2', size: 'medium', camera: 'slow push in', action: 'Minh stands with his back to the camera.', seconds: 3, speech: null }])]); assert.equal(expand(SERIES, { 1: EPISODE }).was['e1-s1'], undefined); assert.equal(acted['e1-s1'].of, n['e1-s1'].of, 'a shot nobody is directed in is written from what it always was');
+  assert.doesNotMatch(n['e1-s1'].prompt, /How they look/);
+  // … by their figure (age, build, hair) and what they wear — never the face: told of a mole, a clip painted a black coin on a cheek
+  const known = structuredClone(SERIES); known.cast.minh.figure = 'A tall man in his thirties with short black hair.'; const far = expand(known, { 1: EPISODE });
+  assert.match(far.nodes['e1-s2'].prompt, /@keep How they look, for what the first frame does not show of them: Minh \(a tall man in his thirties with short black hair; wearing a navy shirt\)\.$/); assert.equal(far.nodes.minh.figure, 'A tall man in his thirties with short black hair.'); assert.equal(far.nodes.minh.look, SERIES.cast.minh.look);
+  assert.match(checkSeries({ ...SERIES, cast: { ...SERIES.cast, minh: { ...SERIES.cast.minh, figure: ' ' } } }).join(), /cast\.minh\.figure: how they are known from afar or from behind/); assert.deepEqual(checkFlow(far), []);
+  const bare = structuredClone(SERIES); delete bare.cast.minh.wardrobe; assert.doesNotMatch(expand(bare, { 1: EPISODE }).nodes['e1-s2'].prompt, /How they look/, 'nothing to tell: nothing is said');
+  const older = { n: 1, shot: '2', size: 'medium', camera: 'slow push in', action: 'Minh stands with his back to the camera.', seconds: 3, speech: null };
+  assert.deepEqual(expand(SERIES, { 1: EPISODE }).was['e1-s2'], [sha(['clip', older]), sha(['clip', { ...older, people: ['minh'] }])]); assert.equal(expand(SERIES, { 1: EPISODE }).was['e1-s1'], undefined); assert.equal(far.was.minh, undefined); assert.equal(acted['e1-s1'].of, n['e1-s1'].of, 'a shot nobody is directed in is written from what it always was');
   assert.match(checkEpisode(SERIES, { ...played, scenes: [{ ...played.scenes[0], shots: [{ ...played.scenes[0].shots[1], acting: ' ' }] }] }).join(), /acting: how it is played, in a sentence/); assert.equal(expand({ ...SERIES, style: undefined }, {}).nodes.keep.text.startsWith('The light and the colours'), true);
   assert.match(checkSeries({ ...SERIES, cast: { keep: SERIES.cast.lan } }).join(), /cast\.keep: "keep" is a name the canvas uses itself/); assert.equal(expand({ ...SERIES, retakes: 2 }, {}).retakes, 2); assert.match(checkFlow({ ...flow, retakes: 9 }).join(), /retakes: how many more takes a run may ask for by itself/); assert.deepEqual(n.e1.shots, ['@e1-s1', '@e1-s2', '@e1-s3', '@e1-s4']); assert.equal(n.e1.notice, 'Nội dung tạo bằng AI');
   // a part of the work: the board is every picture that needs no clip
@@ -626,7 +650,7 @@ test('the script is changed from the canvas window: kept only when sound, and th
     assert.equal(hand.saved, true); assert.deepEqual(written(dir), [1, 2]); assert.ok(readFlow(dir).nodes.e2 && readFlow(dir).nodes['e2-s1']); assert.deepEqual(hand.episodes.written, [1, 2]);
     // the series: what someone wears is changed — the person and their sheet are written again, the face is not
     const series = structuredClone(had.series); series.cast.lan.wardrobe = 'a red coat';
-    const three = await put('/api/series', series); assert.equal(three.saved, true); assert.deepEqual(three.changed.updated.sort(), ['lan', 'lan-sheet']); assert.equal(readSeries(dir).cast.lan.wardrobe, 'a red coat');
+    const three = await put('/api/series', series); assert.equal(three.saved, true); assert.deepEqual(three.changed.updated.sort(), ['e2-s1', 'lan', 'lan-sheet'], 'her sheet, and the wide shot that is told what she wears'); assert.equal(readSeries(dir).cast.lan.wardrobe, 'a red coat');
     // A face an older Songbe drew was drawn with the clothes described. When only the clothes change, the face that stands is held —
     // the same person in other clothes — and let go of again when their looks change.
     const old = readFlow(dir); old.nodes['minh-face'] = { kind: 'picture', prompt: '@style Portrait of @minh.', aspect: '3:4', by: 'director', of: sha(['face', { id: 'minh', name: 'Minh', own: null, medium: true }]) }; old.nodes['minh-face'].as = sha((({ by, as, of, xy, ...rest }) => rest)(old.nodes['minh-face'])); writeFlow(dir, old);

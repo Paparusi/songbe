@@ -72,6 +72,7 @@ export function checkSeries(series, dir = null) {
       if (!text(x.name)) bad.push(`${at}.name: what is ${set === 'cast' ? 'this person' : 'this place'} called?`);
       const own = [].concat(x.pictures ?? []);
       if (!text(x.look) && !own.length) bad.push(`${at}: needs a "look" (what ${set === 'cast' ? 'they look' : 'it looks'} like) or "pictures" of your own`);
+      if (set === 'cast' && x.figure !== undefined && !text(x.figure)) bad.push(`${at}.figure: how they are known from afar or from behind (age, build, hair), in a sentence — or leave it out`);
       for (const p of own) if (!text(p)) bad.push(`${at}.pictures: each is the path of a picture`); else if (dir && !exists(path.resolve(dir, p))) bad.push(`${at}.pictures: ${p} is not there`);
       if (set === 'cast' && x.voice !== undefined && !isObject(x.voice)) bad.push(`${at}.voice: must be an object like { "voice": "Kore" }`);
     }
@@ -94,6 +95,7 @@ export function checkSeries(series, dir = null) {
   if (series.seconds !== undefined && !(typeof series.seconds === 'number' && series.seconds >= 5 && series.seconds <= 600)) bad.push('seconds: how long an episode runs, between 5 and 600');
   if (series.budget !== undefined && !(typeof series.budget === 'number' && series.budget >= 0)) bad.push('budget: what a run may spend, a number of dollars');
   if (series.retakes !== undefined && !(Number.isInteger(series.retakes) && series.retakes >= 0 && series.retakes <= 3)) bad.push('retakes: how many more takes a run may ask for by itself when a take cannot be used, 0 to 3');
+  if (series.listen !== undefined && typeof series.listen !== 'boolean') bad.push('listen: true or false — whether a recorded line is listened to by a model that hears, when there is a key for one');
   return bad;
 }
 export function checkEpisode(series, episode) {
