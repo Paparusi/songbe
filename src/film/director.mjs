@@ -50,7 +50,8 @@ const WRITE = {
         + `${x.speaker ? ` ${x.speaker}'s mouth is closed, about to speak.` : ''} Same place, same light and same time of day as the wide view${x.who.length ? '; everyone keeps exactly the face, hair and clothes of their reference sheet' : ''}. @look A frame from a film, not a posed photograph: nobody looks into the camera. ${NO_TEXT}` }),
   line: (x) => ({ kind: 'voice', who: `@${x.who}`, text: x.text, ...(x.how ? { how: x.how } : {}), ...(x.toPicture ? { fit: `@e${x.n}-s${x.shot}` } : {}), group: `e${x.n}`, label: `Shot ${x.shot}: ${x.name}` }),
   clip: (x) => ({ kind: 'clip', frame: `@e${x.n}-s${x.shot}-frame`, ...(x.speech ? { voice: `@e${x.n}-s${x.shot}-line` } : {}), ...(x.speech === 'heard' ? { heard: true } : {}), ...(x.seconds ? { seconds: x.seconds } : {}), ...(x.model ? { model: x.model } : {}), ...(x.hear?.length ? { sounds: x.hear.map((h) => ({ sound: `@${h.sound}`, at: h.at ?? 0, ...(h.volume ? { volume: h.volume } : {}), ...(h.to ? { to: h.to } : {}) })) } : {}), group: `e${x.n}`, label: `Shot ${x.shot}`,
-    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep` }),
+    // (a shot of a thing alone is told that nobody comes into it: a clip model was seen to walk someone through a wall insert)
+    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.empty ? ' Nobody is in the frame and nobody enters it.' : ''}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep` }),
   // a sound of the series: made once, the same every time it is heard
   sound: (x) => (x.file ? { kind: 'sound', file: x.file, group: 'series', label: x.name || 'A sound' } : { kind: 'sound', prompt: sentence(x.prompt), ...(x.seconds ? { seconds: x.seconds } : {}), group: 'series', label: x.name || 'A sound' }),
   music: (x) => ({ kind: 'music', prompt: `Instrumental film score, no vocals, no singing. ${x.music || 'Quiet and tense, sparse piano and low strings.'}`, group: `e${x.n}`, label: `Episode ${x.n}: music` }),
@@ -83,7 +84,8 @@ export function expand(series, scripts = {}) {
       // a model that acts to a recording gets the line recorded first; one that only speaks films first, and the line is recorded to its lips
       const talks = KNOWN[model || series.models?.talk], toPicture = speech === 'seen' && !!talks?.speaks && !talks.acts;
       if (shot.line) put(`${id}-line`, 'line', { n, shot: shot.id, who: shot.line.who, name: cast[shot.line.who]?.name || shot.line.who, text: shot.line.text, how: shot.line.how, ...(toPicture ? { toPicture } : {}) });
-      put(id, 'clip', { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model, speech, ...(shot.hear?.length ? { hear: shot.hear } : {}) });      // (a shot nothing is set into is written from what it always was)
+      const facts = { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model, speech, ...(shot.hear?.length ? { hear: shot.hear } : {}) };      // (a shot nothing is set into is written from what it always was)
+      if (who.length) put(id, 'clip', facts); else put(id, 'clip', { ...facts, empty: true }, facts);      // nobody in the frame: said to the clip model; one written before that was said keeps its words
     });
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });
     put(`e${n}`, 'cut', { n, shots: all.map(({ shot }) => shot.id), title: ep.title, notice: series.notice ?? NOTICE[String(series.language || '').toLowerCase()] ?? NOTICE.english });
@@ -96,7 +98,8 @@ const bare = ({ by, as, of, xy, ...rest }) => rest;      // a node without the d
 // Brings flow.json up to the series and scripts. Returns { flow, added, updated, removed, kept, mended } — `kept` are nodes whose
 // facts changed, or which the script no longer has, and which were left as they are because a person had changed them or
 // something that stays still works from them. With `rewrite` every node still as the director wrote it is worded afresh (after
-// an update of Songbe, to have its newer wording; what was made from those nodes is made again).
+// an update of Songbe, to have its newer wording; what was made from those nodes is made again) — or, given a list of names,
+// only those nodes.
 //
 // A cut is the one node whose making-of follows the script even after a person changed it (`mended`): their order, their trims
 // and the clips they added stay; a shot the script lost leaves the cut, and a shot it gained goes in after the shot it follows.
@@ -104,13 +107,14 @@ export function sync(dir, series, scripts = {}, { rewrite = false } = {}) {
   const bad = [...checkSeries(series, dir), ...Object.entries(scripts).flatMap(([n, ep]) => checkEpisode(series, ep).map((x) => `episode ${n}: ${x}`))];
   if (bad.length) throw new Error(`the series has ${bad.length} problem${bad.length > 1 ? 's' : ''}:\n  - ` + bad.join('\n  - '));
   const flow = readFlow(dir), wanted = expand(series, scripts), added = [], updated = [], removed = [], kept = [], mended = [];
+  const afresh = (id) => rewrite === true || (Array.isArray(rewrite) && rewrite.includes(id));
   const untouched = (have) => have.by === 'director' && have.as === sha(bare(have)), written = (node, have) => ({ ...node, by: 'director', as: sha(bare(node)), ...(have?.xy ? { xy: have.xy } : {}) });
   for (const [id, node] of Object.entries(wanted.nodes)) {
     const have = flow.nodes[id];
     if (!have) { flow.nodes[id] = written(node); added.push(id); continue; }
     if (have.by !== 'director') { kept.push(id); continue; }                                    // a node of the person's own under a name the director uses
     if (have.of === undefined) { have.of = node.of; continue; }                                 // written before nodes remembered their facts: taken as it stands
-    if ((have.of === node.of || (wanted.was[id] || []).includes(have.of)) && !(rewrite && untouched(have))) continue;      // the same facts: its wording stays
+    if ((have.of === node.of || (wanted.was[id] || []).includes(have.of)) && !(afresh(id) && untouched(have))) continue;      // the same facts: its wording stays
     if (!untouched(have)) { kept.push(id); continue; }
     if (sha(bare(have)) !== sha(bare(node)) || have.of !== node.of) { flow.nodes[id] = written(node, have); updated.push(id); }
   }

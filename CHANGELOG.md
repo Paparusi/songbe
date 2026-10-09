@@ -2,6 +2,13 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.34
+- **A shot of a thing alone stays empty.** The clip model walked an arm through an insert of a wall; a shot with nobody in it
+  is now told that nobody is in the frame and nobody enters it. Shots already on a canvas keep their words.
+- `songbe film expand --rewrite=e1-s10,e2-s3` words afresh only the nodes that are named.
+- Tried against the models: the first episode of a new film, start to finish — fourteen clips by MiniMax H3 acting to lines
+  recorded first, three knocks set at their seconds, music. Thirteen clips stood as filmed; one was filmed again.
+
 ## 0.33
 - **Sounds.** A new kind of node: a sound made from a few words (a knock, a door, rain) or a recording of your own. A clip
   names the sounds heard in it and the second each begins; the cut sets them there, over the clip's own sound, and no clip is

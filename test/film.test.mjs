@@ -286,6 +286,10 @@ test('the sounds a story turns on belong to the series: the director makes each 
   const { of, ...knock } = n.knock; assert.deepEqual(knock, { kind: 'sound', prompt: 'One slow knock on a concrete wall.', seconds: 2, group: 'series', label: 'Tiếng gõ' });
   assert.deepEqual(n['e1-s2'].sounds, [{ sound: '@knock', at: 1 }, { sound: '@knock', at: 2.2 }]); assert.equal(n['e1-s1'].sounds, undefined);
   assert.equal(n['e1-s1'].of, plain['e1-s1'].of, 'a shot nothing is set into is written from what it always was'); assert.notEqual(n['e1-s2'].of, plain['e1-s2'].of); assert.ok(needs(flow, 'e1').includes('knock'));
+  // a shot of a thing alone: the clip model is told that nobody comes into it; one written before that was said keeps its words
+  const alone = structuredClone(EPISODE); alone.scenes[0].shots.push({ id: '5', size: 'insert', who: [], action: 'A key lies on the table.', seconds: 2 }); const thing = expand(SERIES, { 1: alone });
+  assert.equal(thing.nodes['e1-s5'].prompt, 'Insert shot, static. A key lies on the table. Nobody is in the frame and nobody enters it. @keep'.replace('Insert shot, static', 'Insert shot')); assert.doesNotMatch(thing.nodes['e1-s2'].prompt, /nobody enters/);
+  assert.deepEqual(thing.was['e1-s5'], [sha(['clip', { n: 1, shot: '5', size: 'insert', action: 'A key lies on the table.', seconds: 2, speech: null }])]); assert.equal(thing.was['e1-s2'], undefined);
   // what is wrong is said
   assert.match(checkSeries({ ...SERIES, sounds: { lan: { prompt: 'x' } } }).join(), /sounds\.lan: "lan" already names someone in the cast or a place/); assert.match(checkSeries({ ...SERIES, sounds: { knock: {} } }).join(), /sounds\.knock: say what is heard/);
   assert.match(checkSeries({ ...SERIES, sounds: { knock: { prompt: 'x', seconds: 90 } } }).join(), /sounds\.knock\.seconds: how long the sound lasts/);
@@ -490,6 +494,9 @@ test('the director rewrites only what is still as it wrote it: a node changed by
   const older = readFlow(dir), face = older.nodes['minh-face']; face.prompt = '@style Portrait of @minh. Chest-up.'; face.of = sha(['face', { id: 'minh', name: 'Minh', own: null, medium: true }]); face.as = sha(bare(face)); writeFlow(dir, older);
   assert.deepEqual(sync(dir, renamed, { 1: changed }).updated, []); assert.equal(readFlow(dir).nodes['minh-face'].prompt, '@style Portrait of @minh. Chest-up.');
   const taller = structuredClone(renamed); taller.cast.minh.wardrobe = 'a grey suit'; assert.deepEqual(sync(dir, taller, { 1: changed }).updated.sort(), ['minh', 'minh-sheet'], 'other clothes: the person and the sheet, never the face');
+  assert.deepEqual(sync(dir, taller, { 1: changed }, { rewrite: ['lan-sheet', 'e1-s1'] }).updated, [], 'named nodes that are already in the newest words: nothing to do');
+  assert.deepEqual(sync(dir, taller, { 1: changed }, { rewrite: ['minh-face'] }).updated, ['minh-face'], 'only the node that was named is worded afresh'); assert.match(readFlow(dir).nodes['minh-face'].prompt, /^@style Portrait of Minh: 31, broad shoulders\./);
+  const back = readFlow(dir); Object.assign(back.nodes['minh-face'], { prompt: '@style Portrait of @minh. Chest-up.', of: sha(['face', { id: 'minh', name: 'Minh', own: null, medium: true }]) }); back.nodes['minh-face'].as = sha(bare(back.nodes['minh-face'])); writeFlow(dir, back);
   assert.deepEqual(sync(dir, taller, { 1: changed }, { rewrite: true }).updated, ['minh-face']); assert.match(readFlow(dir).nodes['minh-face'].prompt, /^@style Portrait of Minh: 31, broad shoulders\./);
 });
 

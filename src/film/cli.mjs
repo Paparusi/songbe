@@ -21,7 +21,8 @@ export const HELP = `Songbe film — a series from an idea: the script, the cast
                                       first frames, the lines in each person's voice, the clips, the music and the cut → out/eN.mp4
                                       --upto=cast|board|voice|clips stops early: "board" shows every shot before a clip is paid for
   songbe film expand <dir>            bring the canvas (flow.json) up to series.json and the scripts, without making anything
-                                      (--rewrite words afresh every node you have not changed, after an update of Songbe)
+                                      (--rewrite words afresh every node you have not changed, after an update of Songbe;
+                                       --rewrite=e1-s3,e1-s7 only those)
 
 Songbe flow — the canvas itself: every picture, line, clip and cut is a node that can be changed, rewired or made again
 
@@ -119,7 +120,7 @@ export async function main(cmd, args) {
       return r.episode;
     };
     const scriptsOf = () => Object.fromEntries(written(dir).map((n) => [n, readEpisode(dir, n)]));
-    const expand = (series) => { const r = sync(dir, series, scriptsOf(), { rewrite: has('rewrite') }), did = [r.added.length && `${r.added.length} added`, r.updated.length && `${r.updated.length} rewritten`, r.removed.length && `${r.removed.length} removed`].filter(Boolean);
+    const expand = (series) => { const r = sync(dir, series, scriptsOf(), { rewrite: has('rewrite') || (opt('rewrite') ? opt('rewrite').split(',').filter(Boolean) : false) }), did = [r.added.length && `${r.added.length} added`, r.updated.length && `${r.updated.length} rewritten`, r.removed.length && `${r.removed.length} removed`].filter(Boolean);
       log(`canvas: ${Object.keys(r.flow.nodes).length} nodes${did.length ? ` (${did.join(', ')})` : ', nothing to change'}`);
       if (r.kept.length) log(`  left as you changed them: ${r.kept.join(', ')}`);
       return r.flow; };

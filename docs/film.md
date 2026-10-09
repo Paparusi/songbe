@@ -162,7 +162,8 @@ the shot's action, the person's outfit — and only if the node is still as the 
 left alone, and the command says so; a node you added is never touched. A cut is the exception that follows the script even
 after you changed it: your order, your trims and the clips you added stay, a shot the script loses leaves the cut, and a new
 shot goes in after the one it follows. A film already made is therefore not disturbed by a
-newer Songbe that words its prompts differently; `songbe film expand --rewrite` asks for the newer wording on purpose.
+newer Songbe that words its prompts differently; `songbe film expand --rewrite` asks for the newer wording on purpose, and
+`--rewrite=e1-s10,e2-s3` for those nodes only.
 
 ## Models
 
