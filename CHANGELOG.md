@@ -9,6 +9,7 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
   on a shot): each is made once and is the same every time, like a face. On the canvas a sound is a card that is dragged
   onto a clip; in the script drawer the series lists its sounds and a shot says which it hears and when. Made through fal.ai
   (ElevenLabs' sound effects, Stable Audio, or any text-to-audio endpoint).
+- A clip may hear only the first seconds of a sound (`to`): a sound model asked for one knock gave one, then five, then two.
 - A recorded line is judged by its voice alone: a line full of pauses ("Ai... ai đang ở đó?") no longer looks cut short.
 
 ## 0.32

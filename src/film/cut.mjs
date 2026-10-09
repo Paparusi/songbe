@@ -85,11 +85,12 @@ export function cut(file, { parts, music = null, title = null, notice = null, su
       const mean = r.text ? meanOf(raw) : NaN, gain = Number.isFinite(mean) ? Math.max(-12, Math.min(12, SPEECH - mean)) : 0;
       ff(['-i', raw, '-af', `volume=${gain.toFixed(2)}dB,afade=t=in:d=0.02,afade=t=out:st=${Math.max(0, r.length - .03).toFixed(3)}:d=0.03`, '-t', String(r.length), '-ar', String(SR), '-ac', '2', out]);
       // the sounds this clip names, each set at its second (counted in the clip, so a part trimmed at its start moves them with it)
-      const set = (p.sounds || []).map((s) => ({ ...s, pos: s.at - r.from })).filter((s) => s.pos < r.length - .05 && s.pos > .1 - secondsOf(s.file));
+      const set = (p.sounds || []).map((s) => ({ ...s, pos: s.at - r.from, lasts: Math.min(s.to || Infinity, secondsOf(s.file)) })).filter((s) => s.pos < r.length - .05 && s.pos > .1 - s.lasts);      // (`to`: only its first seconds, for a sound that came with more in it than was asked)
       if (set.length) {
         const mixed = path.join(work, `m${n}.wav`), ins = ['-i', out], chain = ['[0:a]anull[b]'], names = ['[b]'];
         set.forEach((s, k) => { const peak = peakOf(s.file), gain = (Number.isFinite(peak) ? EFFECT - peak : 0) + 20 * Math.log10(s.volume || 1), skip = Math.max(0, -s.pos), at = Math.max(0, s.pos);
-          ins.push(...(skip > 0 ? ['-ss', skip.toFixed(3)] : []), '-i', s.file); chain.push(`[${k + 1}:a]aresample=${SR},aformat=channel_layouts=stereo,volume=${gain.toFixed(2)}dB${at > 0 ? `,adelay=${Math.round(at * 1000)}:all=1` : ''}[e${k}]`); names.push(`[e${k}]`); });
+          const kept = s.to ? Math.max(.05, s.lasts - skip) : null;
+          ins.push(...(skip > 0 ? ['-ss', skip.toFixed(3)] : []), ...(kept ? ['-t', kept.toFixed(3)] : []), '-i', s.file); chain.push(`[${k + 1}:a]aresample=${SR},aformat=channel_layouts=stereo,volume=${gain.toFixed(2)}dB${kept ? `,afade=t=out:st=${Math.max(0, kept - .04).toFixed(3)}:d=0.04` : ''}${at > 0 ? `,adelay=${Math.round(at * 1000)}:all=1` : ''}[e${k}]`); names.push(`[e${k}]`); });
         ff([...ins, '-filter_complex', `${chain.join(';')};${names.join('')}amix=inputs=${names.length}:normalize=0:duration=first,afade=t=out:st=${Math.max(0, r.length - .03).toFixed(3)}:d=0.03[o]`, '-map', '[o]', '-t', String(r.length), '-ar', String(SR), '-ac', '2', mixed]);
         fs.renameSync(mixed, out);
       }

@@ -252,7 +252,7 @@ test('a maker that answers that the money has run out is not asked again in that
 test('a sound is made once and set at a second of a clip: the cut puts it there, and no clip is filmed again for it', async () => {
   const dir = fresh('sound'), flow = small(), use = standIns();
   flow.nodes.knock = { kind: 'sound', prompt: 'One slow knock on a wall. @look', seconds: 1 };
-  flow.nodes.s2.sounds = [{ sound: '@knock', at: .4 }, { sound: '@knock', at: 1, volume: .5 }, { sound: '@knock', at: 3 }];      // the third falls after the part of s2 the cut keeps (to 1.5 s)
+  flow.nodes.s2.sounds = [{ sound: '@knock', at: .4 }, { sound: '@knock', at: 1, volume: .5, to: .1 }, { sound: '@knock', at: 3 }];      // the second only its first tenth of a second; the third falls after the part of s2 the cut keeps (to 1.5 s)
   assert.deepEqual(checkFlow(flow), []); assert.ok(needs(flow, 'film').includes('knock')); assert.ok(!needs(flow, 's2').includes('knock'), 'a clip is filmed without its sounds');
   assert.deepEqual((await estimate(dir, flow, { use })).pieces.find((x) => x.id === 'knock'), { id: 'knock', kind: 'sound', model: 'stand-in-sound', units: 1, usd: null });
   const r = await runFlow(dir, flow, { use }); assert.deepEqual(r.failed, []);
@@ -265,6 +265,7 @@ test('a sound is made once and set at a second of a clip: the cut puts it there,
   for (let at = 0; at + 320 <= x.length; at += 320) { let e = 0; for (let i = 0; i < 320; i++) e += x[at + i] ** 2; loud.push(Math.sqrt(e / 320)); }      // fifty times a second
   const top = Math.max(...loud), on = loud.map((v, i) => (v > top * .2 ? i / 50 : -1)).filter((t) => t >= 0), begins = on.filter((t, i) => i === 0 || t - on[i - 1] > .1);
   assert.equal(begins.length, 2, `two bursts, at ${begins}`); part.sounds.forEach((snd, i) => assert.ok(Math.abs(begins[i] - snd.at) < .08, `${begins[i]} is about ${snd.at}`));
+  const lasts = (t) => on.filter((u) => u >= t - .02 && u < t + .5).length / 50; assert.ok(lasts(begins[0]) > .22 && lasts(begins[1]) < .18, `the first whole (${lasts(begins[0])} s), the second only its beginning (${lasts(begins[1])} s)`);
   const level = (t) => Math.max(...loud.slice(Math.round(t * 50), Math.round(t * 50) + 14)); assert.ok(level(begins[1]) < level(begins[0]) * .75 && level(begins[1]) > level(begins[0]) * .3, 'the second at half the volume');
   // other words for the sound: the sound and the cut are made again, no clip is
   const clips = use.asked.filter((a) => a.kind === 'clip').length; flow.nodes.knock.prompt = 'Two knocks.';

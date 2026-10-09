@@ -53,7 +53,7 @@ const ONE_WORD = .4;              // a phrase shorter than this many seconds is 
 export const idOf = (ref) => String(ref || '').replace(/^@/, '');
 const list = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
 const shotOf = (s) => (typeof s === 'string' ? { clip: s } : s || {});
-// the sounds a clip is heard with: [{ sound: "@knock", at (the second of the clip, 0 when left out), volume }]
+// the sounds a clip is heard with: [{ sound: "@knock", at (the second of the clip, 0 when left out), volume, to (only its first seconds) }]
 const soundsOf = (n) => list(n?.sounds).map((s) => (typeof s === 'string' ? { sound: s } : s || {}));
 
 // ---- the file ----
@@ -120,7 +120,8 @@ export function checkFlow(flow, dir = null) {
     for (const r of list(n.refs)) if (!is(r, 'picture')) bad.push(`${id}.refs: "${r}" is not a picture node`);
     if (n.sounds !== undefined) { if (!Array.isArray(n.sounds)) bad.push(`${id}.sounds: a list like [{ "sound": "@knock", "at": 1.5 }]`);
       else soundsOf(n).forEach((x, i) => { if (!is(x.sound, 'sound')) bad.push(`${id}.sounds[${i}]: "${x.sound}" is not a sound node`); if (x.at !== undefined && !(typeof x.at === 'number' && x.at >= 0)) bad.push(`${id}.sounds[${i}].at: the second of the clip at which it is heard`);
-        if (x.volume !== undefined && !(typeof x.volume === 'number' && x.volume > 0 && x.volume <= 4)) bad.push(`${id}.sounds[${i}].volume: how loud, where 1 is as loud as sounds are set by themselves (up to 4)`); }); }
+        if (x.volume !== undefined && !(typeof x.volume === 'number' && x.volume > 0 && x.volume <= 4)) bad.push(`${id}.sounds[${i}].volume: how loud, where 1 is as loud as sounds are set by themselves (up to 4)`);
+        if (x.to !== undefined && !(typeof x.to === 'number' && x.to > 0)) bad.push(`${id}.sounds[${i}].to: how many seconds of the sound are heard, from its beginning`); }); }
     if (n.kind === 'cut') { if (!Array.isArray(n.shots) || !n.shots.length) bad.push(`${id}: a cut needs its shots, in order`);
       else n.shots.forEach((s, i) => { const c = shotOf(s); if (!is(c.clip, 'clip')) bad.push(`${id}.shots[${i}]: "${c.clip}" is not a clip node`); if (c.from !== undefined && c.to !== undefined && !(c.to > c.from)) bad.push(`${id}.shots[${i}]: "to" must come after "from"`); }); }
     if (n.seconds !== undefined && !(typeof n.seconds === 'number' && n.seconds > 0 && n.seconds <= 60)) bad.push(`${id}.seconds: a number of seconds`);
@@ -289,11 +290,11 @@ function sound(c, id, n) {
 }
 function cutting(c, id, n) {
   const parts = list(n.shots).map((s) => { const x = shotOf(s), cid = idOf(x.clip), cn = c.flow.nodes[cid], got = c.got(cid), line = cn.voice ? c.flow.nodes[idOf(cn.voice)] : null, rec = line ? c.got(idOf(cn.voice)) : null;
-    const sounds = soundsOf(cn).map((s) => { const g = c.got(idOf(s.sound)); return { id: idOf(s.sound), file: g.file, take: g.take, at: s.at ?? 0, volume: s.volume ?? 1 }; });
+    const sounds = soundsOf(cn).map((s) => { const g = c.got(idOf(s.sound)); return { id: idOf(s.sound), file: g.file, take: g.take, at: s.at ?? 0, volume: s.volume ?? 1, ...(s.to ? { to: s.to } : {}) }; });
     return { id: cid, file: got.file, take: got.take, info: got.info || {}, from: x.from, to: x.to, text: line?.text || null, who: (line?.who && c.flow.nodes[idOf(line.who)]?.name) || null, rec, ownVoice: !!cn.ownVoice, lay: rec?.info?.fit ? rec.info.lay : null, sounds }; });
   const bed = n.music ? c.got(idOf(n.music)) : null, size = FORMATS[c.flow.format] || FORMATS.tall;
   const settings = { title: n.title || null, notice: n.notice ?? null, subtitles: n.subtitles !== false, musicVolume: n.musicVolume ?? .22, size };
-  return { recipe: { kind: 'cut', parts: parts.map((p) => ({ clip: p.take, voice: take(p.rec), from: p.from, to: p.to, text: p.text, info: p.info, ownVoice: p.ownVoice, lay: p.lay, ...(p.sounds.length ? { sounds: p.sounds.map(({ take: t, at, volume }) => ({ take: t, at, volume })) } : {}) })), music: take(bed), ...settings }, by: null,
+  return { recipe: { kind: 'cut', parts: parts.map((p) => ({ clip: p.take, voice: take(p.rec), from: p.from, to: p.to, text: p.text, info: p.info, ownVoice: p.ownVoice, lay: p.lay, ...(p.sounds.length ? { sounds: p.sounds.map(({ take: t, at, volume, to }) => ({ take: t, at, volume, ...(to ? { to } : {}) })) } : {}) })), music: take(bed), ...settings }, by: null,
     make: (file) => cut(file, { parts: parts.map((p) => ({ ...p, voice: p.rec?.file || null })), music: bed?.file || null, ...settings }) };
 }
 const PLAN = { picture, voice, clip, music, sound, cut: cutting };

@@ -86,7 +86,7 @@ the order of mention. Write `@@` for a plain @.
 | `voice` | `text`, `who: "@person"`, `how` (and `voice`, `model`, `style`, `speed`); `fit: "@clip"` records it to the lips of that clip, after the clip is filmed — or `file` | wav |
 | `clip` | `prompt`, `frame: "@picture"`, `end: "@picture"`, `voice: "@voice"`, `heard: true` (the speaker is not seen), `ownVoice: true` (keep the model's voice), `refs`, `seconds`, `model`, `resolution`, `sound`, `options` — or `file` | mp4 |
 | `music` | `prompt` (and `model`) — or `file` | mp3 |
-| `sound` | `prompt`: one sound in a few words (and `seconds`, `model`) — or `file`, a recording of your own. A clip names the sounds heard in it: `sounds: [{ "sound": "@knock", "at": 1.5, "volume": 1 }]`, the second counted in the clip | wav |
+| `sound` | `prompt`: one sound in a few words (and `seconds`, `model`) — or `file`, a recording of your own. A clip names the sounds heard in it: `sounds: [{ "sound": "@knock", "at": 1.5, "volume": 1, "to": 0.3 }]` — the second counted in the clip, and `to` for only the first seconds of a sound that came with more in it than was asked | wav |
 | `cut` | `shots: ["@clip", { "clip": "@clip", "from": 0.4, "to": 3.1 }]`, `music: "@music"`, `title`, `notice`, `subtitles`, `musicVolume` | mp4, srt |
 
 Any node may carry `label`, `group` and `note`. Nothing else is special: "an episode" is a cut and the nodes it works from.

@@ -122,7 +122,8 @@ export function checkEpisode(series, episode) {
       if (shot.hear !== undefined) { const sounds = series.sounds || {};
         if (!Array.isArray(shot.hear)) bad.push(`${here}.hear: a list like [{ "sound": "knock", "at": 1.5 }]`);
         else shot.hear.forEach((h, i) => { if (!isObject(h) || !sounds[h.sound]) bad.push(`${here}.hear[${i}]: "${h?.sound}" is not one of the sounds of the series (${Object.keys(sounds).join(', ') || 'it has none'})`);
-          else if (h.at !== undefined && !(typeof h.at === 'number' && h.at >= 0 && h.at <= 15)) bad.push(`${here}.hear[${i}].at: the second of the shot at which it is heard`); }); }
+          else if (h.at !== undefined && !(typeof h.at === 'number' && h.at >= 0 && h.at <= 15)) bad.push(`${here}.hear[${i}].at: the second of the shot at which it is heard`);
+          else if (h.to !== undefined && !(typeof h.to === 'number' && h.to > 0)) bad.push(`${here}.hear[${i}].to: how many seconds of the sound are heard, from its beginning`); }); }
       if (shot.line !== undefined) {
         const l = shot.line;
         if (!isObject(l) || !text(l.text)) return bad.push(`${here}.line: must be { "who": …, "text": … }`);
