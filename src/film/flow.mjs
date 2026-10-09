@@ -42,6 +42,10 @@ const SLOTS = { picture: ['grab'], clip: ['frame', 'end', 'voice'], voice: ['fit
 // a line recorded to the lips of a clip ("fit") is made after that clip, not before it
 const fitted = (flow, clip) => { const v = flow.nodes[idOf(flow.nodes[clip]?.voice)]; return !!v && idOf(v.fit) === clip; };
 const made = (node) => !!KINDS[node?.kind]?.ext;
+// what a maker says when it will not be paid: its credit is used up, its spending cap is reached, the account is locked. Asking
+// again changes nothing, and neither does asking it for the next piece.
+const NO_MONEY = /answered 402|prepay|credits? (?:are|is|have been) (?:depleted|exhausted|used up)|insufficient (?:funds|balance|credits?)|locked|TOP_UP|spending cap|spend cap|billing|not enabled/i;
+const DOOR = { google: "Google's API", fal: 'fal.ai' };
 const NEAR = Math.log(1.12);      // a recording within this of the place it goes (about a tenth, either way) is stretched to it unheard
 const ONE_WORD = .4;              // a phrase shorter than this many seconds is a single word
 export const idOf = (ref) => String(ref || '').replace(/^@/, '');
@@ -332,6 +336,7 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
   const bad = checkFlow(flow, dir); if (bad.length) throw new Error(`flow.json has ${bad.length} problem${bad.length > 1 ? 's' : ''}:\n  - ` + bad.join('\n  - '));
   const store = openStore(dir), order = ordered(flow, want || Object.keys(flow.nodes)).filter((id) => made(flow.nodes[id])), redo = new Set(again);
   const out = new Map(), failed = new Map(), busy = new Map(), result = { made: [], ready: [], failed: [], flagged: [] };
+  const broke = new Map();      // a door that answered that the money has run out, and what it said: it is not asked again in this run
   const settle = async (id) => {
     const n = flow.nodes[id];
     if (n.file) { out.set(id, own(dir, n)); on({ type: 'own', id }); return; }
@@ -343,6 +348,7 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
     if (had) { out.set(id, { file: had.file, take: `${sha(stands.recipe)}-${had.n}`, info: had.info }); result.ready.push(id); on({ type: 'ready', id }); return; }
     const p = await PLAN[n.kind]({ flow, env, use, strict: true, got: (x) => out.get(x) }, id, n), key = sha(p.recipe);
     const usd = p.by ? costOf(p.by, p.units) : 0;
+    if (p.by && broke.has(p.by.door)) throw new Error(`not asked: ${DOOR[p.by.door] || p.by.door} has already answered in this run that it will not be paid — ${broke.get(p.by.door)}`);
     if (over(usd)) throw new Error(`held back: it would take this run to about $${(spent + usd).toFixed(2)}, over its budget of $${(+budget).toFixed(2)} (--budget=N raises it)`);
     spent += usd || 0;
     const by = p.by ? nameOf(p.by) : 'here', was = store.picked(id);
@@ -356,7 +362,8 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
             try { found = await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n }); break; }
             catch (e) { fs.rmSync(slot.file, { force: true });
               // a provider that says "too many at once" is given a good while (its limits are counted by the minute), up to five times
-              const full = /(answered|fal) 429/.test(e.message) && !/locked|TOP_UP|spending cap|spend cap|billing|not enabled/i.test(e.message), again = full || /could not be reached|answered 5\d\d|fal 5\d\d|timed out|fetch failed|ECONNRESET/i.test(e.message);
+              const paid = !NO_MONEY.test(e.message), full = /(answered|fal) 429/.test(e.message) && paid, again = full || (paid && /could not be reached|answered 5\d\d|fal 5\d\d|timed out|fetch failed|ECONNRESET/i.test(e.message));
+              if (!paid && p.by) broke.set(p.by.door, e.message.split('\n')[0].slice(0, 200));
               if (!again || tries >= (full ? 5 : 3)) throw e;
               if (full) on({ type: 'wait', id, seconds: 45 * tries, why: 'the provider asks for a pause' });
               await new Promise((r) => setTimeout(r, (full ? 45000 : 4000) * tries * (c0.pause ?? 1))); }

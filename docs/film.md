@@ -133,7 +133,9 @@ many, so they are drawn for the chosen card only.
 costs by list price, and it may spend $5 unless `--budget=N` or `"budget"` in `series.json` says otherwise: a run that would
 spend more stops before anything is asked, and one that reaches its budget on the way holds back what is left and says so. The
 canvas shows the same figure on its Make button and wants a second click to go over. The prices are list prices read in
-October 2026, there for the estimate; the maker's invoice decides.
+October 2026, there for the estimate; the maker's invoice decides. A maker that answers that it will not be paid — credit used
+up, a spending cap reached, an account locked — is not asked again in that run: the rest of its pieces say they were not
+asked, and what another maker can do is still made.
 
 **Looking at what it made.** A run looks at every take as soon as it is made: the take is decoded small and measured — no
 model is asked, and it costs nothing. A take that **cannot be used** is asked for again by the run itself (once, unless

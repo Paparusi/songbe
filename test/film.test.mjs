@@ -231,6 +231,22 @@ test('what a run would cost is said before anything is asked, and a run stops at
   assert.match(checkFlow({ ...flow, budget: 'a lot' }).join(), /budget: what a run may spend, a number of dollars/); assert.equal(expand({ ...SERIES, budget: 12 }, {}).budget, 12);
 });
 
+test('a maker that answers that the money has run out is not asked again in that run, and everything another maker can do is still made', async () => {
+  // three pictures that need nothing, asked one at a time at "google"; music at "fal"
+  const flow = { format: 'tall', nodes: { a: { kind: 'picture', prompt: 'One.' }, b: { kind: 'picture', prompt: 'Two.' }, c: { kind: 'picture', prompt: 'Three.' }, tune: { kind: 'music', prompt: 'Sparse piano.' } } };
+  const use = standIns(), named = use.modelFor, draw = use.makePicture; let asked = 0;
+  use.modelFor = (role, name) => ({ ...named(role, name), door: role === 'music' ? 'fal' : 'google' });
+  use.makePicture = async (r, w, file) => { asked++; if (asked === 1) throw new Error('Google answered 402: Your prepayment credits are depleted. Please go to AI Studio to manage your project and billing.'); return draw(r, w, file); };
+  const r = await runFlow(fresh('broke'), flow, { use, limit: 1 });
+  assert.equal(asked, 1, 'the second and the third picture were not asked for'); assert.deepEqual(r.made, ['tune']); assert.deepEqual(r.failed.map((f) => f.id), ['a', 'b', 'c']);
+  assert.match(r.failed[0].error, /^Google answered 402: Your prepayment credits are depleted/); assert.match(r.failed[1].error, /^not asked: Google's API has already answered in this run that it will not be paid — Google answered 402: Your prepayment credits are depleted/);
+  // a refusal that is about money is never tried again, whatever its number; one that is not still is
+  let tries = 0; const busy = standIns(), paint = busy.makePicture; busy.makePicture = async (r, w, file) => { if (++tries < 3) throw new Error('Google answered 503: overloaded'); return paint(r, w, file); };
+  const ok = await runFlow(fresh('busy'), { format: 'tall', nodes: { a: flow.nodes.a } }, { use: busy, pause: 0 }); assert.deepEqual([ok.made, tries], [['a'], 3]);
+  for (const said of ['fal 403: User is locked. Reason: TOP_UP', 'Google answered 429: Your project has exceeded its monthly spending cap', 'fal 402: insufficient balance']) { let n = 0; const u = standIns(); u.makePicture = async () => { n++; throw new Error(said); };
+    const x = await runFlow(fresh('no-' + said.length), { format: 'tall', nodes: { a: flow.nodes.a } }, { use: u, pause: 0 }); assert.equal(n, 1, said); assert.equal(x.failed[0].error, said); }
+});
+
 // ---- the review: what is odd about a take, found by looking at it ----
 test('a take is looked at without asking any model: a clip that grows a colour, cuts, freezes, goes black or stays silent; a line that is not the line; a picture in another shape', () => {
   const dir = fresh('review'), at = (name) => path.join(dir, name), what = (found) => found.map((f) => f.what).join(' ');

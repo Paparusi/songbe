@@ -2,6 +2,14 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.32
+- **A maker that says the money has run out is not asked again in that run.** Credit used up, a spending cap reached, an
+  account locked: the piece that met the refusal says so, every other piece of that maker says it was not asked, and what
+  another maker can do is still made. (Before, each piece went and collected the same refusal.)
+- Tried against the models: a new film from an idea — the series, three scripts, the cast and the first two boards. Portraits
+  drawn without the clothes and sheets drawn from them in the outfit keep one face (three people, 43 pictures); nothing the
+  review points at.
+
 ## 0.31
 - **A line recorded to picture comes closer to the lips before it is stretched.** Stretching is heard: sped up by a fifth, a
   whispered line was no longer made out. The line is now asked for again until every phrase is within about a tenth of the
