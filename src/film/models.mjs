@@ -128,6 +128,23 @@ export async function listen(file, { language = null } = {}, env = process.env) 
   return google.available(env) ? google.hear({ model: HEARS, file, language }, env) : null;
 }
 
+// In how many of a few frames of a clip, taken at the loudest moments of the line someone says in it, that person's lips are
+// parted: { open, of } — asked of a model that sees, when there is a key for one; null when there is none or the line gives
+// fewer than three such moments. `voice` is the recording, which begins `lead` seconds into the clip.
+export async function lipsOf(file, { who = 'the speaker', voice, lead = 0 } = {}, env = process.env) {
+  if (!google.available(env) || !voice) return null;
+  const raw = run(tools.ffmpeg, ['-v', 'error', '-i', voice, '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', '-'], { binary: true }), x = new Int16Array(raw.buffer, raw.byteOffset, raw.length >> 1), loud = [];
+  for (let at = 0; at + 800 <= x.length; at += 800) { let e = 0; for (let i = 0; i < 800; i++) e += x[at + i] ** 2; loud.push([at / 8000 + .05, Math.sqrt(e / 800)]); }      // ten times a second
+  const top = Math.max(0, ...loud.map((l) => l[1])), lasts = secondsOf(file), moments = [];
+  for (const [t, v] of [...loud].sort((a, b) => b[1] - a[1])) { if (moments.length >= 6 || v < top * .35) break; if (lead + t < lasts - .05 && moments.every((u) => Math.abs(u - t) >= .3)) moments.push(t); }
+  if (moments.length < 3) return null;
+  const frames = moments.sort((a, b) => a - b).map((t, i) => { const out = `${file}.lips${i}.jpg`; ff('-ss', (lead + t).toFixed(2), '-i', file, '-frames:v', '1', '-vf', 'scale=-2:512', '-q:v', '4', out); return out; });
+  try {
+    const said = await google.see({ model: HEARS, files: frames, prompt: `These are ${frames.length} frames of one film shot, each taken at a moment when ${who} is heard speaking. In how many of them are ${who}'s lips parted, as of someone in the middle of a word? Answer with the number only.` }, env), n = /\d+/.exec(said);
+    return n ? { open: Math.min(frames.length, +n[0]), of: frames.length } : null;
+  } finally { for (const f of frames) fs.rmSync(f, { force: true }); }
+}
+
 // { prompt } → instrumental music (mp3)
 export async function makeMusic(r, w, file, env = process.env) {
   if (r.door === 'google') { const s = await google.music({ model: r.id, prompt: w.prompt }, env); return keep(s.bytes, file, 'mp3'); }

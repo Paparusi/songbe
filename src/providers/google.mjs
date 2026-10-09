@@ -40,6 +40,13 @@ export async function hear({ model, file, language }, env = process.env) {
   return /^none\.?$/i.test(out) ? '' : out;
 }
 
+// pictures and a question about them → what the model answers
+export async function see({ model, files, prompt }, env = process.env) {
+  const j = await call(`models/${model}:generateContent`, { contents: [{ role: 'user', parts: [...files.map((f) => ({ inlineData: { mimeType: mimeOf(f), data: b64(f) } })), { text: prompt }] }],
+    generationConfig: { maxOutputTokens: 2000, temperature: 0 } }, { env, timeout: 60000 });
+  return partsOf(j).filter((p) => !p.thought).map((p) => p.text || '').join('').trim();
+}
+
 // words (and pictures to work from, in the order the words refer to them) → one picture. Returns the bytes and what they are.
 export async function picture({ model, prompt, refs = [], aspect = '9:16', size }, env = process.env) {
   const j = await call(`models/${model}:generateContent`, { contents: [{ parts: [...refs.map((f) => ({ inlineData: { mimeType: mimeOf(f), data: b64(f) } })), { text: prompt }] }],

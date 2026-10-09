@@ -165,7 +165,7 @@ no voice in it, with far more than the line, or with only a part of it. When no 
 and nothing is built on it; its takes are kept, and choosing one (`songbe flow pick`, or its button in the panel) uses it as
 it is. What is only **odd** is used and pointed at — a mark on the card, a line in the panel (click it and the clip jumps to
 that moment), a tag on the board, a line in `songbe flow`: a strong colour that appears in a clip and is not in its first
-frame, a jump as if cut to another shot, a stretch of black, a clip that does not begin on its picture or is shorter than
+frame, a jump as if cut to another shot (also when the clip leaves its first frame at once, framed anew), a stretch of black, a clip that does not begin on its picture or is shorter than
 asked, a long pause inside a line, a line recorded to picture that had to be stretched hard to fit the lips, a picture in another shape, with plain bars, or of one flat colour.
 Takes made before Songbe did this are looked at once when the film is opened in the app, or by `songbe flow review`.
 
@@ -175,6 +175,12 @@ again by the run itself — before a clip is acted to it, which is what a take n
 only doubtful is used and pointed at, with what the listener heard; a line of one or two words is never refused for it, and
 words are compared without their marks, because a listener often hears another tone. `"listen": false` in `series.json`
 turns it off. It costs a fraction of a cent for a whole film, and nothing is concluded when nobody can listen.
+
+**Looking at the lips.** A clip acted to a recording can come back with the voice and a mouth that stays shut through the
+whole line — nothing measured can tell, and it reads as a voice from nowhere. With the same key, a few frames of every such
+clip, taken at the loudest moments of the line, are shown to a model that sees, which counts the frames in which the speaker's
+lips are parted. None at all: the clip is filmed again by the run itself. Only one in five or six: it is used and pointed at.
+The same switch turns it off.
 
 Every result is a **take**, kept under a key made from everything it was made from — the words, the model, and the takes of the
 nodes it works from. So running again costs nothing, and changing one thing leaves exactly the nodes that work from it to be made

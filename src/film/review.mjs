@@ -65,6 +65,8 @@ export function reviewClip(file, { start = null, how = null, spoke = null, text 
   if (frames.length < 4) return found;
   const moves = frames.slice(1).map((f, i) => apart(f, frames[i]));
   if (Math.max(...moves) < .06) found.push({ what: 'still', grave: true, says: 'the picture does not move' });
+  // a clip that leaves its first frame at once: the first step is the cut (the model framed the shot anew, closer or wider)
+  if (moves[0] >= 28 && moves[0] >= 4 * Math.max(middle(moves.slice(1, 7)), .5) && moves[1] < moves[0] / 2.5) found.push({ what: 'jump', at: secs(1), says: 'the picture leaves its first frame at once, as if cut to another shot' });
   // a cut inside the clip: one step far larger than the steps around it, with calm on both sides
   for (let i = 1; i < moves.length - 1; i++) {
     const around = middle(moves.slice(Math.max(0, i - 6), i).concat(moves.slice(i + 1, i + 7)));
@@ -111,6 +113,17 @@ export function reviewHeard(text, heard) {
   const share = heardShare(text, heard), as = String(heard).trim() ? `"${String(heard).trim()}"` : 'nothing';
   if (n >= 3 && share < .34) return [{ what: 'unheard', grave: true, says: `a listener heard ${as}: the line cannot be made out` }];
   if (share < (n >= 3 ? .6 : .5)) return [{ what: 'unclear', says: `a listener heard ${as}: listen to it` }];
+  return [];
+}
+
+// ---- the lips of someone who speaks ----
+// `lips` is what a model that sees counted: in `of` frames taken while the line is heard, the speaker's lips are parted in `open`.
+// (A clip acted to a recording came back with the voice and a mouth that stayed shut through the whole line: nothing measured
+// could tell, and it read as a voice from nowhere.)
+export function reviewLips(lips) {
+  if (!lips || !(lips.of >= 3)) return [];
+  if (lips.open === 0) return [{ what: 'lips', grave: true, says: `the line is heard, and in none of ${lips.of} moments of it are the speaker's lips parted` }];
+  if (lips.of >= 5 && lips.open === 1) return [{ what: 'lips', says: `the speaker's lips are parted in only one of ${lips.of} moments of the line: look at it` }];
   return [];
 }
 

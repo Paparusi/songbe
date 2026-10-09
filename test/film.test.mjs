@@ -12,7 +12,7 @@ import { timeline } from '../src/film/cut.mjs';
 import { expand, stageNodes, sync } from '../src/film/director.mjs';
 import { checkFlow, estimate, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
 import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
-import { grave, heardShare, inWords, reviewClip, reviewFit, reviewHeard, reviewPicture, reviewVoice } from '../src/film/review.mjs';
+import { grave, heardShare, inWords, reviewClip, reviewFit, reviewHeard, reviewLips, reviewPicture, reviewVoice } from '../src/film/review.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, episodeFile, lengthOf, readEpisode, readSeries, seriesFile, speechSeconds, writeJson, written } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { bibleSystem, castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
@@ -326,6 +326,9 @@ test('a take is looked at without asking any model: a clip that grows a colour, 
   // a cut to something else at 2 s
   ff(...room, '-f', 'lavfi', '-t', '2', '-i', 'testsrc2=s=180x320:r=24', '-filter_complex', `${moving},trim=0:2,setpts=PTS-STARTPTS[a];[a][2]concat=n=2:v=1:a=0[o]`, '-map', '[o]', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', at('jump.mp4'));
   const jump = reviewClip(at('jump.mp4')).find((f) => f.what === 'jump'); assert.ok(jump && Math.abs(jump.at - 2) < .15, JSON.stringify(reviewClip(at('jump.mp4'))));
+  // a clip that leaves its first frame at once: one frame of the room, then something else (a clip model framed a shot anew, closer, from its second frame)
+  ff('-f', 'lavfi', '-t', '0.08', '-i', 'color=c=0x24364a:s=180x320:r=24', '-f', 'lavfi', '-t', '3', '-i', 'testsrc2=s=180x320:r=24', '-filter_complex', '[0][1]concat=n=2:v=1:a=0[o]', '-map', '[o]', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', at('leaves.mp4'));
+  const leaves = reviewClip(at('leaves.mp4')).find((f) => f.what === 'jump'); assert.ok(leaves && leaves.at <= .2, JSON.stringify(reviewClip(at('leaves.mp4')))); assert.match(leaves.says, /leaves its first frame at once/);
   // a picture that never moves, and one that goes black for a second
   ff('-f', 'lavfi', '-t', '3', '-i', 'color=c=0x24364a:s=180x320:r=24', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', at('still.mp4'));
   assert.deepEqual(reviewClip(at('still.mp4')).map((f) => [f.what, !!f.grave]), [['still', true]]);
@@ -368,6 +371,20 @@ test('a recorded line is listened to when someone can: one nobody can make out i
   assert.equal(heardShare('Rồi sao hả anh?', 'Gọi sao hả anh?'), .75); assert.equal(heardShare('Rồi sao hả anh?', 'Cô Sáu Hán'), 0); assert.equal(heardShare('你在哪里？', '你在那里'), .75);
   assert.deepEqual(reviewHeard('Không...', 'Hãy subscribe cho kênh').map((f) => [f.what, !!f.grave]), [['unclear', false]]); assert.deepEqual(reviewHeard('Về phòng đi.', '').map((f) => [f.what, !!f.grave]), [['unheard', true]]);
   assert.deepEqual(reviewHeard('Anh không biết.', undefined), [], 'not listened to: nothing is said'); assert.deepEqual(reviewHeard('Khuya mà nghe tiếng gì bên vách... tuyệt đối đừng gõ lại.', 'Khuya mà nghe tiếng dì bệnh giách, tuyệt đối đừng gõ lại.'), []);
+});
+
+test('the lips of someone who speaks are looked at when someone can: a clip with the voice and a mouth that stays shut is filmed again', async () => {
+  // the one who looks sees no parted lips in the first take, and four in the second
+  const dir = fresh('lips'), flow = small(), use = standIns(), events = [], asked = []; let n = 0; use.lipsOf = async (file, w) => { asked.push(w); return ++n === 1 ? { open: 0, of: 6 } : { open: 4, of: 6 }; };
+  const r = await runFlow(dir, flow, { use, on: (e) => events.push(`${e.type} ${e.id}${e.why ? ': ' + e.why : ''}`) });
+  assert.deepEqual(r.failed, []); assert.equal(use.asked.filter((x) => x.kind === 'clip' && /Lan looks up/.test(x.prompt)).length, 2, 'filmed once more, by the run itself');
+  assert.ok(events.includes("again s1: the line is heard, and in none of 6 moments of it are the speaker's lips parted"), events.join(' | '));
+  assert.equal(asked.length, 2, 'only the clip someone speaks in is looked at'); assert.equal(asked[0].who, 'Lan'); assert.ok(/\.wav$/.test(asked[0].voice) && asked[0].lead > 0, 'told whose lips, and where the line lies in the clip');
+  const takes = Object.values(JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat().filter((t) => t.info?.lips); assert.deepEqual(takes.map((t) => [t.n, !!t.bad, t.info.lips.open]), [[1, true, 0], [2, false, 4]]);
+  // turned off, nobody looks; and from someone who cannot look nothing is concluded
+  const off = standIns(); let looked = 0; off.lipsOf = async () => { looked++; return { open: 0, of: 6 }; }; await runFlow(fresh('lips-off'), { ...small(), listen: false }, { use: off }); assert.equal(looked, 0);
+  const down = standIns(); down.lipsOf = async () => { throw new Error('no answer'); }; assert.deepEqual((await runFlow(fresh('lips-down'), small(), { use: down })).failed, []); assert.equal(down.asked.filter((x) => x.kind === 'clip').length, 2);
+  assert.deepEqual(reviewLips({ open: 1, of: 6 }).map((f) => [f.what, !!f.grave]), [['lips', false]]); assert.deepEqual(reviewLips({ open: 0, of: 2 }), [], 'too few moments to say'); assert.deepEqual(reviewLips({ open: 3, of: 6 }), []); assert.deepEqual(reviewLips(null), []);
 });
 
 test('a run looks at what it makes: a take that cannot be used is asked for again, the better one stands, and nothing is built on a node that has none', async () => {

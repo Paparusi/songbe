@@ -17,7 +17,7 @@ import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
 import { costOf, nameOf, secondsOf } from './models.mjs';
-import { grave, inWords, reviewClip, reviewFit, reviewHeard, reviewPicture, reviewSound, reviewVoice } from './review.mjs';
+import { grave, inWords, reviewClip, reviewFit, reviewHeard, reviewLips, reviewPicture, reviewSound, reviewVoice } from './review.mjs';
 import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
 import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
@@ -273,7 +273,7 @@ async function clip(c, id, n) {
   const prompt = `${w.words.trim()}${speech} No subtitles, no captions, no text on screen. No music.`, aspect = ASPECT[c.flow.format] || ASPECT.tall, resolution = n.resolution || c.flow.resolution || '720p';
   return { recipe: { kind: 'clip', model: r.name, how, prompt, frame: take(frame), end: take(end), voice: how === 'voice' ? rec.take : undefined, refs: refs.map(take), seconds, aspect, resolution, sound: n.sound !== false, options: n.options }, by: r,
     info: { how, length: how === 'native' ? null : length, keeps: how === 'voice' && can.acts === 'keeps' }, units: seconds,
-    review: (file, found) => reviewClip(file, { start: frame?.file || null, how, spoke: found?.spoke || null, text: line?.text || null, language: c.flow.language, asked: seconds }),
+    review: (file, found) => [...reviewClip(file, { start: frame?.file || null, how, spoke: found?.spoke || null, text: line?.text || null, language: c.flow.language, asked: seconds }), ...reviewLips(found?.lips)],
     make: async (file, { seed }) => {
       const track = how === 'voice' ? file + '.talk.wav' : null;      // the recording as the actor hears it: a breath of silence, the line, then silence to the end of the clip
       if (track) ff('-f', 'lavfi', '-t', String(LEAD), '-i', 'anullsrc=r=48000:cl=mono', '-i', rec.file, '-filter_complex', `[0][1]concat=n=2:v=0:a=1,apad=whole_dur=${Math.max(2, seconds)}`, '-ar', '48000', '-ac', '1', track);
@@ -281,7 +281,12 @@ async function clip(c, id, n) {
       finally { if (track) fs.rmSync(track, { force: true }); }
       if (how === 'native') return { spoke: speechSpans(file) };      // where the model spoke, for the cut
       // a model that keeps the recording it acts to, and came back without it: the cut lays the recording in
-      return how === 'voice' && can.acts === 'keeps' && !(MODELS.hasSound(file) && speechSpans(file).length) ? { lost: true } : null;
+      const found = how === 'voice' && can.acts === 'keeps' && !(MODELS.hasSound(file) && speechSpans(file).length) ? { lost: true } : null;
+      // when someone can look (a key for a model that sees), the speaker's lips are looked at in a few moments of the line: a clip in
+      // which the voice is heard and the mouth stays shut is filmed again. (Not being able to look says nothing about the take.)
+      if (how !== 'voice' || c.flow.listen === false || !c.use.lipsOf) return found;
+      let lips = null; try { lips = await c.use.lipsOf(file, { who, voice: rec.file, lead: LEAD }, c.env); } catch {}
+      return lips ? { ...(found || {}), lips } : found;
     } };
 }
 function music(c, id, n) {

@@ -21,6 +21,12 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
   run itself, a doubtful one is pointed at with what was heard, and what was heard is kept with the take. Tried on that
   line: the take that could not be understood was heard as three other words and refused, the one recorded after it was heard
   right. `"listen": false` in `series.json` turns it off.
+- **The lips of someone who speaks are looked at.** A clip acted to a recording came back with the voice and a mouth shut
+  through a five-second line, and nothing measured could tell. With a key for a model that sees, a few frames taken at the
+  loudest moments of the line are shown to it, and it counts those in which the speaker's lips are parted: none, and the
+  clip is filmed again by the run itself. Tried on that clip: 0 of 6 for the take with the shut mouth, 3 of 6 for the take
+  filmed after it, 3 of 3 for two other speaking clips.
+- The review also finds a clip that leaves its first frame at once (the model frames the shot anew from its second frame).
 - **The last episode ends the story.** The writer was told to end every episode on an open question, the last one too — and
   a three-episode film ended on a look, with nothing paid off. It is now told that the last episode is different: what the
   series set up is paid off on screen, we see what became of the person we followed, and it closes on an image that is final.
