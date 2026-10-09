@@ -14,7 +14,8 @@ import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
 import { nameOf, secondsOf } from './models.mjs';
-import { ASPECT, LEAD, lengthOf, speechSeconds } from './series.mjs';
+import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
+import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
 import { exists, mkdir, run, sha, tools } from '../util.mjs';
 
@@ -26,14 +27,16 @@ export const KINDS = {
   person: { must: ['name'], may: ['look', 'wardrobe', 'manner', 'voice'] },
   place: { must: ['name'], may: ['look'] },
   picture: { one: ['prompt', 'file', 'grab'], may: ['model', 'aspect', 'refs', 'at', 'options'], ext: 'jpg' },
-  voice: { one: ['text', 'file'], may: ['who', 'how', 'voice', 'model', 'style', 'speed', 'options'], ext: 'wav' },
-  clip: { one: ['prompt', 'file'], may: ['frame', 'end', 'voice', 'heard', 'refs', 'model', 'seconds', 'sound', 'resolution', 'options'], ext: 'mp4' },
+  voice: { one: ['text', 'file'], may: ['who', 'how', 'voice', 'model', 'style', 'speed', 'fit', 'options'], ext: 'wav' },
+  clip: { one: ['prompt', 'file'], may: ['frame', 'end', 'voice', 'heard', 'ownVoice', 'refs', 'model', 'seconds', 'sound', 'resolution', 'options'], ext: 'mp4' },
   music: { one: ['prompt', 'file'], may: ['model', 'options'], ext: 'mp3' },
   cut: { must: ['shots'], may: ['music', 'title', 'notice', 'subtitles', 'musicVolume'], ext: 'mp4' },
 };
 const ANY = ['kind', 'label', 'group', 'note', 'by', 'as', 'of', 'xy'];      // what every node may carry (by, as, of: the director's marks; xy: where it sits on the canvas)
 const WORD = { picture: 'image', clip: 'video', voice: 'audio', music: 'audio' };
-const SLOTS = { picture: ['grab'], clip: ['frame', 'end', 'voice'], cut: ['music'] };      // the fields in which a node names another it is made from
+const SLOTS = { picture: ['grab'], clip: ['frame', 'end', 'voice'], voice: ['fit'], cut: ['music'] };      // the fields in which a node names another it is made from
+// a line recorded to the lips of a clip ("fit") is made after that clip, not before it
+const fitted = (flow, clip) => { const v = flow.nodes[idOf(flow.nodes[clip]?.voice)]; return !!v && idOf(v.fit) === clip; };
 const made = (node) => !!KINDS[node?.kind]?.ext;
 export const idOf = (ref) => String(ref || '').replace(/^@/, '');
 const list = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
@@ -65,7 +68,7 @@ export function needs(flow, id) {
   if (!n || n.file) return [];
   const add = (ref) => { const x = idOf(ref); if (flow.nodes[x] && made(flow.nodes[x])) out.add(x); };
   for (const x of mentioned(flow, n.prompt)) add(x);
-  for (const slot of SLOTS[n.kind] || []) if (n[slot]) add(n[slot]);
+  for (const slot of SLOTS[n.kind] || []) if (n[slot] && !(slot === 'voice' && fitted(flow, id))) add(n[slot]);
   for (const r of list(n.refs)) add(r);
   if (n.kind === 'cut') for (const s of list(n.shots)) { const c = idOf(shotOf(s).clip); add(c); if (flow.nodes[c]?.voice) add(flow.nodes[c].voice); }
   out.delete(id); return [...out];
@@ -97,7 +100,7 @@ export function checkFlow(flow, dir = null) {
     for (const m of String(n.prompt || n.text || '').matchAll(MENTION)) if (m[1] !== '@' && !nodes[m[1]]) bad.push(`${id}: it mentions @${m[1]}, and there is no such node (write @@ for a plain @)`);
     for (const x of mentioned(flow, n.kind === 'text' ? '' : n.prompt)) if (n.kind === 'picture' && !is(x, 'picture', 'person', 'place')) bad.push(`${id}: a picture can only be made from pictures, and @${x} is a ${nodes[x].kind}`);
     const slot = (f, ...kinds) => { if (n[f] !== undefined && !is(n[f], ...kinds)) bad.push(`${id}.${f}: must name a ${kinds.join(' or ')} node, like "@${kinds[0] === 'picture' ? 'lan-face' : 'e1-s1'}"`); };
-    slot('frame', 'picture'); slot('end', 'picture'); slot('grab', 'clip'); if (n.kind === 'clip') slot('voice', 'voice'); if (n.kind === 'voice') slot('who', 'person'); if (n.kind === 'cut') slot('music', 'music');
+    slot('frame', 'picture'); slot('end', 'picture'); slot('grab', 'clip'); if (n.kind === 'clip') slot('voice', 'voice'); if (n.kind === 'voice') { slot('who', 'person'); slot('fit', 'clip'); if (n.fit && idOf(nodes[idOf(n.fit)]?.voice) !== id) bad.push(`${id}.fit: ${n.fit} does not have this line as its "voice"`); } if (n.kind === 'cut') slot('music', 'music');
     for (const r of list(n.refs)) if (!is(r, 'picture')) bad.push(`${id}.refs: "${r}" is not a picture node`);
     if (n.kind === 'cut') { if (!Array.isArray(n.shots) || !n.shots.length) bad.push(`${id}: a cut needs its shots, in order`);
       else n.shots.forEach((s, i) => { const c = shotOf(s); if (!is(c.clip, 'clip')) bad.push(`${id}.shots[${i}]: "${c.clip}" is not a clip node`); if (c.from !== undefined && c.to !== undefined && !(c.to > c.from)) bad.push(`${id}.shots[${i}]: "to" must come after "from"`); }); }
@@ -171,20 +174,46 @@ function voice(c, id, n) {
   // a model that takes direction is told who speaks and how; one that does not is given the language and the line
   const style = r.known?.directed ? [`Language: ${language || 'the language the line is written in'}${c.flow.accent ? ', ' + c.flow.accent : ''}.`, person ? `Speaker: ${person.name}${person.manner ? ', ' + person.manner : ''}.` : null, set.style ? `Voice: ${set.style}.` : null,
     `Delivery: ${n.how || 'natural'}. A line of dialogue in a film, said to someone in the same room: conversational pace, not a narrator, not an announcer.`].filter(Boolean).join('\n') : set.style || null;
-  return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r,
-    make: (file) => c.use.makeVoice(r, { text: n.text, voice: name, style, language: language || 'auto', speed: set.speed, options: n.options }, file, c.env) };
+  const say = (how, file) => c.use.makeVoice(r, { text: n.text, voice: name, style: how, language: language || 'auto', speed: set.speed, options: n.options }, file, c.env);
+  if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, make: (file) => say(style, file) };
+  // Recorded to picture, the way a line is dubbed: the clip was filmed first with the actor speaking in a voice of the model's
+  // choosing; the line is now recorded in the person's own voice to last as long as the lips moved (asked for again when it
+  // comes out too long or too short to be stretched), and set exactly where they moved. The result is as long as the clip.
+  const clip = c.got(idOf(n.fit)), spoke = spokenPart(clip.info?.spoke || [], speechSeconds(n.text, language)), target = +spoke.reduce((t, [a, b]) => t + b - a, 0).toFixed(2);
+  return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options, fit: { clip: clip.take, spoke } }, by: r,
+    make: async (file) => {
+      if (!spoke.length) { await say(style, file); return { fit: false }; }      // nobody was heard speaking in the clip: the line is recorded as it is and laid over
+      let best = null, ask = target;
+      for (let tries = 1; tries <= 4; tries++) {
+        // first as the line comes naturally (a voice told to hurry speaks less clearly); only when that does not fit is it told how long to take
+        const tmp = `${file}.${tries}.wav`, pace = `Pace: ${spoke.length > 1 ? `in ${spoke.length} phrases with a short pause between them` : 'in one breath, with no pause inside the line'}. From the first word to the last, the line lasts about ${ask.toFixed(1)} seconds.`;
+        await say(r.known?.directed && tries > 1 ? `${style}\n${pace}` : style, tmp);
+        const said = speechSpans(tmp), lasts = said.reduce((t, [a, b]) => t + b - a, 0), off = lasts ? Math.abs(Math.log(lasts / target)) : Infinity;
+        if (!best || off < best.off) { if (best) fs.rmSync(best.tmp, { force: true }); best = { tmp, said, lasts, off, tries }; } else fs.rmSync(tmp, { force: true });
+        if (lasts >= target * .84 && lasts <= target * 1.22) break;
+        ask = Math.min(target * 2, Math.max(target * .5, ask * target / (lasts || target)));      // too slow: ask for less time; too quick: for more
+      }
+      const lay = layLine(spoke, best.said), total = secondsOf(clip.file);
+      try { ff(...lay.flatMap((l) => ['-ss', String(l.from), '-t', String(+(l.to - l.from).toFixed(3)), '-i', best.tmp]), '-filter_complex',
+        lay.map((l, i) => `[${i}:a]atempo=${l.tempo}${l.at > 0 ? `,adelay=${Math.round(l.at * 1000)}:all=1` : ''}[p${i}]`).join(';') + `;${lay.map((_, i) => `[p${i}]`).join('')}amix=inputs=${lay.length}:normalize=0,apad=whole_dur=${total}[o]`, '-map', '[o]', '-t', String(total), '-ar', '48000', '-ac', '1', file); }
+      finally { fs.rmSync(best.tmp, { force: true }); }
+      return { fit: true, lay, takes: best.tries };
+    } };
 }
 async function clip(c, id, n) {
   const line = n.voice ? c.flow.nodes[idOf(n.voice)] : null, seen = !!line && !n.heard, r = c.use.modelFor(seen ? 'talk' : 'clip', n.model || c.flow.models?.[seen ? 'talk' : 'clip'], c.env, c.strict);
   const frame = n.frame ? c.got(idOf(n.frame)) : null, end = n.end ? c.got(idOf(n.end)) : null, w = wordsOf(c.flow, n.prompt, c.got);
   const refs = [...w.files, ...more(c, n, w)];
   const can = await c.use.clipAbilities(r, { frame: !!frame, refs });
-  // someone seen speaking: the model acts to our recording when it can, speaks the line itself when it can only do that; a voice
-  // that is only heard is laid over a clip in which nobody speaks
-  const how = !line ? 'plain' : !seen ? 'over' : can.acts ? 'voice' : can.speaks ? 'native' : 'over';
-  const rec = line && how !== 'native' ? c.got(idOf(n.voice)) : null, said = rec ? secondsOf(rec.file) : null;
-  const length = how === 'native' ? n.seconds || +(speechSeconds(line.text, c.flow.language) + 1.6).toFixed(1) : lengthOf(n, said), seconds = MODELS.fitSeconds(can, length);
-  if (rec && seconds < length - .05) throw new Error(`the line runs ${said.toFixed(1)} s and ${r.name} makes at most ${seconds} s: shorten the line, or give part of it to another shot`);
+  // someone seen speaking: the model acts to our recording when it can; when it can only speak the line itself it does, and the
+  // cut puts the person's own recorded voice where the model spoke (unless the node keeps the model's voice: ownVoice). A voice
+  // that is only heard is laid over a clip in which nobody speaks.
+  const dubbed = !!line && idOf(line.fit) === id;      // its line is recorded to its lips afterwards: the model has to speak the line itself
+  if (dubbed && (!seen || !can.speaks)) throw new Error(seen ? `${r.name} does not speak a line by itself, so the line cannot be recorded to its lips: take "fit" off ${n.voice}, and the model acts to the recording instead` : `${n.voice} is recorded to the lips of ${id}, where the speaker is only heard: take "fit" off it`);
+  const how = !line ? 'plain' : !seen ? 'over' : dubbed ? 'native' : can.acts ? 'voice' : can.speaks ? 'native' : 'over';
+  const rec = line && !dubbed ? c.got(idOf(n.voice)) : null, said = rec ? secondsOf(rec.file) : null;
+  const length = how === 'native' ? n.seconds || +(LEAD + (said ?? speechSeconds(line.text, c.flow.language)) * 1.15 + TAIL + .4).toFixed(1) : lengthOf(n, said), seconds = MODELS.fitSeconds(can, length);
+  if (rec && seconds < (how === 'native' ? said + .5 : length - .05)) throw new Error(`the line runs ${said.toFixed(1)} s and ${r.name} makes at most ${seconds} s: shorten the line, or give part of it to another shot`);
   if (end && !can.end) throw new Error(`${r.name} does not take a last frame`);
   const who = (line?.who && c.flow.nodes[idOf(line.who)]?.name) || 'The speaker', manner = line?.how ? ` (${line.how})` : '';
   const speech = how === 'voice' ? ` ${who} speaks${manner}, saying: "${line.text}" The lips move with the words. Nobody else speaks.`
@@ -197,6 +226,7 @@ async function clip(c, id, n) {
       if (track) ff('-f', 'lavfi', '-t', String(LEAD), '-i', 'anullsrc=r=48000:cl=mono', '-i', rec.file, '-filter_complex', `[0][1]concat=n=2:v=0:a=1,apad=whole_dur=${Math.max(2, seconds)}`, '-ar', '48000', '-ac', '1', track);
       try { await c.use.makeClip(r, { prompt, frame: frame?.file, end: end?.file, voice: track, refs: refs.map((f) => ({ file: f.file, kind: f.kind })), seconds, aspect, resolution, sound: n.sound !== false, seed, options: n.options }, file, c.env); }
       finally { if (track) fs.rmSync(track, { force: true }); }
+      return how === 'native' ? { spoke: speechSpans(file) } : null;      // where the model spoke, for the cut
     } };
 }
 function music(c, id, n) {
@@ -205,10 +235,10 @@ function music(c, id, n) {
 }
 function cutting(c, id, n) {
   const parts = list(n.shots).map((s) => { const x = shotOf(s), cid = idOf(x.clip), cn = c.flow.nodes[cid], got = c.got(cid), line = cn.voice ? c.flow.nodes[idOf(cn.voice)] : null, rec = line ? c.got(idOf(cn.voice)) : null;
-    return { id: cid, file: got.file, take: got.take, info: got.info || {}, from: x.from, to: x.to, text: line?.text || null, who: (line?.who && c.flow.nodes[idOf(line.who)]?.name) || null, rec }; });
+    return { id: cid, file: got.file, take: got.take, info: got.info || {}, from: x.from, to: x.to, text: line?.text || null, who: (line?.who && c.flow.nodes[idOf(line.who)]?.name) || null, rec, ownVoice: !!cn.ownVoice, lay: rec?.info?.fit ? rec.info.lay : null }; });
   const bed = n.music ? c.got(idOf(n.music)) : null, size = FORMATS[c.flow.format] || FORMATS.tall;
   const settings = { title: n.title || null, notice: n.notice ?? null, subtitles: n.subtitles !== false, musicVolume: n.musicVolume ?? .22, size };
-  return { recipe: { kind: 'cut', parts: parts.map((p) => ({ clip: p.take, voice: take(p.rec), from: p.from, to: p.to, text: p.text, info: p.info })), music: take(bed), ...settings }, by: null,
+  return { recipe: { kind: 'cut', parts: parts.map((p) => ({ clip: p.take, voice: take(p.rec), from: p.from, to: p.to, text: p.text, info: p.info, ownVoice: p.ownVoice, lay: p.lay })), music: take(bed), ...settings }, by: null,
     make: (file) => cut(file, { parts: parts.map((p) => ({ ...p, voice: p.rec?.file || null })), music: bed?.file || null, ...settings }) };
 }
 const PLAN = { picture, voice, clip, music, cut: cutting };
@@ -251,19 +281,24 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
     if (n.file) { out.set(id, own(dir, n)); on({ type: 'own', id }); return; }
     const held = !redo.has(id) && store.held(id);
     if (held) { out.set(id, { file: held.file, take: `${held.key}-${held.n}`, info: held.info }); result.ready.push(id); on({ type: 'ready', id, held: true }); return; }
-    const p = await PLAN[n.kind]({ flow, env, use, strict: true, got: (x) => out.get(x) }, id, n), key = sha(p.recipe), t = redo.has(id) ? null : store.current(id, key);
-    if (t) { out.set(id, { file: t.file, take: `${key}-${t.n}`, info: t.info }); result.ready.push(id); on({ type: 'ready', id }); return; }
+    // what stands is found without asking whether its model can be reached: a film made with a key that is no longer there can
+    // still be looked at, cut again and added to. Only making something needs the key of the model that makes it.
+    const stands = await PLAN[n.kind]({ flow, env, use, strict: false, got: (x) => out.get(x) }, id, n), had = redo.has(id) ? null : store.current(id, sha(stands.recipe));
+    if (had) { out.set(id, { file: had.file, take: `${sha(stands.recipe)}-${had.n}`, info: had.info }); result.ready.push(id); on({ type: 'ready', id }); return; }
+    const p = await PLAN[n.kind]({ flow, env, use, strict: true, got: (x) => out.get(x) }, id, n), key = sha(p.recipe);
     const slot = store.next(key, KINDS[n.kind].ext), t0 = Date.now(), by = p.by ? nameOf(p.by) : 'here';
     on({ type: 'start', id, kind: n.kind, by });
     busy.set(id, (async () => {
+      let found = null;      // what making it found out about the result, kept with the take
       try {
         for (let tries = 1; ; tries++) {      // a busy or unreachable provider gets a second and a third chance; a refusal does not
-          try { await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n }); break; }
+          try { found = await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n }); break; }
           catch (e) { fs.rmSync(slot.file, { force: true }); if (tries >= 3 || !/could not be reached|answered (429|5\d\d)|fal (429|5\d\d)|timed out|fetch failed|ECONNRESET/i.test(e.message)) throw e; await new Promise((r) => setTimeout(r, 4000 * tries)); }
         }
         if (!exists(slot.file) || !fs.statSync(slot.file).size) throw new Error('nothing was written');
-        const kept = store.add(id, key, { n: slot.n, file: slot.name, at: new Date().toISOString(), by, took: +((Date.now() - t0) / 1000).toFixed(1), ...(p.info ? { info: p.info } : {}) });
-        out.set(id, { file: kept.file, take: `${key}-${slot.n}`, info: p.info }); result.made.push(id); on({ type: 'done', id, kind: n.kind, by, took: kept.took, file: kept.file, n: slot.n });
+        const info = p.info || found ? { ...(p.info || {}), ...(found || {}) } : null;
+        const kept = store.add(id, key, { n: slot.n, file: slot.name, at: new Date().toISOString(), by, took: +((Date.now() - t0) / 1000).toFixed(1), ...(info ? { info } : {}) });
+        out.set(id, { file: kept.file, take: `${key}-${slot.n}`, info }); result.made.push(id); on({ type: 'done', id, kind: n.kind, by, took: kept.took, file: kept.file, n: slot.n });
       } catch (e) { failed.set(id, e.message); result.failed.push({ id, error: e.message }); on({ type: 'failed', id, error: e.message }); }
       finally { busy.delete(id); }
     })());

@@ -82,6 +82,7 @@ export function checkEpisode(series, episode) {
   const bad = [], cast = series.cast || {}, places = series.places || {}, seen = new Set();
   if (!isObject(episode)) return ['the script must be an object'];
   if (!Array.isArray(episode.scenes) || !episode.scenes.length) return ['scenes: an episode needs at least one scene'];
+  if (episode.models !== undefined && !isObject(episode.models)) bad.push('models: must be an object like { "clip": "veo-3.1-lite", "talk": "veo-3.1-fast" }');
   episode.scenes.forEach((scene, s) => {
     const at = `scenes[${s}]`;
     if (!isObject(scene)) return bad.push(`${at}: must be an object`);

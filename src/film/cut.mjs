@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { hasSound, secondsOf } from './models.mjs';
-import { LEAD } from './series.mjs';
+import { LEAD, TAIL } from './series.mjs';
+import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { run, tools } from '../util.mjs';
 
 const SR = 48000, FPS = 30, SPEECH = -21;      // dB the lines are brought to before the mix
@@ -16,14 +17,23 @@ const stamp = (t, sep = ',') => { const ms = Math.max(0, Math.round(t * 1000)); 
 const assTime = (t) => { const cs = Math.max(0, Math.round(t * 100)); return `${Math.floor(cs / 360000)}:${String(Math.floor(cs / 6000) % 60).padStart(2, '0')}:${String(Math.floor(cs / 100) % 60).padStart(2, '0')}.${String(cs % 100).padStart(2, '0')}`; };
 const assText = (s) => String(s).replace(/[{}]/g, '').replace(/\s*\n\s*/g, '\\N').trim();
 
-// Where every part falls: [{ id, start, end, from, length, pad, how, text, who, line: [start, end] | null }]
+// Where every part falls: [{ id, start, end, from, length, pad, how, text, who, line: [start, end] | null, lay }]
+// A clip in which the model spoke the line itself becomes a "dub" part when the line was also recorded in the person's own voice:
+// `lay` says which piece of the recording goes where (times within the clip), and the part is cut close around the line.
 export function timeline(parts) {
   let t = 0;
   return parts.map((p) => {
-    const have = secondsOf(p.file), from = Math.max(0, p.from ?? 0), to = p.to ?? (p.info?.length ? from + p.info.length : have), length = +Math.max(.2, to - from).toFixed(3), how = p.info?.how || 'plain';
-    const said = p.voice ? secondsOf(p.voice) : null, at = Math.max(0, LEAD - from);
-    const line = !p.text ? null : said !== null ? [t + at, Math.min(t + length, t + at + said + .15)] : [t + .2, t + length - .15];
-    const row = { id: p.id, start: +t.toFixed(3), end: +(t + length).toFixed(3), from, length, pad: +Math.max(0, from + length - have).toFixed(3), how, text: p.text || null, who: p.who || null, line: line && line.map((x) => +x.toFixed(3)) };
+    const have = secondsOf(p.file), native = (p.info?.how || 'plain') === 'native';
+    // the line was recorded to these lips (p.lay: it is already in place, in a recording as long as the clip), or it was recorded
+    // beforehand and is now stretched onto where the model spoke
+    const ready = native && p.voice && !p.ownVoice && p.lay?.length ? p.lay : null, mine = !ready && native && p.voice && !p.ownVoice ? speechSpans(p.voice) : [];
+    const spoke = mine.length ? spokenPart(p.info?.spoke || [], mine.reduce((s, [a, b]) => s + b - a, 0)) : [];
+    const lay = ready || (spoke.length ? layLine(spoke, mine) : null), how = lay ? 'dub' : native && p.voice && !p.ownVoice ? 'over' : p.info?.how || 'plain';      // the model stayed silent: the line is laid over
+    const ends = lay ? lay.at(-1).at + lay.at(-1).lasts : 0;
+    const from = Math.max(0, p.from ?? (lay ? lay[0].at - LEAD : 0)), to = Math.min(have + 2, p.to ?? (lay ? Math.max(ends + TAIL, from + (p.info?.length || 0)) : p.info?.length ? from + p.info.length : have)), length = +Math.max(.2, Math.min(to, lay ? have : to) - from).toFixed(3);
+    const said = p.voice && !lay ? secondsOf(p.voice) : null, at = Math.max(0, LEAD - from);
+    const line = !p.text ? null : lay ? [t + lay[0].at - from, Math.min(t + length, t + ends - from + .12)] : said !== null && how !== 'native' ? [t + at, Math.min(t + length, t + at + said + .15)] : [t + .2, t + length - .15];
+    const row = { id: p.id, start: +t.toFixed(3), end: +(t + length).toFixed(3), from: +from.toFixed(3), length, pad: +Math.max(0, from + length - have).toFixed(3), how, text: p.text || null, who: p.who || null, line: line && line.map((x) => +x.toFixed(3)), ...(lay ? { lay, placed: !!ready } : {}) };
     t += length; return row;
   });
 }
@@ -53,12 +63,18 @@ export function cut(file, { parts, music = null, title = null, notice = null, su
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-video_track_timescale', '15360', path.join(work, `v${n}.mp4`)]);
       // its sound. A clip that acted to our recording and kept it already holds the line; one that did not keep it, or in which the
       // voice is only heard, gets the recording laid in; a model that spoke the line itself is taken as it is.
-      const lay = p.voice && !(how === 'voice' && p.info?.keeps && own), keepOwn = own && !(how === 'voice' && !p.info?.keeps);
+      const dub = how === 'dub', lay = !dub && p.voice && how !== 'native' && !(how === 'voice' && p.info?.keeps && own), keepOwn = own && !(how === 'voice' && !p.info?.keeps);
       const inputs = [], chains = [], mix = [];
-      if (keepOwn) { inputs.push('-ss', String(r.from), '-t', String(r.length), '-i', p.file); chains.push(`[${mix.length}:a]aresample=${SR},aformat=channel_layouts=stereo,volume=${lay ? .55 : 1},apad=whole_dur=${r.length}[a${mix.length}]`); mix.push(`[a${mix.length}]`); }
+      // where the model spoke its sound is turned right down, and the rest of it — the room, a step, a door — stays
+      const hush = dub ? r.lay.map((l) => `,volume=0.04:enable='between(t,${Math.max(0, l.at - r.from - .05).toFixed(3)},${(l.at - r.from + l.lasts + .08).toFixed(3)})'`).join('') : '';
+      if (keepOwn) { inputs.push('-ss', String(r.from), '-t', String(r.length), '-i', p.file); chains.push(`[${mix.length}:a]aresample=${SR},aformat=channel_layouts=stereo,volume=${lay ? .55 : 1}${hush},apad=whole_dur=${r.length}[a${mix.length}]`); mix.push(`[a${mix.length}]`); }
       else { inputs.push('-f', 'lavfi', '-t', String(r.length), '-i', `anullsrc=r=${SR}:cl=stereo`); chains.push(`[${mix.length}:a]anull[a${mix.length}]`); mix.push(`[a${mix.length}]`); }
       if (lay) { const at = LEAD - r.from; inputs.push(...(at < 0 ? ['-ss', String(-at)] : []), '-i', p.voice);
         chains.push(`[${mix.length}:a]aresample=${SR},aformat=channel_layouts=stereo${at > 0 ? `,adelay=${Math.round(at * 1000)}:all=1` : ''},apad=whole_dur=${r.length}[a${mix.length}]`); mix.push(`[a${mix.length}]`); }
+      // the person's own voice, phrase by phrase, each brought to the length of the place it goes
+      if (dub && r.placed) { inputs.push('-ss', String(r.from), '-t', String(r.length), '-i', p.voice); chains.push(`[${mix.length}:a]aresample=${SR},aformat=channel_layouts=stereo,apad=whole_dur=${r.length}[a${mix.length}]`); mix.push(`[a${mix.length}]`); }
+      else if (dub) for (const l of r.lay) { const at = Math.max(0, l.at - r.from); inputs.push('-ss', String(l.from), '-t', String(+(l.to - l.from).toFixed(3)), '-i', p.voice);
+        chains.push(`[${mix.length}:a]aresample=${SR},atempo=${l.tempo},aformat=channel_layouts=stereo${at > 0 ? `,adelay=${Math.round(at * 1000)}:all=1` : ''},apad=whole_dur=${r.length}[a${mix.length}]`); mix.push(`[a${mix.length}]`); }
       const raw = path.join(work, `r${n}.wav`), out = path.join(work, `a${n}.wav`);
       ff([...inputs, '-filter_complex', `${chains.join(';')};${mix.join('')}amix=inputs=${mix.length}:normalize=0:duration=longest,atrim=duration=${r.length}[o]`, '-map', '[o]', '-t', String(r.length), '-ar', String(SR), '-ac', '2', raw]);
       // lines are brought to one level, so a voice does not jump between a shot that carries it and one it was laid into

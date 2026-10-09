@@ -2,6 +2,17 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.23
+- **Recorded to picture.** A clip model that speaks a line itself (Veo, Seedance, Wan…) films first, in a voice of its own; the
+  line is then recorded in the person's own voice to last as long as the lips moved — as it comes naturally, and asked for again
+  with a pace when that does not fit — set exactly where they moved, and the model's voice is turned down there. So a person
+  keeps one voice whatever model films them, without a model that acts to a recording. The director wires it for such models
+  (`fit` on the line); `ownVoice` on a clip keeps the model's voice.
+- A line already recorded can also be stretched onto where a model spoke (when a clip is handed to a speaking model by hand).
+- An episode's script may name its own models (`models`), written onto its shots only.
+- A film made with a key that is no longer set can still be looked at, cut again and added to: only making something asks for
+  the key of the model that makes it.
+
 ## 0.22
 - **Songbe is proprietary from version 0.20 on.** `LICENSE` is now the Songbe Software Licence: all rights reserved, use needs a
   licence from the owner, what you make with it is yours. Versions 0.19.1 and earlier remain under Apache-2.0. `NOTICE` lists what

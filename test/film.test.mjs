@@ -12,6 +12,7 @@ import { expand, stageNodes, sync } from '../src/film/director.mjs';
 import { checkFlow, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
 import { KNOWN, chosen, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, lengthOf, readEpisode, readSeries, speechSeconds } from '../src/film/series.mjs';
+import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
 import { serve } from '../src/studio.mjs';
 import { run, sha, tools } from '../src/util.mjs';
@@ -22,16 +23,19 @@ const fresh = (name) => { const d = path.join(scratch, name); fs.mkdirSync(d, { 
 const ff = (...a) => run(tools.ffmpeg, ['-v', 'error', '-y', ...a]);
 
 // Stand-ins for the models: each remembers what it was asked and writes a real, tiny file. "speaker" is a clip model that says the
-// line itself and cannot act to a recording; every other clip model acts to the recording and returns it as the clip's sound.
+// line itself and cannot act to a recording (its clip has a voice from 1.0 s to 2.2 s and is silent otherwise); every other clip
+// model acts to the recording and returns it as the clip's sound.
 function standIns({ refuse = null } = {}) {
   const asked = [];
   return { asked,
     modelFor: (role, named) => ({ name: named || `stand-in-${role === 'talk' ? 'clip' : role}`, door: 'none', id: 'x', known: { kind: role === 'talk' ? 'clip' : role, by: 'nobody', directed: true, voices: { female: { Ann: 'plain' }, male: { Bob: 'plain' } } } }),
     clipAbilities: async (r) => ({ seconds: { min: 1, max: 12, whole: true }, end: true, acts: r.name === 'speaker' ? false : 'keeps', speaks: r.name === 'speaker', sound: true }),
     makePicture: async (r, w, file) => { asked.push({ kind: 'picture', ...w }); if (refuse?.test(w.prompt)) throw new Error('the model refused'); ff('-f', 'lavfi', '-i', 'color=c=gray:s=180x320', '-frames:v', '1', '-q:v', '6', file); },
-    makeVoice: async (r, w, file) => { asked.push({ kind: 'voice', ...w }); ff('-f', 'lavfi', '-t', String(Math.max(.6, w.text.split(/\s+/).length * .3)), '-i', 'sine=frequency=220:sample_rate=48000', file); },
+    // a voice that is told how long a line should last takes half as long again (so that being asked a second time is tested)
+    makeVoice: async (r, w, file) => { asked.push({ kind: 'voice', ...w }); const told = /lasts about ([\d.]+) seconds/.exec(w.style || '');
+      ff('-f', 'lavfi', '-t', String(told ? +told[1] * 1.5 : Math.max(.6, w.text.split(/\s+/).length * .3)), '-i', 'sine=frequency=220:sample_rate=48000', file); },
     makeClip: async (r, w, file) => { asked.push({ kind: 'clip', model: r.name, ...w, heard: w.voice ? secondsOf(w.voice) : null });
-      ff('-f', 'lavfi', '-t', String(w.seconds), '-i', 'testsrc2=s=180x320:r=24', '-f', 'lavfi', '-t', String(w.seconds), '-i', 'sine=frequency=330:sample_rate=48000', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', file); },
+      ff('-f', 'lavfi', '-t', String(w.seconds), '-i', 'testsrc2=s=180x320:r=24', '-f', 'lavfi', '-t', String(w.seconds), '-i', 'sine=frequency=330:sample_rate=48000', ...(r.name === 'speaker' ? ['-af', "volume=0:enable='lt(t,1)+gt(t,2.2)'"] : []), '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', file); },
     makeMusic: async (r, w, file) => { asked.push({ kind: 'music', ...w }); ff('-f', 'lavfi', '-t', '6', '-i', 'sine=frequency=110:sample_rate=44100', '-b:a', '64k', file); } };
 }
 // a canvas small enough to follow by eye: a note, a person with a face and a sheet, one shot with a line, music, and the cut
@@ -127,6 +131,25 @@ test('a node that fails is reported, what needs it is not attempted, and everyth
   assert.deepEqual(r.failed.map((f) => f.id), ['lan-sheet', 's1-frame', 's1', 's2', 'film']); assert.equal(r.failed[0].error, 'the model refused'); assert.match(r.failed[1].error, /needs lan-sheet/);
   assert.equal(madeOf(await runFlow(dir, flow, { use: standIns() })), 'film lan-sheet s1 s1-frame s2', 'the next run picks up where this one stopped');
   await assert.rejects(runFlow(dir, { nodes: { a: { kind: 'picture' } } }, { use }), /flow\.json has 1 problem/);
+  // a film made with a key that is gone: everything that stands is still found; only making something new asks for the key
+  const gone = { ...standIns(), modelFor: (role, named, env, strict = true) => { if (strict) throw new Error('that model needs a key that is not set'); return standIns().modelFor(role, named); } };
+  const still = await runFlow(dir, flow, { use: gone }); assert.deepEqual([still.made, still.failed], [[], []]); assert.equal(still.ready.length, 8);
+  flow.nodes.music.prompt = 'A slow cello.'; const partly = await runFlow(dir, flow, { use: gone });
+  assert.deepEqual(partly.failed.map((f) => `${f.id}: ${f.error}`), ['music: that model needs a key that is not set', 'film: needs music, which was not made']); assert.equal(partly.ready.length, 6);
+});
+
+test('where a voice is heard in a sound is found, and a recorded line is laid onto where the actor spoke', () => {
+  const dir = fresh('speech'), a = path.join(dir, 'a.wav');
+  ff('-f', 'lavfi', '-t', '6', '-i', 'sine=frequency=400:sample_rate=48000', '-af', "volume=0:enable='lt(t,0.8)+between(t,1.9,2.6)+gt(t,4.4)'", a);      // two phrases: 0.8–1.9 and 2.6–4.4
+  const spans = speechSpans(a); assert.equal(spans.length, 2); for (const [i, want] of [[0, [.8, 1.9]], [1, [2.6, 4.4]]]) for (const k of [0, 1]) assert.ok(Math.abs(spans[i][k] - want[k]) < .08, `${spans[i]} is about ${want}`);
+  ff('-f', 'lavfi', '-t', '2', '-i', 'anullsrc=r=48000:cl=mono', a); assert.deepEqual(speechSpans(a), [], 'room tone is not a voice');
+  // the line among other noises: the run of stretches whose length is nearest to the line's
+  assert.deepEqual(spokenPart([[.1, .3], [1, 2.4], [2.7, 3.9], [5.5, 5.7]], 2.5), [[1, 2.4], [2.7, 3.9]]); assert.deepEqual(spokenPart([[.2, .5], [1, 3]], 2.1), [[1, 3]]); assert.deepEqual(spokenPart([], 2), []);
+  // phrase onto phrase when both pause alike; each stretched to its place, but never more than sounds right
+  assert.deepEqual(layLine([[1, 2], [3, 5]], [[0, 1.1], [1.5, 3.3]]), [{ from: 0, to: 1.1, at: 1, tempo: 1.1, lasts: 1 }, { from: 1.5, to: 3.3, at: 3, tempo: .9, lasts: 2 }]);
+  assert.deepEqual(layLine([[1, 4]], [[0, 1], [1.4, 2.6]]), [{ from: 0, to: 2.6, at: 1, tempo: .8667, lasts: 3 }], 'a different number of phrases: the whole line onto the whole stretch');
+  assert.deepEqual(layLine([[1, 2]], [[0, 2]]), [{ from: 0, to: 2, at: .68, tempo: 1.22, lasts: 1.639 }], 'twice too long for its place: sped up as far as sounds right, and centred');
+  assert.deepEqual(layLine([], [[0, 1]]), []);
 });
 
 test('a line can be acted to, spoken by the model itself, or only heard — and a file of your own stands in for any node', async () => {
@@ -141,9 +164,41 @@ test('a line can be acted to, spoken by the model itself, or only heard — and 
   const spoken = use.asked.find((a) => a.kind === 'clip' && a.model === 'speaker'); assert.equal(spoken.voice, null); assert.match(spoken.prompt, /Lan says in Vietnamese \(quiet\): "Anh về rồi à\?"/);
   const over = use.asked.find((a) => a.kind === 'clip' && a.prompt.startsWith('Medium')); assert.equal(over.voice, null); assert.match(over.prompt, /Nobody in the frame speaks/);
   const laid = JSON.parse(fs.readFileSync(r.out.get('film').file.replace(/\.mp4$/, '.json'), 'utf8')).parts;
-  assert.deepEqual(laid.map((p) => p.how), ['native', 'plain', 'over']); assert.ok(laid[2].line[0] - laid[2].start - LEAD < .01, 'the heard line starts a breath into its shot');
+  assert.deepEqual(laid.map((p) => p.how), ['dub', 'plain', 'over']); assert.ok(laid[2].line[0] - laid[2].start - LEAD < .01, 'the heard line starts a breath into its shot');
+  // the model spoke from 1.0 s to 2.2 s in a voice of its own: the person's recorded voice goes exactly there, the shot is cut
+  // close around the line, and the subtitle sits on it
+  const dub = laid[0], said = secondsOf(r.out.get('s1-line').file); assert.equal(dub.lay.length, 1); assert.ok(Math.abs(dub.lay[0].at - 1) < .08 && Math.abs(dub.from - (dub.lay[0].at - LEAD)) < .011, JSON.stringify(dub));
+  assert.ok(dub.lay[0].tempo >= .84 && dub.lay[0].tempo <= 1.22 && Math.abs(dub.lay[0].lasts - said / dub.lay[0].tempo) < .08); assert.ok(Math.abs(dub.line[0] - LEAD) < .1 && dub.length < 3, 'cut close around the line');
+  assert.match(spoken.prompt, /Lan says in Vietnamese/, 'and the model was told the words, so the lips move with them');
+  // keeping the model's own voice is a choice on the node; the clip is not made again for it, only the cut
+  flow.nodes.s1.ownVoice = true; const n = use.asked.length, own = await runFlow(dir, flow, { use });
+  assert.deepEqual(own.made, ['film']); assert.equal(use.asked.length, n); assert.equal(JSON.parse(fs.readFileSync(own.out.get('film').file.replace(/\.mp4$/, '.json'), 'utf8')).parts[0].how, 'native');
   assert.ok(fs.statSync(r.out.get('s3-end').file).size > 200, 'a frame taken from a clip');
   fs.rmSync(path.join(dir, 'media', 'me.jpg')); assert.match(checkFlow(flow, dir).join('\n'), /lan-face: the file media\/me\.jpg is not there/);
+});
+
+test('a line recorded to picture: the clip is filmed first with the model speaking, then the line is recorded to last as long as the lips moved', async () => {
+  const dir = fresh('fit'), flow = small(), use = standIns(), events = [];
+  flow.nodes.s1.model = 'speaker'; flow.nodes['s1-line'].fit = '@s1';
+  assert.deepEqual(checkFlow(flow), []); assert.deepEqual(needs(flow, 's1'), ['s1-frame']); assert.deepEqual(needs(flow, 's1-line'), ['s1'], 'the line now comes after its clip');
+  const r = await runFlow(dir, flow, { use, on: (e) => events.push(`${e.type} ${e.id}`) }); assert.deepEqual(r.failed, []); assert.ok(events.indexOf('done s1') < events.indexOf('start s1-line'));
+  const clip = use.asked.find((a) => a.kind === 'clip' && a.model === 'speaker'); assert.equal(clip.voice, null); assert.match(clip.prompt, /Lan says in Vietnamese \(quiet\): "Anh về rồi à\?"/);
+  // the lips moved for 1.2 s. The line is first recorded as it comes; here that fits (four words, 1.2 s), so nobody is told to hurry
+  const first = use.asked.filter((a) => a.kind === 'voice'); assert.equal(first.length, 1); assert.doesNotMatch(first[0].style, /lasts about/);
+  const store = JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')), line = Object.values(store.takes).flat().find((t) => t.info?.fit);
+  assert.equal(line.info.takes, 1); assert.ok(Math.abs(line.info.lay[0].at - 1) < .08 && Math.abs(line.info.lay[0].lasts - 1.2) < .1, JSON.stringify(line.info));
+  assert.ok(Math.abs(secondsOf(r.out.get('s1-line').file) - secondsOf(r.out.get('s1').file)) < .06, 'the recording is as long as the clip, the voice set where the lips moved');
+  assert.deepEqual(speechSpans(r.out.get('s1-line').file).map(([a, b]) => [Math.round(a * 10) / 10, Math.round(b * 10) / 10]), [[1, 2.2]]);
+  const part = JSON.parse(fs.readFileSync(r.out.get('film').file.replace(/\.mp4$/, '.json'), 'utf8')).parts[0]; assert.equal(part.how, 'dub'); assert.equal(part.placed, true); assert.ok(Math.abs(part.line[0] - LEAD) < .1 && Math.abs(part.from - .7) < .1);
+  // a longer line for the same lips: as it comes it takes 2.1 s, too long to be squeezed into 1.2 s, so it is asked for again
+  // and told how long to take (less than the place it goes, since it ran over)
+  flow.nodes['s1-line'].text = 'Anh về rồi à? Em chờ anh.'; const more = standIns(), again = await runFlow(dir, flow, { use: more }); assert.deepEqual(again.failed, []);
+  const told = more.asked.filter((a) => a.kind === 'voice').map((a) => +(/in one breath, with no pause inside the line\. From the first word to the last, the line lasts about ([\d.]+) seconds/.exec(a.style)?.[1] ?? 0));
+  assert.equal(told.length, 2); assert.equal(told[0], 0); assert.ok(told[1] > .6 && told[1] < .9, `told ${told}`);
+  const fitted = JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')), last = Object.values(fitted.takes).flat().filter((t) => t.info?.fit).at(-1); assert.equal(last.info.takes, 2); assert.ok(last.info.lay[0].tempo >= .84 && last.info.lay[0].tempo <= 1.22);
+  // what cannot be: a line recorded to a clip whose model acts to a recording, or to a clip that is not its own
+  flow.nodes.s1.model = 'actor'; assert.match((await runFlow(dir, flow, { use })).failed[0].error, /actor does not speak a line by itself, so the line cannot be recorded to its lips: take "fit" off @s1-line/);
+  flow.nodes['s1-line'].fit = '@s2'; assert.match(checkFlow(flow).join('\n'), /s1-line\.fit: @s2 does not have this line as its "voice"/);
 });
 
 // ---- the director and the writer ----
@@ -184,6 +239,15 @@ test('the director fills the canvas: everyone a face and a sheet, every scene a 
   assert.deepEqual(stageNodes(flow, 1, 'cast'), ['lan-face', 'lan-sheet', 'minh-face', 'minh-sheet', 'can-ho-plate']);
   assert.deepEqual(stageNodes(flow, 1, 'board').slice(5), ['e1-scene1', 'e1-s1-frame', 'e1-s2-frame', 'e1-s3-frame']); assert.ok(stageNodes(flow, 1, 'cut').includes('e1')); assert.throws(() => stageNodes(flow, 1, 'later'), /is not one of cast, board/);
   assert.match(boardHtml(flow, [], { title: 'T' }), /<b>Lan<\/b> · voice Kore[\s\S]*Episode 1: Hai giờ sáng[\s\S]*<b>Lan \(off screen\):<\/b> Minh\?/);
+  // which comes first, the line or the clip, follows the model that films people speaking: one that acts to a recording gets the
+  // line first; one that only speaks films first, and the line is recorded to its lips
+  assert.equal(n['e1-s1-line'].fit, undefined); assert.equal(expand({ ...SERIES, models: { talk: 'hailuo-h3' } }, { 1: EPISODE }).nodes['e1-s1-line'].fit, undefined);
+  const spoken = expand({ ...SERIES, models: { talk: 'veo-3.1-fast' } }, { 1: EPISODE }); assert.equal(spoken.nodes['e1-s1-line'].fit, '@e1-s1'); assert.equal(spoken.nodes['e1-s3-line'].fit, undefined, 'a voice that is only heard is not recorded to anyone\'s lips');
+  assert.deepEqual(checkFlow(spoken), []); assert.deepEqual(needs(spoken, 'e1-s1-line'), ['e1-s1']); const one = structuredClone(EPISODE); one.scenes[0].shots[0].model = 'veo-3.1'; assert.equal(expand(SERIES, { 1: one }).nodes['e1-s1-line'].fit, '@e1-s1');
+  // an episode may name its own models; they are written onto its shots, so the other episodes are left as they were
+  const own = expand(SERIES, { 1: EPISODE, 2: { ...EPISODE, models: { clip: 'veo-3.1-lite', talk: 'veo-3.1-fast' } } }).nodes;
+  assert.deepEqual([own['e2-s1'].model, own['e2-s2'].model, own['e2-s3'].model, own['e2-s1-line'].fit, own['e1-s1'].model, own['e1-s1-line'].fit], ['veo-3.1-fast', 'veo-3.1-lite', 'veo-3.1-lite', '@e2-s1', undefined, undefined]);
+  assert.match(checkEpisode(SERIES, { ...EPISODE, models: 'veo' }).join(), /models: must be an object/);
 });
 
 test('the director rewrites only what is still as it wrote it: a node changed by hand is left alone, and said to be', () => {

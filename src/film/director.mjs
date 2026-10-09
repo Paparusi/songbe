@@ -7,6 +7,7 @@
 // film already made is not disturbed by a new version of Songbe that words its prompts differently — and never when a person has
 // changed it since: that one is left alone, and said to be.
 import { readFlow, writeFlow } from './flow.mjs';
+import { KNOWN } from './models.mjs';
 import { SIZES, checkEpisode, checkSeries, shotsOf, speechOf } from './series.mjs';
 import { sha } from '../util.mjs';
 
@@ -38,7 +39,7 @@ const WRITE = {
       prompt: `@e${x.n}-scene${x.s} is a wide view of one moment in a film: the place, the light, and where everyone is. ${sheets(x.who)} Show that same moment from another camera position. ${SIZES[x.size] || SIZES.medium}. ${String(x.action).trim()} `
         + `${x.who.length ? `In the frame: ${names(x.who.map((p) => p.name))}${x.others.length ? `; ${names(x.others)} ${x.others.length > 1 ? 'are' : 'is'} outside the frame` : ''}.` : 'Nobody is in the frame.'}`
         + `${x.speaker ? ` ${x.speaker}'s mouth is closed, about to speak.` : ''} Same place, same light and same time of day as the wide view${x.who.length ? '; everyone keeps exactly the face, hair and clothes of their reference sheet' : ''}. @look A frame from a film, not a posed photograph: nobody looks into the camera. ${NO_TEXT}` }),
-  line: (x) => ({ kind: 'voice', who: `@${x.who}`, text: x.text, ...(x.how ? { how: x.how } : {}), group: `e${x.n}`, label: `Shot ${x.shot}: ${x.name}` }),
+  line: (x) => ({ kind: 'voice', who: `@${x.who}`, text: x.text, ...(x.how ? { how: x.how } : {}), ...(x.toPicture ? { fit: `@e${x.n}-s${x.shot}` } : {}), group: `e${x.n}`, label: `Shot ${x.shot}: ${x.name}` }),
   clip: (x) => ({ kind: 'clip', frame: `@e${x.n}-s${x.shot}-frame`, ...(x.speech ? { voice: `@e${x.n}-s${x.shot}-line` } : {}), ...(x.speech === 'heard' ? { heard: true } : {}), ...(x.seconds ? { seconds: x.seconds } : {}), ...(x.model ? { model: x.model } : {}), group: `e${x.n}`, label: `Shot ${x.shot}`,
     prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @look` }),
   music: (x) => ({ kind: 'music', prompt: `Instrumental film score, no vocals, no singing. ${x.music || 'Quiet and tense, sparse piano and low strings.'}`, group: `e${x.n}`, label: `Episode ${x.n}: music` }),
@@ -63,8 +64,12 @@ export function expand(series, scripts = {}) {
     all.forEach(({ shot, scene, s, i }) => {
       const id = shotId(n, shot), who = (shot.who || []).filter((x) => cast[x]), others = [...new Set(scene.shots.flatMap((x) => x.who || []))].filter((x) => cast[x] && !who.includes(x)), speech = speechOf(shot), prev = i > 0 && all[i - 1].s === s ? all[i - 1].shot : null;
       put(`${id}-frame`, 'frame', shot.continues && prev ? { n, shot: shot.id, after: prev.id } : { n, s, shot: shot.id, size: shot.size, action: shot.action, who: who.map(person), others: others.map((x) => cast[x].name), speaker: speech === 'seen' ? cast[shot.line.who].name : null });
-      if (shot.line) put(`${id}-line`, 'line', { n, shot: shot.id, who: shot.line.who, name: cast[shot.line.who]?.name || shot.line.who, text: shot.line.text, how: shot.line.how });
-      put(id, 'clip', { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model: shot.model, speech });
+      // the model of this shot: its own, else the one the episode names for its kind of shot (the series' is left to the canvas)
+      const model = shot.model || ep.models?.[speech === 'seen' ? 'talk' : 'clip'];
+      // a model that acts to a recording gets the line recorded first; one that only speaks films first, and the line is recorded to its lips
+      const talks = KNOWN[model || series.models?.talk], toPicture = speech === 'seen' && !!talks?.speaks && !talks.acts;
+      if (shot.line) put(`${id}-line`, 'line', { n, shot: shot.id, who: shot.line.who, name: cast[shot.line.who]?.name || shot.line.who, text: shot.line.text, how: shot.line.how, ...(toPicture ? { toPicture } : {}) });
+      put(id, 'clip', { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model, speech });
     });
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });
     put(`e${n}`, 'cut', { n, shots: all.map(({ shot }) => shot.id), title: ep.title, notice: series.notice ?? NOTICE[String(series.language || '').toLowerCase()] ?? NOTICE.english });

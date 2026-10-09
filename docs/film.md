@@ -29,9 +29,11 @@ other makers through fal.ai. With both, each model is asked at its maker when th
   front and the back, in their one outfit). Every picture a person appears in is drawn with that sheet handed to the model.
 - **Scenes.** Every scene gets one wide picture that fixes the place, the light and where everyone is. Every shot's first frame is
   drawn from that picture and the sheets of the people in the frame; the clip starts from that frame.
-- **Voices.** Every person has one voice. A line is recorded first, in that voice, with the delivery the script asks for; a clip
-  model that can act to a recording performs to it, so the voice in the film is exactly that recording. A model that can only
-  speak a line itself is told the words instead, and a voice that is only heard is laid over a shot in which nobody speaks.
+- **Voices.** Every person has one voice, and every line is recorded in it with the delivery the script asks for. A clip model
+  that can act to a recording is handed the line first and performs to it. A model that can only speak a line itself films first,
+  in a voice of its own choosing; the line is then **recorded to picture** the way a film is dubbed — to last as long as the lips
+  moved, set exactly where they moved — and the model's voice is turned down there. Either way the voice in the film is the
+  person's own, in every shot and every episode. A voice that is only heard is laid over a shot in which nobody speaks.
 - **The look.** One note describes the medium and one the light and colours; every picture and clip prompt carries them.
 
 ## The files
@@ -53,6 +55,9 @@ A shot in a script:
   "sound": "room tone", "model": "veo-3.1-fast" }
 ```
 
+An episode's script may name its own models at the top — `"models": { "clip": "veo-3.1-lite", "talk": "veo-3.1-fast" }` — for
+its shots nobody speaks in and those somebody does; they are written onto that episode's shots, so other episodes stay as made.
+
 `size` is one of `wide`, `full`, `medium`, `two shot`, `over shoulder`, `close`, `extreme close`, `insert`. A shot has at most one
 line, said by one person. When the speaker is in `who` they are seen saying it; when only the listener is, the voice is heard from
 off screen. `seconds` sets the length of a shot nobody speaks in (a shot with a line lasts as long as the line). `continues: true`
@@ -71,8 +76,8 @@ the order of mention. Write `@@` for a plain @.
 | `person` | `name`, `look`, `wardrobe`, `manner`, `voice: { voice, model, style, speed }` | none |
 | `place` | `name`, `look` | none |
 | `picture` | `prompt` (and `refs`, `aspect`, `model`, `options`) — or `file`, a picture of your own — or `grab: "@clip"`, `at: 2.5 \| "end"`, one frame of a clip | jpg |
-| `voice` | `text`, `who: "@person"`, `how` (and `voice`, `model`, `style`, `speed`) — or `file` | wav |
-| `clip` | `prompt`, `frame: "@picture"`, `end: "@picture"`, `voice: "@voice"`, `heard: true`, `refs`, `seconds`, `model`, `resolution`, `sound`, `options` — or `file` | mp4 |
+| `voice` | `text`, `who: "@person"`, `how` (and `voice`, `model`, `style`, `speed`); `fit: "@clip"` records it to the lips of that clip, after the clip is filmed — or `file` | wav |
+| `clip` | `prompt`, `frame: "@picture"`, `end: "@picture"`, `voice: "@voice"`, `heard: true` (the speaker is not seen), `ownVoice: true` (keep the model's voice), `refs`, `seconds`, `model`, `resolution`, `sound`, `options` — or `file` | mp4 |
 | `music` | `prompt` (and `model`) — or `file` | mp3 |
 | `cut` | `shots: ["@clip", { "clip": "@clip", "from": 0.4, "to": 3.1 }]`, `music: "@music"`, `title`, `notice`, `subtitles`, `musicVolume` | mp4, srt |
 
@@ -111,8 +116,10 @@ endpoint on fal.ai, `google:<model id>` for any model of Google's API. The serie
 (`picture`, `clip`, `talk` — a clip in which someone seen speaks —, `voice`, `music`); any node may name its own in `model`.
 
 What a clip model can do decides how a line reaches the screen: one that takes a recording (an input called `target_audio_url`,
-`audio_url` or `driving_audio_url`) acts to it; one known to speak (`veo-3.1`, `seedance-2.5`, `wan-3.0`, …) is told the line;
-for any other the recording is laid over the shot. For endpoints named by their door this is read from fal's description of them.
+`audio_url` or `driving_audio_url`) acts to it; one known to speak (`veo-3.1`, `seedance-2.5`, `wan-3.0`, …) is told the line,
+and the person's own voice is recorded to its lips afterwards (the director sets `fit` on such a line; `ownVoice` on the clip
+keeps the model's voice instead); for any other the recording is laid over the shot. For endpoints named by their door this is
+read from fal's description of them.
 
 ## What it cannot do yet
 
@@ -121,4 +128,5 @@ for any other the recording is laid over the shot. For endpoints named by their 
 - One line per shot, one speaker per shot. Two people talking over each other is not written.
 - Reference pictures for clips go to fal.ai endpoints only; Google's Veo is asked with a first frame (and a last one).
 - A clip is taken from its start; `from` and `to` in a cut choose the part to keep by hand.
-- Lip-sync after the fact (re-voicing a finished clip) is not wired in; the voice is recorded before the clip is made.
+- A line recorded to picture is fitted in time to where the lips moved, phrase by phrase; the lips themselves are not redrawn
+  (no lip-sync model is run), so a model that paces a line very differently from the recording can still look a little off.
