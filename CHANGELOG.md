@@ -14,6 +14,11 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
   Tried on three shots of that episode: the picture moves two to two and a half times as much, and each face goes somewhere.
   Films already made keep their words; `songbe film expand --rewrite=keep,<frames>` asks for the new ones.
 - The writer is told not to ask for stiff or motionless acting, and to keep a still camera for the few shots meant to be still.
+- **Hair that the first frame hides.** Someone lying down was drawn with the hair out of sight behind the head, and the clip
+  that starts on that picture gave her a short crop as she sat up — twice, on two takes of the picture. A scene picture and a
+  first frame with people in them are now told that hair is as long as on the reference sheet in every pose, and is seen
+  spread beside the head of someone lying down; the shot filmed again from such a frame kept her shoulder-length hair.
+  Pictures already on a canvas keep their words; `songbe film expand --rewrite=<frame>` asks for the new ones.
 
 ## 0.34
 - **A shot of a thing alone stays empty.** The clip model walked an arm through an insert of a wall; a shot with nobody in it

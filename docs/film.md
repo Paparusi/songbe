@@ -70,6 +70,11 @@ its shots nobody speaks in and those somebody does; they are written onto that e
 clip model with the action; the first frame of a shot is drawn as the instant before its action, so that the clip has it
 still to do.
 
+A clip model sees only its first frame: what that picture hides, the clip makes up. A first frame that hid the hair of
+someone lying down gave them a short crop when they sat up — so every picture with people in it is told that hair keeps the
+length of the reference sheet in every pose and is seen. When a shot shows a person wrong, look at its first frame before the
+clip: a new take of the clip from the same frame makes the same thing up again.
+
 `size` is one of `wide`, `full`, `medium`, `two shot`, `over shoulder`, `close`, `extreme close`, `insert`. A shot has at most one
 line, said by one person. When the speaker is in `who` they are seen saying it; when only the listener is, the voice is heard from
 off screen. `seconds` sets the length of a shot nobody speaks in (a shot with a line lasts as long as the line). `continues: true`

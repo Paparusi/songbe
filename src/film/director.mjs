@@ -17,6 +17,9 @@ const names = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') 
 const sentence = (t) => String(t || '').trim().replace(/([^.!?])$/, '$1.');
 const plain = (t) => String(t ?? '').trim().replace(/@/g, '@@');      // words put into a prompt as they are
 const sheets = (people) => people.map((p) => `@${p.id}-sheet is the reference sheet of ${p.name}.`).join(' ');
+// Someone lying down was seen drawn with the hair out of sight behind the head; the clip that starts on that picture then has
+// to make the hair up when they rise, and made a short crop of shoulder-length hair. So a picture is told that hair is seen.
+const HAIR = 'Hair is as long as on the sheet in every pose: on someone lying down it is seen, spread loose beside the head.';
 export const shotId = (n, shot) => `e${n}-s${shot.id}`;
 
 // How each node is worded. Every one of these sees only the facts it is given (x), so those facts are exactly what the node is
@@ -45,12 +48,12 @@ const WRITE = {
   // The plate of a place is drawn in a light of its own (a room by day). A scene at another hour was seen to keep that light — a
   // bright window at midnight — when the hour was only named beside the place; so the scene is told that the hour is its own.
   scene: (x) => ({ kind: 'picture', group: `e${x.n}`, label: `Episode ${x.n}, scene ${x.s}: the whole scene`, aspect: '16:9',
-    prompt: `@look One moment of a film scene, in a wide shot that shows the whole space and everyone in it. The place is @${x.where}-plate: its walls, furniture and layout are kept.${x.time ? ` The hour and the light are this moment's, not that picture's: ${plain(x.time).replace(/\.$/, '')}. Any window shows the sky of that hour.` : ''} ${String(x.staging || '').trim()} ${sheets(x.people)}${x.people.length ? ' Everyone keeps exactly the face, hair, build and clothes of their reference sheet.' : ''} ${NO_TEXT}` }),
+    prompt: `@look One moment of a film scene, in a wide shot that shows the whole space and everyone in it. The place is @${x.where}-plate: its walls, furniture and layout are kept.${x.time ? ` The hour and the light are this moment's, not that picture's: ${plain(x.time).replace(/\.$/, '')}. Any window shows the sky of that hour.` : ''} ${String(x.staging || '').trim()} ${sheets(x.people)}${x.people.length ? ` Everyone keeps exactly the face, hair, build and clothes of their reference sheet. ${HAIR}` : ''} ${NO_TEXT}` }),
   frame: (x) => (x.after ? { kind: 'picture', grab: `@e${x.n}-s${x.after}`, at: 'end', group: `e${x.n}`, label: `Shot ${x.shot}: first frame (where shot ${x.after} ends)` }
     : { kind: 'picture', group: `e${x.n}`, label: `Shot ${x.shot}: first frame`,
       prompt: `@e${x.n}-scene${x.s} is a wide view of one moment in a film: the place, the light, and where everyone is. ${sheets(x.who)} Show that same moment from another camera position. ${SIZES[x.size] || SIZES.medium}. This picture is the first frame of a film shot in which this happens: ${String(x.action).trim()} Show the instant before it happens — the pose and the expression it starts from — so that the shot has it still to do. `
         + `${x.who.length ? `In the frame: ${names(x.who.map((p) => p.name))}${x.others.length ? `; ${names(x.others)} ${x.others.length > 1 ? 'are' : 'is'} outside the frame` : ''}.` : 'Nobody is in the frame.'}`
-        + `${x.speaker ? ` ${x.speaker}'s mouth is closed, about to speak.` : ''} Same place, same light and same time of day as the wide view${x.who.length ? '; everyone keeps exactly the face, hair and clothes of their reference sheet' : ''}. @look A frame from a film, not a posed photograph: nobody looks into the camera. ${NO_TEXT}` }),
+        + `${x.speaker ? ` ${x.speaker}'s mouth is closed, about to speak.` : ''} Same place, same light and same time of day as the wide view${x.who.length ? `; everyone keeps exactly the face, hair and clothes of their reference sheet. ${HAIR}` : '.'} @look A frame from a film, not a posed photograph: nobody looks into the camera. ${NO_TEXT}` }),
   line: (x) => ({ kind: 'voice', who: `@${x.who}`, text: x.text, ...(x.how ? { how: x.how } : {}), ...(x.toPicture ? { fit: `@e${x.n}-s${x.shot}` } : {}), group: `e${x.n}`, label: `Shot ${x.shot}: ${x.name}` }),
   clip: (x) => ({ kind: 'clip', frame: `@e${x.n}-s${x.shot}-frame`, ...(x.speech ? { voice: `@e${x.n}-s${x.shot}-line` } : {}), ...(x.speech === 'heard' ? { heard: true } : {}), ...(x.seconds ? { seconds: x.seconds } : {}), ...(x.model ? { model: x.model } : {}), ...(x.hear?.length ? { sounds: x.hear.map((h) => ({ sound: `@${h.sound}`, at: h.at ?? 0, ...(h.volume ? { volume: h.volume } : {}), ...(h.to ? { to: h.to } : {}) })) } : {}), group: `e${x.n}`, label: `Shot ${x.shot}`,
     // (a shot of a thing alone is told that nobody comes into it: a clip model was seen to walk someone through a wall insert)
