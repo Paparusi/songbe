@@ -6,6 +6,9 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
 - **A maker that says the money has run out is not asked again in that run.** Credit used up, a spending cap reached, an
   account locked: the piece that met the refusal says so, every other piece of that maker says it was not asked, and what
   another maker can do is still made. (Before, each piece went and collected the same refusal.)
+- **A scene's hour is its own.** The picture of a place is drawn by day; a scene set there at midnight kept the bright window.
+  The scene is now told that the walls, furniture and layout are kept while the hour and the light are this moment's. Tried
+  on two night scenes of a real film: the windows went dark in fifteen of sixteen pictures, and the last on a second take.
 - Tried against the models: a new film from an idea — the series, three scripts, the cast and the first two boards. Portraits
   drawn without the clothes and sheets drawn from them in the outfit keep one face (three people, 43 pictures); nothing the
   review points at.
