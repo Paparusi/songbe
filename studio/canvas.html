@@ -15,7 +15,7 @@ main { display: grid; grid-template-columns: 1fr 400px; height: calc(100% - 56px
 .node.dim { opacity: .38; }
 .nh { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 9px; font-size: 12px; cursor: move; background: var(--raise); border-bottom: 1px solid var(--line); }
 .nh b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .nh i { font-style: normal; color: var(--soft); margin-left: auto; flex: none; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #55616F; flex: none; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #55616F; flex: none; } .nh .flag { color: var(--warn); font-weight: 800; flex: none; } .msg.warn { color: var(--warn); }
 .s-ready .dot, .s-held .dot, .s-own .dot { background: #46D39A; } .s-make .dot { background: var(--warn); } .s-stuck .dot { background: var(--bad); } .s-words .dot { background: #6E8BFF; }
 .s-busy .dot { background: var(--accent); animation: pulse 1s infinite; } @keyframes pulse { 50% { opacity: .25; } }
 .nb { position: relative; background: #0B0F15; } .nb img, .nb video { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -104,7 +104,7 @@ function card(id) {
   else if (n.kind === 'clip' || n.kind === 'cut') { const f = n.kind === 'clip' ? rows.get(bare(n.frame)) : null; body.append(r.url ? el('video', { src: r.url + '#t=0.1', preload: 'metadata', muted: true, playsinline: true }) : f?.url ? el('img', { src: f.url, draggable: 'false', style: 'opacity:.45' }) : el('div', { class: 'none', text: STATE[state] || 'to make' })); if (r.url) body.append(el('div', { class: 'play', text: '▶' })); }
   else { const words = el('div', { class: 'words' }); if (n.name) words.append(el('b', { text: n.name + (n.voice?.voice ? ` · ${n.voice.voice}` : '') }), el('br')); words.append(String(n.text || n.look || n.prompt || '').slice(0, 260)); body.append(words); }
   return el('div', { class: `node k-${n.kind} s-${state}${id === sel ? ' sel' : ''}`, 'data-id': id, style: `left:${x}px;top:${y}px;width:${w}px` },
-    el('div', { class: 'nh' }, el('span', { class: 'dot' }), el('b', { text: id }), el('i', { text: n.kind })), body);
+    el('div', { class: 'nh' }, el('span', { class: 'dot' }), el('b', { text: id }), r.review || r.refused ? el('span', { class: 'flag', text: '!', title: r.review ? r.review.map((f) => f.says).join('; ') : 'takes were made and not used: ' + r.refused.at(-1).why }) : null, el('i', { text: n.kind })), body);
 }
 function wire([from, to]) {
   const [ax, ay] = place(from), [aw, ah] = sizeOf(from), [bx, by] = place(to), [bw, bh] = sizeOf(to), down = Math.abs(bx - ax) < 60 && by > ay;
@@ -121,11 +121,13 @@ function draw() {
   $('#count').textContent = S.bad.length ? `${S.bad.length} problem${S.bad.length > 1 ? 's' : ''}` : `${done} made · ${todo} to make`; $('#count').className = 'tag' + (S.bad.length ? ' warn' : todo ? '' : ' on');
   const L = S.licence; $('#lic').hidden = !L || L.kind === 'licensed' || (L.kind === 'trial' && L.left > 3); if (L) $('#lic').textContent = L.kind === 'over' ? 'Licence needed to make more' : `Trial · ${L.left} day${L.left === 1 ? '' : 's'}`;
   episodes();
+  // takes made by an older Songbe are being looked at: ask again until that is done, and their marks appear
+  if (S.reviewing && !lookTimer) lookTimer = setTimeout(async () => { lookTimer = null; take(await api('/api/state').then((r) => r.json())); draw(); panel(); }, 2500);
   $('#go').textContent = todo ? `Make what is missing (${todo})${plan?.pieces?.length ? ` · about $${plan.usd.toFixed(2)}` : ''}` : 'Everything is made'; $('#go').disabled = !todo || S.running || !!S.bad.length; $('#go').hidden = S.running; $('#stop').hidden = !S.running;
 }
 // The episodes: each can be made up to a point (its pictures first, to look at before any clip is paid for), and the next one written.
 const UPTO = { board: 'its pictures (to look at first)', voice: 'its pictures and lines', clips: 'everything but the cut', cut: 'the whole episode' };
-let epTimer = null, epFailed = null;
+let epTimer = null, epFailed = null, lookTimer = null;
 function episodes() {
   const E = S.episodes, box = $('#eps'); if (!E) return;
   const made = E.written.filter((n) => S.flow.nodes['e' + n]), next = E.planned.find((p) => !E.written.includes(p.n));
@@ -168,6 +170,11 @@ function panel() {
   const models = (kind) => { const id = 'models-' + kind; if (!document.getElementById(id)) document.body.append(el('datalist', { id }, ...Object.entries(S.models.known).filter(([, m]) => m.kind === kind).map(([name]) => el('option', { value: name })))); return id; };
   if (r.state === 'stuck' || (r.state === 'wait' && r.why)) kids.push(el('div', { class: 'msg ' + (r.state === 'stuck' ? 'bad' : 'note'), text: r.why }));
   if (failed.has(sel) && r.state !== 'ready') kids.push(el('div', { class: 'msg bad', text: 'It was not made: ' + failed.get(sel) }));
+  // what looking at the take found: Songbe looks at every take it makes, and says what is odd about it
+  for (const f of r.review || []) { const shown = f.at !== undefined && (n.kind === 'clip' || n.kind === 'cut');      // a finding with a moment: a click shows it
+    kids.push(el('div', { class: 'msg ' + (f.grave ? 'bad' : 'warn'), style: shown ? 'cursor:pointer' : null, title: shown ? 'Show that moment' : null, text: 'Look at this take: ' + f.says + '.' + (shown ? ' ▸' : ''),
+      onclick: () => { const v = shown && side.querySelector('.out video'); if (!v) return; v.pause(); v.currentTime = f.to !== undefined ? (f.at + f.to) / 2 : f.at; v.scrollIntoView({ block: 'nearest' }); } })); }
+  if (r.refused) kids.push(el('div', { class: 'msg bad', text: `${r.refused.length} take${r.refused.length > 1 ? 's were' : ' was'} made and not used: ${r.refused.at(-1).why}. Choose one below to use it as it is, or make another.` }));
   if (n.kind === 'text') kids.push(text('Words (other nodes bring them in with @' + sel + ')', 'text', 6));
   if (n.kind === 'person' || n.kind === 'place') kids.push(line('Name', 'name'), text('Looks like', 'look', 4));
   if (n.kind === 'person') { const v = n.voice || {}, voices = Object.entries(S.models.known[S.flow.models?.voice || '']?.voices || S.models.known[S.models.prefer.voice[0]]?.voices || {}).flatMap(([g, all]) => Object.entries(all).map(([name, sounds]) => [name, `${name} — ${g}, ${sounds}`]));
@@ -186,7 +193,7 @@ function panel() {
   if (r.recipe?.prompt) kids.push(el('details', {}, el('summary', { text: `As ${r.recipe.model || 'the model'} reads it` }), el('div', { class: 'read', text: r.recipe.prompt + (r.recipe.refs?.length ? `\n\n(${r.recipe.refs.length} reference${r.recipe.refs.length > 1 ? 's' : ''} handed over)` : '') })));
   if (r.url) kids.push(el('div', { class: 'out' }, n.kind === 'picture' ? el('img', { src: r.url }) : n.kind === 'clip' || n.kind === 'cut' ? el('video', { src: r.url, controls: true, playsinline: true }) : el('audio', { src: r.url, controls: true })));
   const takes = el('div', { class: 'takes' }); kids.push(takes);
-  if (r.state === 'ready' && r.takes > 1) api('/api/takes?id=' + sel).then((x) => x.json()).then((t) => { if (t.takes?.length > 1) takes.replaceChildren(...t.takes.map((k) => el('button', { class: 'btn small' + (k.current ? ' on' : ''), text: 'take ' + k.n, title: `${k.by || ''} ${String(k.at || '').slice(0, 16).replace('T', ' ')}`, onclick: () => post('/api/pick', { id: sel, n: k.n }) }))); });
+  if ((r.state === 'ready' && r.takes > 1) || r.refused) api('/api/takes?id=' + sel).then((x) => x.json()).then((t) => { if (t.takes?.length > 1 || r.refused) takes.replaceChildren(...t.takes.map((k) => el('button', { class: 'btn small' + (k.current ? ' on' : ''), text: 'take ' + k.n + (k.bad ? ' ✕' : k.review ? ' !' : ''), title: `${k.by || ''} ${String(k.at || '').slice(0, 16).replace('T', ' ')}${k.review ? '\n' + k.review.join('; ') : ''}`, onclick: () => post('/api/pick', { id: sel, n: k.n }) }))); });
   const acts = el('div', { class: 'acts' }); kids.push(acts);
   if (K.ext && !n.file) { if (['make', 'wait'].includes(r.state)) acts.append(el('button', { class: 'btn go', text: 'Make it', disabled: S.running, onclick: () => run({ want: [sel] }) })); if (r.state === 'ready') acts.append(el('button', { class: 'btn', text: 'Another take', disabled: S.running, onclick: () => run({ again: [sel] }) }));
     if (r.state === 'ready' || r.state === 'held') acts.append(el('button', { class: 'btn', text: r.held ? 'Let it follow again' : 'Hold this take', onclick: () => post('/api/hold', { id: sel, on: !r.held }) })); }
@@ -213,7 +220,8 @@ async function run(what) {
 function listen() {
   if (events) events.close(); events = new EventSource(prefix + '/api/events');
   events.onmessage = async (m) => { const e = JSON.parse(m.data);
-    if (e.type === 'start') { busy.add(e.id); failed.delete(e.id); say(`${e.id}: ${e.by}${e.usd ? ` · about $${e.usd.toFixed(2)}` : ''}`); } else if (e.type === 'done') busy.delete(e.id); else if (e.type === 'failed') { busy.delete(e.id); failed.set(e.id, e.error); say(`${e.id}: ${e.error}`, true); } else if (e.type === 'line') say(e.text, /^songbe:/.test(e.text)); else if (e.type === 'wait') say(`${e.id}: ${e.why}, trying again in ${e.seconds} s`);
+    if (e.type === 'start') { busy.add(e.id); failed.delete(e.id); say(`${e.id}: ${e.by}${e.usd ? ` · about $${e.usd.toFixed(2)}` : ''}`); } else if (e.type === 'done') busy.delete(e.id); else if (e.type === 'failed') { busy.delete(e.id); failed.set(e.id, e.error); say(`${e.id}: ${e.error}`, true); } else if (e.type === 'line') say(e.text, /^songbe:/.test(e.text)); else if (e.type === 'wait') say(`${e.id}: ${e.why}, trying again in ${e.seconds} s`); else if (e.type === 'again') say(`${e.id}: ${e.why} — another take`, true); else if (e.type === 'note') say(e.text, true);
+    if (e.type === 'done' && e.review?.length) say(`${e.id}: look at it — ${e.review.join('; ')}`, true);
     if (e.type === 'end') { events.close(); events = null; busy.clear(); }
     if (['done', 'failed', 'end'].includes(e.type)) { take(await api('/api/state').then((r) => r.json())); panel(); }
     draw(); };

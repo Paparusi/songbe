@@ -35,6 +35,7 @@ export function filmCard(id, dir, home) {
 export function canvasRoutes(h) {
   const runs = new Map();      // project id → { proc, done, events, watchers, stopped }
   const scripts = new Map();   // project id → { n, done, error }: the next episode being written
+  const reviews = new Map();   // project id → { proc, done }: takes made before Songbe looked at what it made, being looked at once
   const route = async function (req, res, u, id, dir, rest) {
     const prefix = `/c/${id}`, what = `${req.method} ${rest}`, run = runs.get(id), busy = !!run && !run.done;
     const link = (file) => (file ? `${prefix}/file?p=${encodeURIComponent(file)}&v=${Math.round(fs.statSync(file).mtimeMs)}` : null);
@@ -43,9 +44,14 @@ export function canvasRoutes(h) {
       if (!bad.length) try { rows = await look(dir, flow, { env: process.env }); } catch (e) { bad.push(e.message); }
       const store = openStore(dir);
       const series = readJson(path.join(dir, 'series.json')), title = series?.title || null, job = scripts.get(id);
+      // a film from before Songbe looked at its takes: they are looked at once, in a process of their own (it asks no model), and the page asks again
+      if (!bad.length && !busy && !reviews.has(id) && rows.some((r) => r.state === 'ready' && !r.looked && (r.kind === 'clip' || (r.kind === 'picture' && !flow.nodes[r.id].grab) || (r.kind === 'voice' && !flow.nodes[r.id].fit)))) {
+        const look = { done: false, proc: spawn(process.execPath, [path.join(ROOT, 'bin', 'songbe.mjs'), 'flow', 'review', dir, '--json'], { stdio: 'ignore', windowsHide: true }) }; reviews.set(id, look);
+        look.proc.on('close', () => { look.done = true; }); look.proc.on('error', () => { look.done = true; });
+      }
       // the episodes: which are planned, which have a script, and whether one is being written now
       const episodes = { planned: Array.isArray(series?.episodes) ? series.episodes.map((e, i) => ({ n: i + 1, title: e.title || null })) : [], written: written(dir), writing: job && !job.done ? job.n : null, failed: job?.done && job.error ? job.error : null, stages: STAGES };
-      return { id, dir, name: path.basename(dir), title, episodes, version: h.version, flow, bad, running: busy, keys: h.keysFor(dir), licence: h.standing?.() || null,
+      return { id, dir, name: path.basename(dir), title, episodes, version: h.version, flow, bad, running: busy, reviewing: !!reviews.get(id) && !reviews.get(id).done, keys: h.keysFor(dir), licence: h.standing?.() || null,
         rows: rows.map(({ file, ...r }) => ({ ...r, url: file && exists(file) ? link(file) : null, held: store.locked(r.id) })),
         edges: bad.length ? [] : Object.keys(flow.nodes).flatMap((to) => needs(flow, to).map((from) => [from, to])),
         models: { known: Object.fromEntries(Object.entries(KNOWN).map(([name, m]) => [name, { kind: m.kind, by: m.by, acts: !!m.acts, speaks: !!m.speaks, voices: m.voices || null }])), prefer: PREFER }, kinds: KINDS };
@@ -82,9 +88,8 @@ export function canvasRoutes(h) {
     }
     if (what === 'GET /api/takes') {      // every take a node has for what it is asked for now
       const node = u.searchParams.get('id'), row = (await look(dir, readFlow(dir), { env: process.env })).find((r) => r.id === node);
-      if (!row?.take || row.state === 'own') return h.send(res, 200, { takes: [] });
-      const key = row.take.slice(0, row.take.lastIndexOf('-'));
-      return h.send(res, 200, { takes: openStore(dir).all(key).map((t) => ({ n: t.n, by: t.by, at: t.at, took: t.took, url: link(t.file), current: t.n === row.n })) });
+      if (!row?.key || row.state === 'own') return h.send(res, 200, { takes: [] });
+      return h.send(res, 200, { takes: openStore(dir).all(row.key).map((t) => ({ n: t.n, by: t.by, at: t.at, took: t.took, url: link(t.file), current: !!row.take && t.n === row.n, ...(t.bad ? { bad: true } : {}), ...(t.review?.length ? { review: t.review.map((f) => f.says) } : {}) })) });
     }
     if (what === 'PUT /api/node') {
       const node = u.searchParams.get('id') || '', value = await h.json(req);
@@ -113,8 +118,8 @@ export function canvasRoutes(h) {
     if (what === 'POST /api/pick' || what === 'POST /api/hold') {
       const q = await h.json(req), row = (await look(dir, readFlow(dir), { env: process.env })).find((r) => r.id === q.id), store = openStore(dir);
       if (what.endsWith('hold') && q.on === false) { store.release(q.id); return h.send(res, 200, await state()); }
-      if (!row?.take || row.state === 'own') return h.send(res, 400, { error: 'That node has no take yet.' });
-      const key = row.take.slice(0, row.take.lastIndexOf('-'));
+      const key = row?.state === 'own' ? null : row?.key;      // (a take a run could not use can be chosen too: it then stands)
+      if (!key || !store.all(key).length || (what.endsWith('hold') && !row.take)) return h.send(res, 400, { error: 'That node has no take yet.' });
       try { if (what.endsWith('pick')) store.pick(q.id, key, +q.n); else store.hold(q.id, key, row.n); } catch (e) { return h.send(res, 400, { error: e.message }); }
       return h.send(res, 200, await state());
     }
@@ -144,5 +149,5 @@ export function canvasRoutes(h) {
     h.send(res, 404, { error: 'not found' });
   };
   // nothing started from a canvas may outlive the server
-  return Object.assign(route, { close: () => { for (const j of runs.values()) if (!j.done) { j.stopped = true; killTree(j.proc); } } });
+  return Object.assign(route, { close: () => { for (const j of runs.values()) if (!j.done) { j.stopped = true; killTree(j.proc); } for (const l of reviews.values()) if (!l.done) { try { l.proc.kill(); } catch {} } } });
 }

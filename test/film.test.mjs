@@ -11,6 +11,7 @@ import { timeline } from '../src/film/cut.mjs';
 import { expand, stageNodes, sync } from '../src/film/director.mjs';
 import { checkFlow, estimate, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
 import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
+import { grave, inWords, reviewClip, reviewPicture, reviewVoice } from '../src/film/review.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, lengthOf, readEpisode, readSeries, speechSeconds } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
@@ -225,6 +226,92 @@ test('what a run would cost is said before anything is asked, and a run stops at
   assert.match(checkFlow({ ...flow, budget: 'a lot' }).join(), /budget: what a run may spend, a number of dollars/); assert.equal(expand({ ...SERIES, budget: 12 }, {}).budget, 12);
 });
 
+// ---- the review: what is odd about a take, found by looking at it ----
+test('a take is looked at without asking any model: a clip that grows a colour, cuts, freezes, goes black or stays silent; a line that is not the line; a picture in another shape', () => {
+  const dir = fresh('review'), at = (name) => path.join(dir, name), what = (found) => found.map((f) => f.what).join(' ');
+  // a calm shot: a dark-blue room with a skin-coloured shape moving slowly across it
+  const room = ['-f', 'lavfi', '-t', '4', '-i', 'color=c=0x24364a:s=180x320:r=24', '-f', 'lavfi', '-t', '4', '-i', 'color=c=0xb98a6a:s=60x80:r=24'], moving = "[0][1]overlay=x='40+12*t':y=100";
+  const film = (name, graph, ...more) => { ff(...room, ...more, '-filter_complex', graph, '-map', '[o]', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', at(name)); return at(name); };
+  const calm = film('calm.mp4', `${moving}[o]`); assert.deepEqual(reviewClip(calm), []);
+  ff('-i', calm, '-frames:v', '1', '-q:v', '2', at('calm.jpg')); assert.deepEqual(reviewClip(calm, { start: at('calm.jpg'), how: 'plain', asked: 4 }), [], 'and it begins on the picture it started from');
+  // a yellow patch that is there from 1.0 s to 2.6 s — what a clip model did to a face in a real film
+  const patch = reviewClip(film('patch.mp4', `${moving}[a];[a][2]overlay=x=30:y=40:enable='between(t,1,2.6)'[o]`, '-f', 'lavfi', '-t', '4', '-i', 'color=c=0xe2c200:s=60x70:r=24'), { start: at('calm.jpg') });
+  assert.equal(what(patch), 'colour'); assert.ok(Math.abs(patch[0].at - 1) < .2 && Math.abs(patch[0].to - 2.6) < .25, JSON.stringify(patch)); assert.match(patch[0].says, /^a strong colour that the first frame does not have covers [\d.]+% of the picture from 1(\.\d)? s to 2\.\d s$/); assert.equal(grave(patch).length, 0, 'odd, not unusable');
+  // a cut to something else at 2 s
+  ff(...room, '-f', 'lavfi', '-t', '2', '-i', 'testsrc2=s=180x320:r=24', '-filter_complex', `${moving},trim=0:2,setpts=PTS-STARTPTS[a];[a][2]concat=n=2:v=1:a=0[o]`, '-map', '[o]', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', at('jump.mp4'));
+  const jump = reviewClip(at('jump.mp4')).find((f) => f.what === 'jump'); assert.ok(jump && Math.abs(jump.at - 2) < .15, JSON.stringify(reviewClip(at('jump.mp4'))));
+  // a picture that never moves, and one that goes black for a second
+  ff('-f', 'lavfi', '-t', '3', '-i', 'color=c=0x24364a:s=180x320:r=24', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', at('still.mp4'));
+  assert.deepEqual(reviewClip(at('still.mp4')).map((f) => [f.what, !!f.grave]), [['still', true]]);
+  const dark = reviewClip(film('dark.mp4', `${moving},drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='between(t,2,3)'[o]`)).find((f) => f.what === 'dark'); assert.ok(dark && Math.abs(dark.at - 2) < .15 && Math.abs(dark.to - 3) < .2, JSON.stringify(dark));
+  // it was to start from another picture; it is shorter than was asked for; the model was to say the line and nobody is heard
+  ff('-f', 'lavfi', '-i', 'testsrc2=s=180x320', '-frames:v', '1', '-q:v', '2', at('other.jpg'));
+  assert.equal(what(reviewClip(calm, { start: at('other.jpg') })), 'start'); assert.match(inWords(reviewClip(calm, { asked: 6 })), /^it lasts 4\.0 s, and 6 s were asked for$/);
+  const line = 'Đêm nào anh cũng lẻn đi. Anh giấu em chuyện gì?';
+  assert.deepEqual(reviewClip(calm, { how: 'native', spoke: [], text: line, language: 'Vietnamese' }).map((f) => [f.what, f.grave, f.says]), [['silent', true, 'nobody is heard saying the line']]);
+  assert.match(inWords(reviewClip(calm, { how: 'native', spoke: [[1, 1.4]], text: line, language: 'Vietnamese' })), /^only 0\.4 s of voice is heard, and the line takes about 2\.\d s to say$/);
+  assert.deepEqual(reviewClip(calm, { how: 'native', spoke: [[1, 3.2]], text: line, language: 'Vietnamese' }), []); assert.deepEqual(reviewClip(calm, { how: 'voice', spoke: [], text: line }), [], 'only a model that was to speak is listened to');
+  // a recorded line: as long as the line takes, nothing at all, far more than the line, a part of it, a long pause inside
+  const tone = (name, seconds, filter) => { ff('-f', 'lavfi', '-t', String(seconds), '-i', 'sine=frequency=400:sample_rate=48000', ...(filter ? ['-af', filter] : []), at(name)); return at(name); }, said = (file) => reviewVoice(file, { text: line, language: 'Vietnamese' });
+  assert.deepEqual(said(tone('fine.wav', 2.8)), []);
+  ff('-f', 'lavfi', '-t', '2', '-i', 'anullsrc=r=48000:cl=mono', at('none.wav')); assert.deepEqual(said(at('none.wav')).map((f) => [f.what, f.grave]), [['nothing', true]]);
+  assert.match(inWords(said(tone('long.wav', 9))), /^the recording holds 9\.0 s of voice for a line that takes about 2\.\d s to say: more than the line was said$/); assert.equal(grave(said(at('long.wav'))).length, 1);
+  assert.match(inWords(said(tone('part.wav', .9))), /part of the line is missing$/); assert.deepEqual(reviewVoice(tone('word.wav', .5), { text: 'Minh?', language: 'Vietnamese' }), [], 'a word is not held to a stopwatch');
+  assert.deepEqual(said(tone('pause.wav', 5.2, "volume=0:enable='between(t,1.4,3.6)'")).map((f) => [f.what, !!f.grave]), [['pause', false]]);
+  // a picture: the shape asked for, another shape, one flat colour, plain bars above and below
+  const pic = (name, source, filter) => { ff('-f', 'lavfi', '-i', source, ...(filter ? ['-vf', filter] : []), '-frames:v', '1', '-q:v', '2', at(name)); return at(name); };
+  assert.deepEqual(reviewPicture(pic('tall.jpg', 'testsrc2=s=180x320'), { aspect: '9:16' }), []); assert.match(inWords(reviewPicture(at('tall.jpg'), { aspect: '16:9' })), /^it came back 180×320, not the 16:9 that was asked for$/);
+  assert.equal(what(reviewPicture(pic('flat.jpg', 'color=c=gray:s=180x320'), { aspect: '9:16' })), 'blank'); assert.match(inWords(reviewPicture(pic('bars.jpg', 'testsrc2=s=180x240', 'pad=180:320:0:40:black'), { aspect: '9:16' })), /^it has plain bars along its top and bottom edges$/);
+  assert.deepEqual(reviewPicture(at('calm.jpg'), {}), [], 'a dark picture with a plain wall has no bars');
+});
+
+test('a run looks at what it makes: a take that cannot be used is asked for again, the better one stands, and nothing is built on a node that has none', async () => {
+  // "mute-once" says the line itself and stays silent the first time it is asked; "mute" never says anything
+  const models = () => { const use = standIns(), plain = use.makeClip, can = use.clipAbilities; let calls = 0;
+    use.clipAbilities = async (r) => (/^mute/.test(r.name) ? { seconds: { min: 1, max: 12, whole: true }, end: true, acts: false, speaks: true, sound: true } : can(r));
+    use.makeClip = async (r, w, file) => { if (!/^mute/.test(r.name)) return plain(r, w, file); use.asked.push({ kind: 'clip', model: r.name, ...w }); const quiet = r.name === 'mute' || ++calls === 1;
+      ff('-f', 'lavfi', '-t', String(w.seconds), '-i', 'testsrc2=s=180x320:r=24', '-f', 'lavfi', '-t', String(w.seconds), '-i', 'sine=frequency=330:sample_rate=48000', '-af', quiet ? 'volume=0' : "volume=0:enable='lt(t,1)+gt(t,2.2)'", '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', file); };
+    return use; };
+  const clips = (use) => use.asked.filter((a) => a.kind === 'clip' && /^mute/.test(a.model)).length, takes = (dir) => Object.values(JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat();
+  const dir = fresh('retake'), flow = small(), use = models(), events = []; flow.nodes.s1.model = 'mute-once';
+  const r = await runFlow(dir, flow, { use, on: (e) => events.push(`${e.type} ${e.id}${e.why ? ': ' + e.why : ''}`) });
+  assert.deepEqual(r.failed, []); assert.equal(clips(use), 2, 'asked once more, by the run itself'); assert.ok(events.includes('again s1: nobody is heard saying the line'), events.join(' | ')); assert.equal(r.spent, +(.15 + .0006 + .3 * 2 + .2).toFixed(2), 'and the second take is counted');
+  const s1 = (await look(dir, flow, { use })).find((x) => x.id === 's1'); assert.deepEqual([s1.state, s1.n, s1.takes], ['ready', 2, 2]);
+  assert.deepEqual(takes(dir).filter((t) => t.bad).map((t) => [t.n, inWords(grave(t.review))]), [[1, 'nobody is heard saying the line']], 'the take that could not be used is kept, and marked');
+  assert.equal(JSON.parse(fs.readFileSync(r.out.get('film').file.replace(/\.mp4$/, '.json'), 'utf8')).parts[0].how, 'dub', 'the film is cut from the take in which the line is said');
+  // what is only odd is used, and pointed at: the stand-in pictures are one flat colour
+  assert.deepEqual(r.flagged.filter((f) => f.id === 's1-frame').map((f) => inWords(f.review)), ['it is one flat colour']); assert.deepEqual((await look(dir, flow, { use })).find((x) => x.id === 'lan-face').review.map((f) => f.what), ['shape', 'blank'], 'the stand-in draws every picture tall, and the face was asked for as 3:4');
+
+  // a model that never says the line: two takes, neither can be used, so the node is not made and the cut is not attempted
+  const never = fresh('never'), mute = models(), heard = []; flow.nodes.s1.model = 'mute';
+  const bad = await runFlow(never, flow, { use: mute, on: (e) => heard.push(e.type) });
+  assert.equal(clips(mute), 2); assert.deepEqual(bad.failed.map((f) => f.id), ['s1', 'film']); assert.equal(bad.failed[0].error, '2 takes were made and none can be used: nobody is heard saying the line. Choose a take to use it as it is, or run again for another.'); assert.match(bad.failed[1].error, /needs s1/);
+  const row = (await look(never, flow, { use: mute })).find((x) => x.id === 's1'); assert.equal(row.state, 'make'); assert.deepEqual(row.refused, [{ n: 1, why: 'nobody is heard saying the line' }, { n: 2, why: 'nobody is heard saying the line' }]);
+  // a person may use such a take all the same: chosen, it stands, the cut is made from it, and no model is asked again
+  openStore(never).pick('s1', row.key, 2); const asked = mute.asked.length, used = await runFlow(never, flow, { use: mute });
+  assert.deepEqual([used.made, used.failed], [['film'], []]); assert.equal(mute.asked.length, asked); const chosen = (await look(never, flow, { use: mute })).find((x) => x.id === 's1'); assert.deepEqual([chosen.state, chosen.n, grave(chosen.review)[0].what], ['ready', 2, 'silent']);
+  // "retakes" says how often a run may ask again by itself: not at all, or not when the budget has no room for it
+  const none = models(); assert.match((await runFlow(fresh('once'), { ...flow, retakes: 0 }, { use: none })).failed[0].error, /^the take that was made cannot be used: nobody is heard saying the line/); assert.equal(clips(none), 1);
+  const tight = models(), notes = [], t = await runFlow(fresh('tight'), flow, { use: tight, budget: .7, on: (e) => { if (e.type === 'note') notes.push(e.text); } });
+  assert.equal(clips(tight), 1); assert.deepEqual(notes, ['s1: nobody is heard saying the line; another take would go over the budget of this run']); assert.deepEqual(t.failed.map((f) => f.id), ['s1', 'film']);
+});
+
+test('takes made before Songbe looked at them are looked at on request, and a clip that lost the recording it acted to gets it laid in', async () => {
+  const dir = fresh('lookback'), flow = small(), use = standIns(), file = path.join(dir, '.songbe', 'flow', 'takes.json');
+  await runFlow(dir, flow, { use });
+  const old = JSON.parse(fs.readFileSync(file, 'utf8')); for (const t of Object.values(old.takes).flat()) delete t.review; fs.writeFileSync(file, JSON.stringify(old));      // a film from before
+  assert.ok((await look(dir, flow, { use })).every((x) => !x.looked && !x.review)); const n = use.asked.length;
+  const seen = await look(dir, flow, { use, review: true }); assert.equal(use.asked.length, n, 'no model is asked');
+  assert.deepEqual(seen.filter((x) => x.looked).map((x) => x.id).sort(), ['lan-face', 'lan-sheet', 's1', 's1-frame', 's1-line', 's2']); assert.equal(seen.find((x) => x.id === 's1-frame').review[0].what, 'blank');
+  assert.ok(seen.filter((x) => x.state !== 'words').every((x) => x.state === 'ready'), 'looking changes nothing that stands'); assert.equal((await look(dir, flow, { use })).filter((x) => x.looked).length, 6, 'and what was found is kept');
+  // a model that keeps the recording it acts to, and this once came back without it
+  const lost = fresh('lost'), forgetful = standIns(), plain = forgetful.makeClip;
+  forgetful.makeClip = async (r, w, f) => { await plain(r, w, f); if (w.voice) { const quiet = f + '.q.mp4'; ff('-i', f, '-c:v', 'copy', '-af', 'volume=0', '-c:a', 'aac', quiet); fs.renameSync(quiet, f); } };
+  const made = await runFlow(lost, flow, { use: forgetful }); assert.deepEqual(made.failed, []);
+  assert.equal(Object.values(JSON.parse(fs.readFileSync(path.join(lost, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat().find((t) => t.info?.how === 'voice').info.lost, true);
+  const heard = speechSpans(made.out.get('film').file); assert.ok(heard.length && Math.abs(heard[0][0] - LEAD) < .15, `the line is in the film all the same: ${JSON.stringify(heard)}`);
+});
+
 // ---- the director and the writer ----
 const SERIES = { title: 'Hai giờ sáng', language: 'Vietnamese', format: 'tall', style: 'Photorealistic live action.', look: 'Cold blue moonlight, deep shadows', accent: 'Southern Vietnamese (Saigon) accent', seconds: 20,
   cast: { lan: { name: 'Lan', gender: 'female', look: '26, slim, a black bob', wardrobe: 'a beige blouse', manner: 'speaks softly', voice: { voice: 'Kore' } }, minh: { name: 'Minh', gender: 'male', look: '31, broad shoulders', wardrobe: 'a navy shirt', voice: { voice: 'Charon' } } },
@@ -252,13 +339,16 @@ test('a series and its script are checked in words, and timed by how long the li
 test('the director fills the canvas: everyone a face and a sheet, every scene a wide picture, every shot a frame, a line and a clip', () => {
   const flow = expand(SERIES, { 1: EPISODE }), n = flow.nodes;
   assert.deepEqual(checkFlow(flow), []); assert.equal(flow.language, 'Vietnamese'); assert.equal(flow.accent, SERIES.accent);
-  assert.deepEqual(Object.keys(n), ['style', 'look', 'lan', 'lan-face', 'lan-sheet', 'minh', 'minh-face', 'minh-sheet', 'can-ho', 'can-ho-plate', 'e1-scene1', 'e1-s1-frame', 'e1-s1-line', 'e1-s1', 'e1-s2-frame', 'e1-s2', 'e1-s3-frame', 'e1-s3-line', 'e1-s3', 'e1-s4-frame', 'e1-s4', 'e1-music', 'e1']);
+  assert.deepEqual(Object.keys(n), ['style', 'look', 'keep', 'lan', 'lan-face', 'lan-sheet', 'minh', 'minh-face', 'minh-sheet', 'can-ho', 'can-ho-plate', 'e1-scene1', 'e1-s1-frame', 'e1-s1-line', 'e1-s1', 'e1-s2-frame', 'e1-s2', 'e1-s3-frame', 'e1-s3-line', 'e1-s3', 'e1-s4-frame', 'e1-s4', 'e1-music', 'e1']);
   assert.equal(n.look.text, '@style Cold blue moonlight, deep shadows.'); assert.match(n['lan-face'].prompt, /^@style Portrait of @lan\./); assert.match(n['lan-sheet'].prompt, /the person in @lan-face.*every view wears a beige blouse/);
   assert.deepEqual(needs(flow, 'e1-scene1').sort(), ['can-ho-plate', 'lan-sheet', 'minh-sheet']); assert.deepEqual(needs(flow, 'e1-s1-frame').sort(), ['e1-scene1', 'lan-sheet']);
   assert.match(n['e1-s1-frame'].prompt, /In the frame: Lan; Minh is outside the frame\. Lan's mouth is closed, about to speak\./);
   assert.deepEqual([n['e1-s1'].voice, n['e1-s1'].heard, n['e1-s3'].heard, n['e1-s2'].seconds], ['@e1-s1-line', undefined, true, 3], 'a line whose speaker is not in the frame is heard, not seen');
   const { of, ...grabbed } = n['e1-s4-frame']; assert.deepEqual(grabbed, { kind: 'picture', grab: '@e1-s3', at: 'end', group: 'e1', label: 'Shot 4: first frame (where shot 3 ends)' }); assert.match(of, /^[0-9a-f]{16}$/);
-  assert.equal(n['e1-s1'].prompt, 'Close-up, static. Lan stares from the shadows. Sound: a ticking clock. @look'); assert.deepEqual(n.e1.shots, ['@e1-s1', '@e1-s2', '@e1-s3', '@e1-s4']); assert.equal(n.e1.notice, 'Nội dung tạo bằng AI');
+  assert.equal(n['e1-s1'].prompt, 'Close-up, static. Lan stares from the shadows. Sound: a ticking clock. @keep');
+  // a clip is told the medium and to keep what its first frame shows — not the palette, which a model may paint onto a face
+  assert.equal(n.keep.text, "@style The light and the colours stay as they are in the first frame, and so do everyone's face, hair and clothes."); assert.equal(expand({ ...SERIES, style: undefined }, {}).nodes.keep.text.startsWith('The light and the colours'), true);
+  assert.match(checkSeries({ ...SERIES, cast: { keep: SERIES.cast.lan } }).join(), /cast\.keep: "keep" is a name the canvas uses itself/); assert.equal(expand({ ...SERIES, retakes: 2 }, {}).retakes, 2); assert.match(checkFlow({ ...flow, retakes: 9 }).join(), /retakes: how many more takes a run may ask for by itself/); assert.deepEqual(n.e1.shots, ['@e1-s1', '@e1-s2', '@e1-s3', '@e1-s4']); assert.equal(n.e1.notice, 'Nội dung tạo bằng AI');
   // a part of the work: the board is every picture that needs no clip
   assert.deepEqual(stageNodes(flow, 1, 'cast'), ['lan-face', 'lan-sheet', 'minh-face', 'minh-sheet', 'can-ho-plate']);
   assert.deepEqual(stageNodes(flow, 1, 'board').slice(5), ['e1-scene1', 'e1-s1-frame', 'e1-s2-frame', 'e1-s3-frame']); assert.ok(stageNodes(flow, 1, 'cut').includes('e1')); assert.throws(() => stageNodes(flow, 1, 'later'), /is not one of cast, board/);
@@ -276,7 +366,7 @@ test('the director fills the canvas: everyone a face and a sheet, every scene a 
 
 test('the director rewrites only what is still as it wrote it: a node changed by hand is left alone, and said to be', () => {
   const dir = fresh('sync');
-  const first = sync(dir, SERIES, { 1: EPISODE }); assert.equal(first.added.length, 23); assert.deepEqual(sync(dir, SERIES, { 1: EPISODE }).added.concat(sync(dir, SERIES, { 1: EPISODE }).updated), []);
+  const first = sync(dir, SERIES, { 1: EPISODE }); assert.equal(first.added.length, 24); assert.deepEqual(sync(dir, SERIES, { 1: EPISODE }).added.concat(sync(dir, SERIES, { 1: EPISODE }).updated), []);
   const flow = readFlow(dir); flow.nodes['e1-s2'].model = 'veo-3.1-fast'; flow.nodes.rain = { kind: 'picture', prompt: 'Rain on glass.' }; writeFlow(dir, flow);
   const changed = structuredClone(EPISODE); changed.scenes[0].shots[1].action = 'Minh turns around.'; changed.scenes[0].shots[0].line.text = 'Anh đi đâu vậy?'; changed.scenes[0].shots.pop();
   const second = sync(dir, SERIES, { 1: changed });
@@ -368,7 +458,7 @@ test('in the app: a film is written from an idea, listed on the home screen, and
     const job = await until(() => get('/api/filmwriting/' + made.id), (j) => j.done); assert.equal(job.error, null); assert.equal(job.step, 'canvas');
     // on disk: the series, the script of episode 1, and the canvas laid out from them — nothing drawn or filmed
     const film = (await get('/api/home')).films[0], dir = film.dir; assert.equal(path.dirname(dir), home); assert.equal(path.basename(dir), 'Lan phát hiện chồng rời');
-    assert.deepEqual([film.title, film.planned, film.written, film.cut, film.poster, film.nodes], ['Hai giờ sáng', 2, 1, 0, null, 23]); assert.deepEqual(film.size, [1080, 1920]);
+    assert.deepEqual([film.title, film.planned, film.written, film.cut, film.poster, film.nodes], ['Hai giờ sáng', 2, 1, 0, null, 24]); assert.deepEqual(film.size, [1080, 1920]);
     assert.equal(readSeries(dir).seconds, 12); assert.equal(readEpisode(dir, 1).scenes.length, 1); assert.ok(readFlow(dir).nodes.e1);
     // the canvas says which episodes there are and what making a part of one would ask for
     const at = `/c/${made.id}`, st = await get(at + '/api/state'); assert.deepEqual([st.title, st.episodes.planned.map((e) => e.n), st.episodes.written, st.episodes.writing], ['Hai giờ sáng', [1, 2], [1], null]);

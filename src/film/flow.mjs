@@ -8,12 +8,16 @@
 // Every result is a take, kept under a key made from everything it was made from. So asking again costs nothing, and changing one
 // thing — a line, a face, a model — leaves exactly the nodes that work from it to be made again. Earlier takes are kept; any of
 // them can be chosen (pick), and a chosen take can be held whatever changes around it (lock).
+//
+// A run looks at every take it makes (review.mjs). A take that cannot be used — nobody says the line, the recording is not the
+// line — is asked for again by the run itself, as often as `retakes` allows; one that is merely odd is used and pointed at.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
 import { costOf, nameOf, secondsOf } from './models.mjs';
+import { grave, inWords, reviewClip, reviewPicture, reviewVoice } from './review.mjs';
 import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
 import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
@@ -90,6 +94,7 @@ export function checkFlow(flow, dir = null) {
   const bad = [], nodes = flow.nodes || {}, is = (ref, ...kinds) => kinds.includes(nodes[idOf(ref)]?.kind);
   if (flow.format !== undefined && !FORMATS[flow.format]) bad.push(`format: "${flow.format}" is not one of ${Object.keys(FORMATS).join(', ')}`);
   if (flow.budget !== undefined && !(typeof flow.budget === 'number' && flow.budget >= 0)) bad.push('budget: what a run may spend, a number of dollars');
+  if (flow.retakes !== undefined && !(Number.isInteger(flow.retakes) && flow.retakes >= 0 && flow.retakes <= 3)) bad.push('retakes: how many more takes a run may ask for by itself when a take cannot be used, 0 to 3');
   for (const [id, n] of Object.entries(nodes)) {
     if (!ID.test(id) || id.length > 48) bad.push(`${id}: a node's name is lower-case letters, digits and dashes (like "lan-sheet" or "e1-s3")`);
     const shape = KINDS[n?.kind];
@@ -130,7 +135,9 @@ export function wordsOf(flow, text, got, state = { files: [], count: {}, at: new
 }
 
 // ---- takes ----
-// .songbe/flow/takes.json: { takes: { key: [{ n, file, at, by, took, info }] }, picks: { node: { key, n } }, locks: { node: true } }
+// .songbe/flow/takes.json: { takes: { key: [{ n, file, at, by, took, info, review, bad }] }, picks: { node: { key, n, chosen } }, locks: { node: true } }
+// `review` is what looking at the take found; `bad` marks a take the run that made it could not use. A bad take stands for its
+// node only when a person chose it (`chosen`).
 const storeDir = (dir) => path.join(dir, '.songbe', 'flow');
 export function openStore(dir) {
   const file = path.join(storeDir(dir), 'takes.json');
@@ -140,13 +147,23 @@ export function openStore(dir) {
   return {
     save() { mkdir(storeDir(dir)); fs.writeFileSync(file, JSON.stringify(s, null, 1)); },
     all: (key) => (s.takes[key] || []).filter(there).map(abs),
-    // the take in use for a node asked for as `key`: the chosen one, else the latest
-    current(id, key) { const mine = (s.takes[key] || []).filter(there), p = s.picks[id]; return abs((p && p.key === key && mine.find((t) => t.n === p.n)) || mine.at(-1) || null); },
+    // the take in use for a node asked for as `key`: the chosen one, else the latest — of those that can be used
+    current(id, key) { const p = s.picks[id], mine = (s.takes[key] || []).filter(there).filter((t) => !t.bad || (!!p?.chosen && p.key === key && p.n === t.n)); return abs((p && p.key === key && mine.find((t) => t.n === p.n)) || mine.at(-1) || null); },
+    // the takes a run made for `key` and could not use
+    refused: (key) => (s.takes[key] || []).filter(there).filter((t) => t.bad).map(abs),
     // a take held whatever is asked for now
     held(id) { const p = s.picks[id]; if (!s.locks[id] || !p) return null; const t = (s.takes[p.key] || []).find((x) => x.n === p.n); return there(t) ? { ...abs(t), key: p.key } : null; },
     next(key, ext) { const n = ((s.takes[key] || []).at(-1)?.n || 0) + 1; mkdir(path.join(storeDir(dir), 'takes')); return { n, name: `takes/${key}-${n}.${ext}`, file: path.join(storeDir(dir), 'takes', `${key}-${n}.${ext}`) }; },
     add(id, key, take) { (s.takes[key] ||= []).push(take); s.picks[id] = { key, n: take.n }; this.save(); return abs(take); },
-    pick(id, key, n) { if (!(s.takes[key] || []).some((t) => t.n === n)) throw new Error(`${id} has no take ${n}`); s.picks[id] = { key, n }; this.save(); },
+    stand(id, key, n) { s.picks[id] = { key, n }; this.save(); },      // the take a run settled on, of several it made
+    // Something learnt about a take afterwards. It is written into the file as the file is now, so that what another process
+    // chose in the meantime is kept (takes are looked at in a process of their own while the canvas is open).
+    note(key, n, more) { const mine = (s.takes[key] || []).find((x) => x.n === n); if (!mine) return; Object.assign(mine, more);
+      let now = s; if (exists(file)) try { now = { takes: {}, picks: {}, locks: {}, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
+      const theirs = (now.takes[key] || []).find((x) => x.n === n); if (theirs) Object.assign(theirs, more); mkdir(storeDir(dir)); fs.writeFileSync(file, JSON.stringify(now, null, 1)); },
+    back(id, was) { if (was) s.picks[id] = was; else delete s.picks[id]; this.save(); },      // a node's choice as it was before a run that came to nothing
+    // a person's choice: it stands even when the run that made it could not use it
+    pick(id, key, n) { if (!(s.takes[key] || []).some((t) => t.n === n)) throw new Error(`${id} has no take ${n}`); s.picks[id] = { key, n, chosen: true }; this.save(); },
     // hold the take a node stands on now (named by its key and number), or let the node follow what it is made from again
     hold(id, key, n) { this.pick(id, key, n); s.locks[id] = true; this.save(); }, release(id) { delete s.locks[id]; this.save(); }, locked: (id) => !!s.locks[id], picked: (id) => s.picks[id] || null,
   };
@@ -154,7 +171,8 @@ export function openStore(dir) {
 const own = (dir, node) => { const file = path.resolve(dir, node.file); if (!exists(file)) throw new Error(`the file ${node.file} is not there`); return { file, take: 'own-' + crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 16), info: {} }; };
 
 // ---- how each kind is made ----
-// Each returns { recipe: everything the result depends on, by: the model, info: what later steps need to know, make(file, { seed }) }.
+// Each returns { recipe: everything the result depends on, by: the model, info: what later steps need to know, make(file, { seed }),
+// review(file, found): what is wrong with a take of it (found: what making it learnt, kept in the take's info) }.
 const ff = (...args) => run(tools.ffmpeg, ['-v', 'error', '-y', ...args]);
 const take = (x) => x?.take;
 // the references a node lists in "refs" beyond those its prompt mentions
@@ -166,7 +184,7 @@ function picture(c, id, n) {
   }
   const r = c.use.modelFor('picture', n.model || c.flow.models?.picture, c.env, c.strict), w = wordsOf(c.flow, n.prompt, c.got), files = [...w.files, ...more(c, n, w)];
   const aspect = n.aspect || ASPECT[c.flow.format] || ASPECT.tall;
-  return { recipe: { kind: 'picture', model: r.name, prompt: w.words, refs: files.map(take), aspect, options: n.options }, by: r, units: 1,
+  return { recipe: { kind: 'picture', model: r.name, prompt: w.words, refs: files.map(take), aspect, options: n.options }, by: r, units: 1, review: (file) => reviewPicture(file, { aspect }),
     make: (file, { seed }) => c.use.makePicture(r, { prompt: w.words, refs: files.map((f) => f.file), aspect, seed, options: n.options }, file, c.env) };
 }
 function voice(c, id, n) {
@@ -177,7 +195,7 @@ function voice(c, id, n) {
     `Delivery: ${n.how || 'natural'}. A line of dialogue in a film, said to someone in the same room: conversational pace, not a narrator, not an announcer.`].filter(Boolean).join('\n') : set.style || null;
   const say = (how, file) => c.use.makeVoice(r, { text: n.text, voice: name, style: how, language: language || 'auto', speed: set.speed, options: n.options }, file, c.env);
   const spoken = String(n.text).length / 1000;      // thousands of characters, which is what voices are priced by
-  if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, units: spoken, make: (file) => say(style, file) };
+  if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, units: spoken, make: (file) => say(style, file), review: (file) => reviewVoice(file, { text: n.text, language }) };
   // Recorded to picture, the way a line is dubbed: the clip was filmed first with the actor speaking in a voice of the model's
   // choosing; the line is now recorded in the person's own voice to last as long as the lips moved (asked for again when it
   // comes out too long or too short to be stretched), and set exactly where they moved. The result is as long as the clip.
@@ -223,12 +241,15 @@ async function clip(c, id, n) {
   const prompt = `${w.words.trim()}${speech} No subtitles, no captions, no text on screen. No music.`, aspect = ASPECT[c.flow.format] || ASPECT.tall, resolution = n.resolution || c.flow.resolution || '720p';
   return { recipe: { kind: 'clip', model: r.name, how, prompt, frame: take(frame), end: take(end), voice: how === 'voice' ? rec.take : undefined, refs: refs.map(take), seconds, aspect, resolution, sound: n.sound !== false, options: n.options }, by: r,
     info: { how, length: how === 'native' ? null : length, keeps: how === 'voice' && can.acts === 'keeps' }, units: seconds,
+    review: (file, found) => reviewClip(file, { start: frame?.file || null, how, spoke: found?.spoke || null, text: line?.text || null, language: c.flow.language, asked: seconds }),
     make: async (file, { seed }) => {
       const track = how === 'voice' ? file + '.talk.wav' : null;      // the recording as the actor hears it: a breath of silence, the line, then silence to the end of the clip
       if (track) ff('-f', 'lavfi', '-t', String(LEAD), '-i', 'anullsrc=r=48000:cl=mono', '-i', rec.file, '-filter_complex', `[0][1]concat=n=2:v=0:a=1,apad=whole_dur=${Math.max(2, seconds)}`, '-ar', '48000', '-ac', '1', track);
       try { await c.use.makeClip(r, { prompt, frame: frame?.file, end: end?.file, voice: track, refs: refs.map((f) => ({ file: f.file, kind: f.kind })), seconds, aspect, resolution, sound: n.sound !== false, seed, options: n.options }, file, c.env); }
       finally { if (track) fs.rmSync(track, { force: true }); }
-      return how === 'native' ? { spoke: speechSpans(file) } : null;      // where the model spoke, for the cut
+      if (how === 'native') return { spoke: speechSpans(file) };      // where the model spoke, for the cut
+      // a model that keeps the recording it acts to, and came back without it: the cut lays the recording in
+      return how === 'voice' && can.acts === 'keeps' && !(MODELS.hasSound(file) && speechSpans(file).length) ? { lost: true } : null;
     } };
 }
 function music(c, id, n) {
@@ -247,10 +268,15 @@ const PLAN = { picture, voice, clip, music, cut: cutting };
 
 // ---- the run ----
 const seedOf = (key, n) => (parseInt(key.slice(0, 7), 16) + n * 7919) % 2147483647;
+// what looking at a take finds wrong with it; nothing at all when its kind is not looked at, or it cannot be (no conclusion is drawn from that)
+const looked = (p, file, info) => { if (!p.review) return undefined; try { return p.review(file, info || {}) || []; } catch { return undefined; } };
 // What stands for each node now, without making anything: [{ id, kind, state, file, take, by, why }] where state is
 //   words (nothing to make) · own (a file of yours) · ready · held (a chosen take kept although what it is made from changed)
-//   make (to be made: `first` when it has no take at all) · wait (needs something not made yet) · stuck (cannot be planned: `why`)
-export async function look(dir, flow, { env = process.env, use = MODELS } = {}) {
+//   make (to be made: `first` when it has no take at all, `refused` when a run made takes it could not use)
+//   wait (needs something not made yet) · stuck (cannot be planned: `why`)
+// A take that was looked at and found odd carries `review`. With `review` set, the takes that were never looked at are looked at
+// now ('all': every take, afresh) and what is found is kept with them; no model is asked for that.
+export async function look(dir, flow, { env = process.env, use = MODELS, review = false } = {}) {
   const store = openStore(dir), out = new Map(), rows = [];
   for (const id of ordered(flow)) {
     const n = flow.nodes[id];
@@ -258,13 +284,17 @@ export async function look(dir, flow, { env = process.env, use = MODELS } = {}) 
     try {
       if (n.file) { const o = own(dir, n); out.set(id, o); rows.push({ id, kind: n.kind, state: 'own', ...o }); continue; }
       const held = store.held(id);
-      if (held) { out.set(id, { file: held.file, take: `${held.key}-${held.n}`, info: held.info }); rows.push({ id, kind: n.kind, state: 'held', file: held.file, take: `${held.key}-${held.n}`, by: held.by, n: held.n }); continue; }
+      if (held) { out.set(id, { file: held.file, take: `${held.key}-${held.n}`, info: held.info }); rows.push({ id, kind: n.kind, state: 'held', file: held.file, take: `${held.key}-${held.n}`, key: held.key, by: held.by, n: held.n, ...(held.review ? { looked: true } : {}), ...(held.review?.length ? { review: held.review } : {}) }); continue; }
       const missing = needs(flow, id).filter((d) => !out.has(d));
       if (missing.length) { rows.push({ id, kind: n.kind, state: 'wait', why: 'needs ' + missing.join(', ') }); continue; }
       const p = await PLAN[n.kind]({ flow, env, use, strict: false, got: (x) => out.get(x) }, id, n), key = sha(p.recipe), t = store.current(id, key);
       const asked = p.recipe.prompt ? { recipe: { model: p.recipe.model, prompt: p.recipe.prompt, refs: p.recipe.refs, how: p.recipe.how, seconds: p.recipe.seconds } } : {};      // what the model is told, for whoever wants to read it
-      if (t) { out.set(id, { file: t.file, take: `${key}-${t.n}`, info: t.info }); rows.push({ id, kind: n.kind, state: 'ready', file: t.file, take: `${key}-${t.n}`, by: t.by, n: t.n, takes: store.all(key).length, ...asked }); }
-      else rows.push({ id, kind: n.kind, state: 'make', by: p.by ? nameOf(p.by) : null, first: !store.picked(id), ...asked, ...(p.by ? { model: p.by.name, units: p.units, usd: costOf(p.by, p.units) } : {}) });
+      if (t) {
+        let found = t.review;
+        if (review && (found === undefined || review === 'all')) { const now = looked(p, t.file, t.info); if (now) { found = now; store.note(key, t.n, { review: now }); } }
+        out.set(id, { file: t.file, take: `${key}-${t.n}`, info: t.info }); rows.push({ id, kind: n.kind, state: 'ready', file: t.file, take: `${key}-${t.n}`, key, by: t.by, n: t.n, takes: store.all(key).length, ...(found ? { looked: true } : {}), ...(found?.length ? { review: found } : {}), ...asked });
+      } else { const refused = store.refused(key).map((x) => ({ n: x.n, why: inWords(grave(x.review)) }));
+        rows.push({ id, kind: n.kind, state: 'make', key, by: p.by ? nameOf(p.by) : null, first: !store.picked(id), ...(refused.length ? { refused } : {}), ...asked, ...(p.by ? { model: p.by.name, units: p.units, usd: costOf(p.by, p.units) } : {}) }); }
     } catch (e) { rows.push({ id, kind: n.kind, state: 'stuck', why: e.message }); }
   }
   return rows;
@@ -272,16 +302,21 @@ export async function look(dir, flow, { env = process.env, use = MODELS } = {}) 
 
 // Makes what is missing or out of date among `want` (node names; everything when left out) and whatever those work from.
 // `again` names nodes to make another take of even though one stands. Up to `limit` models are asked at once; a node that fails
-// is reported and everything that does not need it still gets made. `on` hears { type: 'start' | 'done' | 'failed' | 'ready' | 'own', id, … }.
+// is reported and everything that does not need it still gets made. `on` hears { type: 'start' | 'done' | 'failed' | 'ready' | 'own' | 'again' | 'wait' | 'note', id, … }.
 // (`use` stands in for the models in tests.)
 // `budget` (US dollars by list price) is the most this run may ask models for: once the next piece would go over it, that piece
 // and whatever needs it are held back and said to be.
-export async function runFlow(dir, flow, { want = null, again = [], limit = 4, env = process.env, use = MODELS, on = () => {}, pause = 1, budget = null } = {}) {
+// Every take is looked at as soon as it is made. One that cannot be used is asked for again, up to `retakes` more times (one,
+// unless the canvas or the caller says otherwise; each counts against the budget); the best of them stands. A node none of whose
+// takes can be used is reported as not made, so nothing is built on it — its takes are kept, and a person may choose one anyway.
+// A take that is only odd stands, and is listed in `flagged`. → { made, ready, failed, flagged: [{ id, review }], out, spent }
+export async function runFlow(dir, flow, { want = null, again = [], limit = 4, env = process.env, use = MODELS, on = () => {}, pause = 1, budget = null, retakes = null } = {}) {
   const c0 = { pause };      // (tests shorten the waits)
   let spent = 0;
+  const more = Math.max(0, Math.min(3, retakes ?? flow.retakes ?? 1)), over = (usd) => budget !== null && budget !== undefined && !!usd && spent + usd > budget + 1e-9;
   const bad = checkFlow(flow, dir); if (bad.length) throw new Error(`flow.json has ${bad.length} problem${bad.length > 1 ? 's' : ''}:\n  - ` + bad.join('\n  - '));
   const store = openStore(dir), order = ordered(flow, want || Object.keys(flow.nodes)).filter((id) => made(flow.nodes[id])), redo = new Set(again);
-  const out = new Map(), failed = new Map(), busy = new Map(), result = { made: [], ready: [], failed: [] };
+  const out = new Map(), failed = new Map(), busy = new Map(), result = { made: [], ready: [], failed: [], flagged: [] };
   const settle = async (id) => {
     const n = flow.nodes[id];
     if (n.file) { out.set(id, own(dir, n)); on({ type: 'own', id }); return; }
@@ -293,26 +328,38 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
     if (had) { out.set(id, { file: had.file, take: `${sha(stands.recipe)}-${had.n}`, info: had.info }); result.ready.push(id); on({ type: 'ready', id }); return; }
     const p = await PLAN[n.kind]({ flow, env, use, strict: true, got: (x) => out.get(x) }, id, n), key = sha(p.recipe);
     const usd = p.by ? costOf(p.by, p.units) : 0;
-    if (budget !== null && budget !== undefined && usd && spent + usd > budget + 1e-9) throw new Error(`held back: it would take this run to about $${(spent + usd).toFixed(2)}, over its budget of $${(+budget).toFixed(2)} (--budget=N raises it)`);
+    if (over(usd)) throw new Error(`held back: it would take this run to about $${(spent + usd).toFixed(2)}, over its budget of $${(+budget).toFixed(2)} (--budget=N raises it)`);
     spent += usd || 0;
-    const slot = store.next(key, KINDS[n.kind].ext), t0 = Date.now(), by = p.by ? nameOf(p.by) : 'here';
+    const by = p.by ? nameOf(p.by) : 'here', was = store.picked(id);
     on({ type: 'start', id, kind: n.kind, by, usd });
     busy.set(id, (async () => {
-      let found = null;      // what making it found out about the result, kept with the take
       try {
-        for (let tries = 1; ; tries++) {      // a busy or unreachable provider gets a second and a third chance; a refusal does not
-          try { found = await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n }); break; }
-          catch (e) { fs.rmSync(slot.file, { force: true });
-            // a provider that says "too many at once" is given a good while (its limits are counted by the minute), up to five times
-            const full = /(answered|fal) 429/.test(e.message) && !/locked|TOP_UP|spending cap|spend cap|billing|not enabled/i.test(e.message), again = full || /could not be reached|answered 5\d\d|fal 5\d\d|timed out|fetch failed|ECONNRESET/i.test(e.message);
-            if (!again || tries >= (full ? 5 : 3)) throw e;
-            if (full) on({ type: 'wait', id, seconds: 45 * tries, why: 'the provider asks for a pause' });
-            await new Promise((r) => setTimeout(r, (full ? 45000 : 4000) * tries * (c0.pause ?? 1))); }
+        let best = null, last = null, tried = 0;
+        for (;;) {      // a take, and another as long as it cannot be used and the run may ask again
+          const slot = store.next(key, KINDS[n.kind].ext), t0 = Date.now(); let found = null;      // found: what making it learnt about the result, kept with the take
+          for (let tries = 1; ; tries++) {      // a busy or unreachable provider gets a second and a third chance; a refusal does not
+            try { found = await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n }); break; }
+            catch (e) { fs.rmSync(slot.file, { force: true });
+              // a provider that says "too many at once" is given a good while (its limits are counted by the minute), up to five times
+              const full = /(answered|fal) 429/.test(e.message) && !/locked|TOP_UP|spending cap|spend cap|billing|not enabled/i.test(e.message), again = full || /could not be reached|answered 5\d\d|fal 5\d\d|timed out|fetch failed|ECONNRESET/i.test(e.message);
+              if (!again || tries >= (full ? 5 : 3)) throw e;
+              if (full) on({ type: 'wait', id, seconds: 45 * tries, why: 'the provider asks for a pause' });
+              await new Promise((r) => setTimeout(r, (full ? 45000 : 4000) * tries * (c0.pause ?? 1))); }
+          }
+          if (!exists(slot.file) || !fs.statSync(slot.file).size) throw new Error('nothing was written');
+          const info = p.info || found ? { ...(p.info || {}), ...(found || {}) } : null, seen = looked(p, slot.file, info), review = seen || [], faults = grave(review);
+          const kept = store.add(id, key, { n: slot.n, file: slot.name, at: new Date().toISOString(), by, took: +((Date.now() - t0) / 1000).toFixed(1), ...(usd ? { usd } : {}), ...(info ? { info } : {}), ...(seen ? { review } : {}), ...(faults.length ? { bad: true } : {}) });
+          last = { n: slot.n, file: kept.file, info, review, faults, took: kept.took }; tried++;
+          if (!best || last.faults.length < best.faults.length || (last.faults.length === best.faults.length && last.review.length <= best.review.length)) best = last;
+          if (!faults.length || tried > more) break;
+          if (over(usd)) { on({ type: 'note', id, text: `${id}: ${faults[0].says}; another take would go over the budget of this run` }); break; }
+          spent += usd || 0; on({ type: 'again', id, kind: n.kind, by, usd, why: faults[0].says });
         }
-        if (!exists(slot.file) || !fs.statSync(slot.file).size) throw new Error('nothing was written');
-        const info = p.info || found ? { ...(p.info || {}), ...(found || {}) } : null;
-        const kept = store.add(id, key, { n: slot.n, file: slot.name, at: new Date().toISOString(), by, took: +((Date.now() - t0) / 1000).toFixed(1), ...(usd ? { usd } : {}), ...(info ? { info } : {}) });
-        out.set(id, { file: kept.file, take: `${key}-${slot.n}`, info }); result.made.push(id); on({ type: 'done', id, kind: n.kind, by, took: kept.took, file: kept.file, n: slot.n });
+        if (best.faults.length) { store.back(id, was);      // what stood before still stands
+          throw new Error(`${tried > 1 ? `${tried} takes were made and none can be used` : 'the take that was made cannot be used'}: ${best.faults[0].says}. Choose a take to use it as it is, or run again for another.`); }
+        if (best.n !== last.n) store.stand(id, key, best.n);
+        out.set(id, { file: best.file, take: `${key}-${best.n}`, info: best.info }); result.made.push(id); if (best.review.length) result.flagged.push({ id, review: best.review });
+        on({ type: 'done', id, kind: n.kind, by, took: best.took, file: best.file, n: best.n, ...(best.review.length ? { review: best.review } : {}) });
       } catch (e) { failed.set(id, e.message); result.failed.push({ id, error: e.message }); on({ type: 'failed', id, error: e.message }); }
       finally { busy.delete(id); }
     })());

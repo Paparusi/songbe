@@ -2,6 +2,22 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.28
+- **Songbe looks at what it makes.** Every take is measured the moment it is made — decoded small, no model asked, no cost.
+  A take that cannot be used (the model was to say the line and nobody is heard; the picture never moves; the recording holds
+  no voice, far more than the line, or a part of it) is asked for again by the run itself — once, or `--retakes=N` /
+  `"retakes"` in `series.json` — and the better take stands; a node none of whose takes can be used counts as not made, so
+  nothing is built on it, and a person may still choose one of them. What is only odd is used and pointed at on the card, in
+  the panel, on the board and in `songbe flow`: a strong colour a clip did not start with, a jump as if cut to another shot, a
+  stretch of black, a clip that does not begin on its picture, a long pause in a line, a picture in another shape or with
+  bars. `songbe flow review` looks at the takes of a film made before this. (Measured on a real film: of sixty takes it
+  pointed at one, a clip in which the model painted a yellow patch onto a face — and at nothing else.)
+- **A clip is no longer told the palette.** The director ends a clip's prompt with a new note, `keep` — the medium, and that
+  light, colours, faces and clothes stay as the first frame shows them — instead of the look with its named colours, which is
+  what that yellow patch came from. Clips already on a canvas keep their words; `songbe film expand --rewrite` asks for the new.
+- A clip model that keeps the recording it acts to, and comes back without it, no longer leaves the line out of the film: the
+  cut lays the recording in.
+
 ## 0.27
 - **Continue with ChatGPT.** A person can sign in with their ChatGPT account and have Songbe write on their Plus or Pro plan
   instead of an API key — OpenAI's published flow for apps on the person's own computer: a loopback sign-in with PKCE, tokens

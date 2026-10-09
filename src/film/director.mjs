@@ -23,6 +23,9 @@ export const shotId = (n, shot) => `e${n}-s${shot.id}`;
 const WRITE = {
   style: (x) => ({ kind: 'text', text: sentence(x.style), group: 'series', label: 'The medium: what kind of picture this is' }),
   look: (x) => ({ kind: 'text', text: [x.medium ? '@style' : null, sentence(x.look)].filter(Boolean).join(' '), group: 'series', label: 'The look of every picture' }),
+  // A clip starts from a picture that already has the look. Told the palette again, a clip model has been seen to paint one of
+  // its colours onto a face halfway through; so a clip is told the medium, and to keep what its first frame shows.
+  keep: (x) => ({ kind: 'text', text: `${x.medium ? '@style ' : ''}The light and the colours stay as they are in the first frame, and so do everyone's face, hair and clothes.`, group: 'series', label: 'What every clip keeps from its first frame' }),
   person: (x) => ({ kind: 'person', name: x.name, ...(x.look ? { look: x.look } : {}), ...(x.wardrobe ? { wardrobe: x.wardrobe } : {}), ...(x.manner ? { manner: x.manner } : {}), ...(x.voice ? { voice: x.voice } : {}), group: 'cast' }),
   face: (x) => (x.own ? { kind: 'picture', file: x.own, group: 'cast', label: `${x.name}: face` }      // (faces are drawn in the medium, in plain light: the mood of the series is for scenes)
     : { kind: 'picture', prompt: `${x.medium ? '@style' : '@look'} Portrait of @${x.id}. Chest-up, facing the camera, calm neutral expression, eyes to the lens. Even soft daylight on the face, plain light-grey backdrop, sharp focus. ${NO_TEXT}`, aspect: '3:4', group: 'cast', label: `${x.name}: face` }),
@@ -41,7 +44,7 @@ const WRITE = {
         + `${x.speaker ? ` ${x.speaker}'s mouth is closed, about to speak.` : ''} Same place, same light and same time of day as the wide view${x.who.length ? '; everyone keeps exactly the face, hair and clothes of their reference sheet' : ''}. @look A frame from a film, not a posed photograph: nobody looks into the camera. ${NO_TEXT}` }),
   line: (x) => ({ kind: 'voice', who: `@${x.who}`, text: x.text, ...(x.how ? { how: x.how } : {}), ...(x.toPicture ? { fit: `@e${x.n}-s${x.shot}` } : {}), group: `e${x.n}`, label: `Shot ${x.shot}: ${x.name}` }),
   clip: (x) => ({ kind: 'clip', frame: `@e${x.n}-s${x.shot}-frame`, ...(x.speech ? { voice: `@e${x.n}-s${x.shot}-line` } : {}), ...(x.speech === 'heard' ? { heard: true } : {}), ...(x.seconds ? { seconds: x.seconds } : {}), ...(x.model ? { model: x.model } : {}), group: `e${x.n}`, label: `Shot ${x.shot}`,
-    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @look` }),
+    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep` }),
   music: (x) => ({ kind: 'music', prompt: `Instrumental film score, no vocals, no singing. ${x.music || 'Quiet and tense, sparse piano and low strings.'}`, group: `e${x.n}`, label: `Episode ${x.n}: music` }),
   cut: (x) => ({ kind: 'cut', shots: x.shots.map((s) => `@e${x.n}-s${s}`), music: `@e${x.n}-music`, ...(x.title ? { title: x.title } : {}), notice: x.notice, group: `e${x.n}`, label: `Episode ${x.n}${x.title ? ': ' + x.title : ''}` }),
 };
@@ -51,7 +54,7 @@ export function expand(series, scripts = {}) {
   const nodes = {}, cast = series.cast || {}, places = series.places || {}, medium = !!series.style;
   const put = (id, how, x) => { nodes[id] = { ...WRITE[how](x), of: sha([how, x]) }; };
   if (medium) put('style', 'style', { style: series.style });
-  put('look', 'look', { medium, look: series.look });
+  put('look', 'look', { medium, look: series.look }); put('keep', 'keep', { medium });
   for (const [id, c] of Object.entries(cast)) {
     const own = [].concat(c.pictures ?? []);
     put(id, 'person', { name: c.name, look: c.look, wardrobe: c.wardrobe, manner: c.manner, voice: c.voice });
@@ -74,7 +77,7 @@ export function expand(series, scripts = {}) {
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });
     put(`e${n}`, 'cut', { n, shots: all.map(({ shot }) => shot.id), title: ep.title, notice: series.notice ?? NOTICE[String(series.language || '').toLowerCase()] ?? NOTICE.english });
   }
-  return { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), ...(typeof series.budget === 'number' ? { budget: series.budget } : {}), nodes };
+  return { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), ...(typeof series.budget === 'number' ? { budget: series.budget } : {}), ...(Number.isInteger(series.retakes) ? { retakes: series.retakes } : {}), nodes };
 }
 
 const bare = ({ by, as, of, xy, ...rest }) => rest;      // a node without the director's bookkeeping and its place on the canvas
@@ -97,7 +100,7 @@ export function sync(dir, series, scripts = {}, { rewrite = false } = {}) {
   }
   for (const [id, have] of Object.entries(flow.nodes)) if (have.by === 'director' && !wanted.nodes[id]) { if (untouched(have)) { delete flow.nodes[id]; removed.push(id); } else kept.push(id); }
   const { nodes, ...settings } = wanted;
-  for (const k of ['format', 'language', 'accent', 'resolution', 'models', 'budget']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
+  for (const k of ['format', 'language', 'accent', 'resolution', 'models', 'budget', 'retakes']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
   writeFlow(dir, { ...Object.fromEntries(Object.entries(flow).filter(([k]) => k !== 'nodes')), nodes: flow.nodes });
   return { flow, added, updated, removed, kept };
 }

@@ -25,9 +25,12 @@ Songbe has no interactive steps. A build is: write `video.json`, look at stills,
    each first frame shows what its shot says, and that nobody's clothes change between shots. Fix the script, or the node in
    `flow.json`, and run again: only what you changed is made again.
 3. `songbe film run <dir>` makes the lines, the clips, the music and the cut. `songbe flow <dir>` says what stands for every node.
+   Songbe measures every take it makes and asks again by itself for one that cannot be used; what it found odd is printed as
+   `look:` lines (a colour that was not in the first frame, a jump, a silence — with the second it happens at). Read them, and
+   look at those moments first. `songbe flow review <dir>` does the same for takes made earlier, and costs nothing.
 4. For one bad clip: `songbe flow retake <dir> e1-s5`, or change that node (`prompt`, `model`, `seconds`) and `songbe flow run
    <dir> e1`. Choose between takes with `songbe flow takes` and `pick`.
-5. Report what you could not judge: you cannot watch motion or hear a voice. Transcribe `out/eN.mp4` when a key for that is set,
+5. Report what you could not judge: you cannot watch motion or hear a voice, and the review only measures. Transcribe `out/eN.mp4` when a key for that is set,
    compare with the lines, and say which shots you looked at as stills only.
 
 Clips are the dear part (seconds of video); pictures and lines are cheap. Never `retake` a whole episode to fix one shot.

@@ -64,7 +64,7 @@ export function checkSeries(series, dir = null) {
     for (const [id, x] of Object.entries(series[set])) {
       const at = `${set}.${id}`;
       if (!NAME.test(id)) bad.push(`${at}: names here are lower-case letters, digits and dashes, starting with a letter (like "lan" or "old-house")`);
-      if (id === 'look' || id === 'style' || /^e\d+(-|$)/.test(id) || /-(face|sheet|plate)$/.test(id)) bad.push(`${at}: "${id}" is a name the canvas uses itself; choose another`);
+      if (id === 'look' || id === 'style' || id === 'keep' || /^e\d+(-|$)/.test(id) || /-(face|sheet|plate)$/.test(id)) bad.push(`${at}: "${id}" is a name the canvas uses itself; choose another`);
       if (set === 'places' && series.cast?.[id]) bad.push(`${at}: "${id}" already names someone in the cast`);
       if (!isObject(x)) { bad.push(`${at}: must be an object`); continue; }
       if (!text(x.name)) bad.push(`${at}.name: what is ${set === 'cast' ? 'this person' : 'this place'} called?`);

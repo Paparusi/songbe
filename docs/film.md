@@ -34,7 +34,9 @@ other makers through fal.ai. With both, each model is asked at its maker when th
   in a voice of its own choosing; the line is then **recorded to picture** the way a film is dubbed — to last as long as the lips
   moved, set exactly where they moved — and the model's voice is turned down there. Either way the voice in the film is the
   person's own, in every shot and every episode. A voice that is only heard is laid over a shot in which nobody speaks.
-- **The look.** One note describes the medium and one the light and colours; every picture and clip prompt carries them.
+- **The look.** One note describes the medium and one the light and colours; every picture prompt carries them. A clip starts
+  from a picture that already has the look, so it is told the medium and to keep what its first frame shows — told the palette
+  again, a clip model has been seen to paint one of its colours onto a face.
 
 ## The files
 
@@ -90,6 +92,7 @@ songbe flow run my-series e1               # make what e1 works from and is miss
 songbe flow plan my-series e2              # what making e2 would ask of which model, and about what it costs
 songbe flow spent my-series                # what the takes made so far cost by list price, day by day
 songbe flow retake my-series e1-s5         # another take of one clip; songbe flow takes / pick choose between takes
+songbe flow review my-series               # look at the takes that stand and say what is odd about them (no model is asked)
 songbe flow lock my-series lan-sheet       # hold a take whatever changes around it
 songbe flow board my-series                # one picture of the whole canvas
 songbe flow models                         # the models known by name
@@ -112,6 +115,18 @@ costs by list price, and it may spend $5 unless `--budget=N` or `"budget"` in `s
 spend more stops before anything is asked, and one that reaches its budget on the way holds back what is left and says so. The
 canvas shows the same figure on its Make button and wants a second click to go over. The prices are list prices read in
 October 2026, there for the estimate; the maker's invoice decides.
+
+**Looking at what it made.** A run looks at every take as soon as it is made: the take is decoded small and measured — no
+model is asked, and it costs nothing. A take that **cannot be used** is asked for again by the run itself (once, unless
+`--retakes=N` or `"retakes"` in `series.json` says otherwise, 0 to 3; each counts against the budget) and the better take
+stands: a clip in which the model was to say the line and nobody is heard, a clip whose picture never moves, a recording with
+no voice in it, with far more than the line, or with only a part of it. When no take can be used the node counts as not made
+and nothing is built on it; its takes are kept, and choosing one (`songbe flow pick`, or its button in the panel) uses it as
+it is. What is only **odd** is used and pointed at — a mark on the card, a line in the panel (click it and the clip jumps to
+that moment), a tag on the board, a line in `songbe flow`: a strong colour that appears in a clip and is not in its first
+frame, a jump as if cut to another shot, a stretch of black, a clip that does not begin on its picture or is shorter than
+asked, a long pause inside a line, a picture in another shape, with plain bars, or of one flat colour.
+Takes made before Songbe did this are looked at once when the film is opened in the app, or by `songbe flow review`.
 
 Every result is a **take**, kept under a key made from everything it was made from — the words, the model, and the takes of the
 nodes it works from. So running again costs nothing, and changing one thing leaves exactly the nodes that work from it to be made
@@ -156,3 +171,5 @@ Claude.ai sign-in or to run on a person's Pro or Max plan, and xAI publishes no 
 - A clip is taken from its start; `from` and `to` in a cut choose the part to keep by hand.
 - A line recorded to picture is fitted in time to where the lips moved, phrase by phrase; the lips themselves are not redrawn
   (no lip-sync model is run), so a model that paces a line very differently from the recording can still look a little off.
+- The review measures; it does not understand. It finds a colour that was not there, a cut, a freeze, a silence — not a face
+  that is no longer the person's, a hand with six fingers, or the wrong person speaking. Those are still for your eyes.

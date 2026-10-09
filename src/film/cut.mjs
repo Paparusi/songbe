@@ -63,7 +63,8 @@ export function cut(file, { parts, music = null, title = null, notice = null, su
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-video_track_timescale', '15360', path.join(work, `v${n}.mp4`)]);
       // its sound. A clip that acted to our recording and kept it already holds the line; one that did not keep it, or in which the
       // voice is only heard, gets the recording laid in; a model that spoke the line itself is taken as it is.
-      const dub = how === 'dub', lay = !dub && p.voice && how !== 'native' && !(how === 'voice' && p.info?.keeps && own), keepOwn = own && !(how === 'voice' && !p.info?.keeps);
+      const keeps = !!p.info?.keeps && !p.info?.lost;      // (lost: the model keeps the recording it acts to, and this once came back without it)
+      const dub = how === 'dub', lay = !dub && p.voice && how !== 'native' && !(how === 'voice' && keeps && own), keepOwn = own && !(how === 'voice' && !keeps);
       const inputs = [], chains = [], mix = [];
       // where the model spoke its sound is turned right down, and the rest of it — the room, a step, a door — stays
       const hush = dub ? r.lay.map((l) => `,volume=0.04:enable='between(t,${Math.max(0, l.at - r.from - .05).toFixed(3)},${(l.at - r.from + l.lasts + .08).toFixed(3)})'`).join('') : '';
