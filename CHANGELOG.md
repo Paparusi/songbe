@@ -2,6 +2,12 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.26
+- **Licence keys.** A copy runs as a trial for 14 days from its first start. After that it still opens, plays and exports
+  everything and lets it be changed, but makes nothing new until a key is entered (*Settings → Licence*, or
+  `songbe licence <key>`). A key is a signed note the app checks by itself, offline; `tools/licence.mjs` issues them with the
+  seller's private key, which is not in the repository. `songbe doctor` and the app's header say where a copy stands.
+
 ## 0.25
 - **Films in the app.** The home screen lists your films beside your videos, each with the first frame of its first shot and how
   far it has come. *New film* takes a few sentences and writes the series and the shot table of its first episode, then opens the

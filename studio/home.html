@@ -71,7 +71,7 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
 <body>
 <header class="bar">
   <a class="logo" href="/home"><img src="/studio/logo.png" alt=""><b>Song<span>be</span></b></a><div class="gap"></div>
-  <button class="tag" id="ktools" hidden></button><button class="tag" id="kkeys">…</button>
+  <button class="tag" id="klic" hidden></button><button class="tag" id="ktools" hidden></button><button class="tag" id="kkeys">…</button>
   <button class="btn quiet" id="bset">Settings</button>
 </header>
 <main>
@@ -128,6 +128,11 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
 
 <dialog id="dset"><div class="in">
   <h2>Settings</h2>
+  <div class="sec"><h3>Licence</h3>
+    <div class="row"><div class="k" id="lwords"></div><div class="d" id="lmore"></div><div class="v"><button class="btn small" id="lrem" hidden>Remove</button></div></div>
+    <div class="keyrow"><input type="text" id="lkey" autocomplete="off" spellcheck="false" placeholder="Paste a licence key (SB1.…)"><button class="btn" id="lset">Enter key</button></div>
+    <div class="msg note" id="lmsg" style="margin-top:6px">A key lets this copy make things. Without one, everything you made still opens.</div>
+  </div>
   <div class="sec"><h3>Keys</h3>
     <div class="lead" style="margin-bottom:6px">Voice, music, generated footage and the script writer are services you pay yourself. Songbe adds nothing on top. Without a key a video still builds: silent, with motion graphics and sound effects.</div>
     <div id="keys"></div>
@@ -232,7 +237,20 @@ function need() {      // the setup card: shown only while something is missing
 }
 const again = () => { const b = el('button', { className: 'btn', textContent: 'Check again' }); b.onclick = load; return b; };
 
+// how this copy is licensed: a tag in the header while it matters, and the whole story in Settings
+function licensing() {
+  const l = H.licence, tag = $('#klic'); if (!l) return;
+  tag.hidden = l.kind === 'licensed'; tag.textContent = l.kind === 'trial' ? `Trial · ${l.left} day${l.left === 1 ? '' : 's'}` : 'Licence needed'; tag.className = 'tag' + (l.kind === 'over' || l.left <= 3 ? ' warn' : '');
+  $('#lwords').textContent = l.words; $('#lrem').hidden = l.kind !== 'licensed';
+  $('#lmore').textContent = l.kind === 'licensed' ? [l.email, 'plan ' + l.plan, l.until ? 'runs until ' + l.until : 'does not run out'].filter(Boolean).join(' · ') : l.kind === 'trial' ? 'Everything works during the trial.' : 'Making is paused: your projects open, play and can be changed, but nothing new is made until a key is entered.';
+}
+async function setLicence(method, body) {
+  const r = await api('/api/licence', { method, ...(body ? { body: JSON.stringify(body) } : {}) }), j = await r.json();
+  if (!r.ok) { $('#lmsg').textContent = j.error; $('#lmsg').className = 'msg bad'; return; }
+  H.licence = j; $('#lkey').value = ''; licensing(); $('#lmsg').textContent = method === 'PUT' ? 'Thank you. This copy is licensed.' : 'The key was removed from this computer.'; $('#lmsg').className = 'msg note';
+}
 function settings() {
+  licensing();
   const k = H.keys, from = { environment: 'set in the environment', project: 'set', saved: 'saved' };
   if (!$('#keys').children.length) for (const [n, , title, about] of KEYS) {      // drawn once, so a key being typed is not wiped by the next refresh
     const get = el('button', { className: 'btn small', textContent: 'Get a key' }), off = el('button', { className: 'btn small', id: 'x' + n, textContent: 'Remove', hidden: true });
@@ -344,6 +362,8 @@ async function putKeys(data, done) {
   if (!r.ok) { $('#kmsg').textContent = j.error; $('#kmsg').className = 'msg bad'; return; }
   H.keys = j; for (const [n] of KEYS) $('#k' + n).value = ''; load(); $('#kmsg').textContent = done; $('#kmsg').className = 'msg note';
 }
+$('#lset').onclick = () => { const key = $('#lkey').value.trim(); if (!key) { $('#lmsg').textContent = 'Paste the key first.'; $('#lmsg').className = 'msg bad'; return; } setLicence('PUT', { key }); };
+$('#lrem').onclick = () => setLicence('DELETE'); $('#klic').onclick = () => showSettings();
 $('#ksave').onclick = () => { const d = {}; for (const [n, name] of KEYS) if ($('#k' + n).value.trim()) d[name] = $('#k' + n).value.trim();
   if (!Object.keys(d).length) { $('#kmsg').textContent = 'Paste a key first.'; return; } putKeys(d, 'Saved.'); };
 

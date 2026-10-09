@@ -7,6 +7,7 @@ import { checkFlow, estimate, look, openStore, readFlow, runFlow } from './flow.
 import { KNOWN, PREFER, modelFor } from './models.mjs';
 import { hasEpisode, readEpisode, readSeries, seriesFile, written } from './series.mjs';
 import { scriptSeconds, writeEpisode, writeSeries } from './writer.mjs';
+import { mayMake } from '../licence.mjs';
 import { dataDir, exists, loadDotEnv, log, mkdir } from '../util.mjs';
 
 export const HELP = `Songbe film — a series from an idea: the script, the cast with their faces and voices, every shot, every episode
@@ -94,6 +95,7 @@ export async function main(cmd, args) {
     if (!sub || sub === 'help') return log(HELP);
     if (!target) throw new Error('which project directory?\n\n' + HELP);
     const dir = path.resolve(target); keys(dir);
+    if (['new', 'make', 'script', 'run'].includes(sub)) mayMake();      // making needs a licence or a running trial
     const newSeries = async () => {
       const r = await writeSeries(dir, opt('idea') ? fs.readFileSync(path.resolve(opt('idea')), 'utf8') : rest.join(' '), { episodes: +(opt('episodes') || 3), seconds: +(opt('seconds') || 60), format: opt('format') || 'tall', language: opt('language'), force: has('force'), onStep: onStep('series') });
       const s = r.series;
@@ -179,6 +181,7 @@ export async function main(cmd, args) {
     return log(`${days.size ? '' : 'no take with a known price yet; '}${unknown ? `${plural(unknown, 'take')} made before prices were kept, or by a model without a list price, ${unknown === 1 ? 'is' : 'are'} not counted` : 'every take is counted'}`);
   }
   if (sub === 'run' || sub === 'retake') {
+    mayMake();
     if (sub === 'retake' && !names.length) throw new Error('another take of which node?');
     const want = names.length ? names : null, again = sub === 'retake' ? names : (opt('again') || '').split(',').filter(Boolean);
     const budget = await allowed(dir, flow, { want, again, budget: opt('budget') === undefined ? undefined : +opt('budget') }, has('events'));

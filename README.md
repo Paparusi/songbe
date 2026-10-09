@@ -21,7 +21,7 @@ of its own: change a line, hand one shot to another model, add a prop of yours, 
 
 <p align="center"><img src="docs/img/film-canvas.jpg" width="92%" alt="The canvas: every first frame, clip and line of an episode as a card; the chosen clip's panel shows its prompt as the model reads it"></p>
 
-> Version 0.25.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.26.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux, Windows and macOS (the tests
 > and each installer run on all three for every release). Named after the Sông Bé, a river in southern Vietnam.
 
@@ -361,6 +361,9 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
   runs the tests on every push, and builds, installs and starts the installers of a tagged release before attaching them.
 
 ## Licence
+
+A copy runs as a trial for 14 days; after that a licence key keeps it making things (*Settings → Licence*, or
+`songbe licence <key>`). Without one, everything you made still opens and exports.
 
 Songbe is proprietary software. Copyright © 2026 Le Hieu, all rights reserved: using it needs a licence from its owner, and it may
 not be copied, passed on or changed without one (`LICENSE`). What you make with it is yours. Versions 0.19.1 and earlier were
