@@ -64,8 +64,10 @@ try {
     const made = await (await call(at + '/api/projects', { method: 'POST', body: JSON.stringify({ name: 'smoke ' + st.id.replace(/[^a-z0-9]+/gi, ' '), starter: st.id }) })).json();
     const state = made.id ? await (await call(`${at}/p/${made.id}/api/state`)).json() : null, page = made.id ? await call(`${at}/p/${made.id}/preview`) : null;
     const poster = st.poster ? await call(at + st.poster) : null;
-    ok(!!state?.plan && !state.errors?.length && page?.ok && (!poster || poster.ok), `starter "${st.name}" opens`,
-      state?.spec ? `${state.spec.scenes.length} scenes${state.errors?.length ? ', problems: ' + state.errors.join('; ') : ''}${poster && !poster.ok ? ', its picture is missing' : ''}` : made.error || 'no project');
+    // a starter with clips cannot be laid out where there is no ffmpeg: the app saying so is the right answer on such a computer
+    const untooled = !home.tools?.ffmpeg && !!state?.spec && state.errors?.length > 0 && state.errors.every((e) => /ffmpeg/i.test(e));
+    ok((!!state?.plan && !state.errors?.length || untooled) && page?.ok && (!poster || poster.ok), `starter "${st.name}" opens`,
+      state?.spec ? `${state.spec.scenes.length} scenes${untooled ? ', not laid out: it has clips and this computer has no ffmpeg' : state.errors?.length ? ', problems: ' + state.errors.join('; ') : ''}${poster && !poster.ok ? ', its picture is missing' : ''}` : made.error || 'no project');
   }
 
   const seen = await until(45_000, () => fresh().split('\n').find((l) => l.startsWith('GET /api/home · ') && !l.includes('songbe-smoke')));

@@ -5,7 +5,8 @@
 # In a private copy of the repository tagged runs are skipped (macOS minutes cost ten times the others).
 #
 # Signing: the macOS app is signed and checked by Apple when the repository holds a Developer ID (five secrets, see app/README.md).
-# That happens in a step of its own, after compiling, with Apple's tools and app/mac.mjs alone. Windows is not code-signed.
+# That happens in a job of its own, on a machine that compiled nothing: it receives the finished app and runs Apple's tools and
+# app/mac.mjs, so the identity is never near other people's build scripts. Windows is not code-signed.
 # No action from outside GitHub's own is used here.
 name: release
 on:
@@ -24,8 +25,6 @@ jobs:
       matrix:
         os: ${{ (github.event_name == 'workflow_dispatch' && inputs.os != 'all') && fromJSON(format('["{0}"]', inputs.os)) || fromJSON('["ubuntu-22.04","windows-latest","macos-latest"]') }}
     runs-on: ${{ matrix.os }}
-    env:
-      HAVE_APPLE: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_API_KEY_P8 != '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -35,7 +34,7 @@ jobs:
       - name: Libraries the window needs (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf xvfb dbus
-      - uses: actions/cache@v6
+      - uses: actions/cache/restore@v6
         id: tauri
         with:
           path: ~/.cargo/bin/cargo-tauri${{ runner.os == 'Windows' && '.exe' || '' }}
@@ -43,10 +42,70 @@ jobs:
       - name: The Tauri command
         if: steps.tauri.outputs.cache-hit != 'true'
         run: cargo install tauri-cli --version ${{ env.TAURI_CLI }} --locked
+      - uses: actions/cache/save@v6      # kept at once, whatever happens to the rest of the run
+        if: steps.tauri.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cargo/bin/cargo-tauri${{ runner.os == 'Windows' && '.exe' || '' }}
+          key: cargo-tauri-${{ env.TAURI_CLI }}-${{ matrix.os }}-${{ runner.arch }}
       - run: node app/build.mjs
-      # The Developer ID is taken out of the secrets only now, into a keychain of its own that is thrown away afterwards.
-      - name: Sign and have Apple check (macOS)
-        if: runner.os == 'macOS' && env.HAVE_APPLE == 'true'
+      # install what was made the way a person would, start it, and see that it works
+      - name: Try it (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y ./app/src-tauri/target/*/release/bundle/deb/*.deb
+          songbe doctor
+          dbus-run-session -- xvfb-run -a node app/smoke.mjs /usr/bin/songbe
+          dbus-run-session -- xvfb-run -a node app/smoke.mjs app/src-tauri/target/*/release/bundle/appimage/*.AppImage
+      - name: Try it (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem app/src-tauri/target/*/release/bundle/nsis/*.exe)[0].FullName
+          Start-Process $setup -ArgumentList '/S' -Wait
+          $dir = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Songbe').InstallLocation.Trim('"')
+          node bin/songbe.mjs setup ffmpeg      # what the app's own button does: the installed app must then find it
+          node app/smoke.mjs "$dir\songbe.exe"
+      - uses: actions/upload-artifact@v7
+        if: runner.os != 'macOS'
+        with:
+          name: songbe-${{ runner.os }}
+          path: |
+            app/src-tauri/target/*/release/bundle/nsis/*.exe
+            app/src-tauri/target/*/release/bundle/appimage/*.AppImage
+            app/src-tauri/target/*/release/bundle/deb/*.deb
+      # macOS: the finished app goes to the job below, which signs it (when it can), makes the disk image and tries it
+      - name: Hand the app over (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent app/src-tauri/target/*/release/bundle/macos/Songbe.app "$RUNNER_TEMP/Songbe.app.zip"
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with: { name: unsigned-macOS-app, path: '${{ runner.temp }}/Songbe.app.zip', retention-days: 1 }
+
+  # A machine that compiled nothing: it unpacks the app, signs it and has Apple check it when the repository holds a Developer ID,
+  # makes the disk image, and starts the app out of that image.
+  mac:
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/') || inputs.os == 'macos-latest' || inputs.os == 'all' }}
+    runs-on: macos-latest
+    permissions: { contents: read }
+    env:
+      HAVE_APPLE: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_API_KEY_P8 != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - uses: actions/download-artifact@v8
+        with: { name: unsigned-macOS-app, path: '${{ runner.temp }}' }
+      - name: Unpack the app
+        run: |
+          to="app/src-tauri/target/$([ "$(uname -m)" = arm64 ] && echo aarch64 || echo x86_64)-apple-darwin/release/bundle/macos"
+          mkdir -p "$to" && ditto -x -k "$RUNNER_TEMP/Songbe.app.zip" "$to" && ls "$to"
+      - name: Disk image, unsigned
+        if: env.HAVE_APPLE != 'true'
+        run: node app/mac.mjs
+      # The Developer ID is taken out of the secrets only here, into a keychain of its own that is thrown away afterwards.
+      - name: Sign, have Apple check, disk image
+        if: env.HAVE_APPLE == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -69,24 +128,7 @@ jobs:
           test -n "$APPLE_SIGNING_IDENTITY" || { echo "no Developer ID Application identity in APPLE_CERTIFICATE"; exit 1; }
           node app/mac.mjs
           security delete-keychain "$chain"; rm "$RUNNER_TEMP/notary.p8"
-      # install what was made the way a person would, start it, and see that it works
-      - name: Try it (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get install -y ./app/src-tauri/target/*/release/bundle/deb/*.deb
-          songbe doctor
-          dbus-run-session -- xvfb-run -a node app/smoke.mjs /usr/bin/songbe
-          dbus-run-session -- xvfb-run -a node app/smoke.mjs app/src-tauri/target/*/release/bundle/appimage/*.AppImage
-      - name: Try it (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $setup = (Get-ChildItem app/src-tauri/target/*/release/bundle/nsis/*.exe)[0].FullName
-          Start-Process $setup -ArgumentList '/S' -Wait
-          $dir = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Songbe').InstallLocation.Trim('"')
-          node app/smoke.mjs "$dir\songbe.exe"
       - name: Try it (macOS)
-        if: runner.os == 'macOS'
         run: |
           hdiutil attach app/src-tauri/target/*/release/bundle/dmg/*.dmg -nobrowse -readonly -mountpoint "$RUNNER_TEMP/songbe-image" > /dev/null
           ls -la "$RUNNER_TEMP/songbe-image"
@@ -96,16 +138,14 @@ jobs:
           node app/smoke.mjs "$RUNNER_TEMP/Applications/Songbe.app/Contents/MacOS/songbe"
       - uses: actions/upload-artifact@v7
         with:
-          name: songbe-${{ runner.os }}
+          name: songbe-macOS
           path: |
-            app/src-tauri/target/*/release/bundle/nsis/*.exe
-            app/src-tauri/target/*/release/bundle/appimage/*.AppImage
-            app/src-tauri/target/*/release/bundle/deb/*.deb
             app/src-tauri/target/*/release/bundle/dmg/*.dmg
             app/src-tauri/target/*/release/bundle/dmg/macos-signing.txt
+
   # Every system built and started: gather the installers, write their checksums and the notes, and make the release.
   publish:
-    needs: build
+    needs: [build, mac]
     if: ${{ startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.os == 'all') }}
     runs-on: ubuntu-latest
     permissions: { contents: write }
@@ -114,7 +154,7 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22 }
       - uses: actions/download-artifact@v8
-        with: { path: got, merge-multiple: true }
+        with: { path: got, pattern: 'songbe-*', merge-multiple: true }
       - name: Checksums and notes
         run: |
           mkdir out && find got -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' -o -name 'macos-signing.txt' \) -exec mv {} out/ \;
