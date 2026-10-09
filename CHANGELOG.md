@@ -2,6 +2,18 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.36
+- **The same person through a clip.** A clip model sees its first frame and nothing else of the people in it: what that
+  picture does not show, the clip makes up. Seen twice on one film, and both mended in what the models are told:
+  - someone lying down was drawn with the hair out of sight behind the head, and the clip gave her a short crop as she sat
+    up — on two takes of the picture. A scene picture and a first frame with people in them are now told that hair is as
+    long as on the reference sheet in every pose, and is seen spread beside the head of someone lying down;
+  - a man seen small and from behind in a wide frame turned round with another face and a white shirt for his green one, and
+    the woman beside him had her hair up. A shot that is not close (`wide`, `full`, `medium`, `two shot`, `over shoulder`)
+    now tells the clip model in words how its people look and what they wear, after everything else it is told. Filmed
+    again, he kept his shirt and she her hair, and she still did what the shot directs her to do.
+  Clips and pictures already on a canvas keep their words; `songbe film expand --rewrite=<node>` asks for the new ones.
+
 ## 0.35
 - **Acting.** An episode came out stiff: its picture moved half as much as that of the film before it, on the same clip
   model. Three things in what the model was told, all changed:
@@ -14,11 +26,6 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
   Tried on three shots of that episode: the picture moves two to two and a half times as much, and each face goes somewhere.
   Films already made keep their words; `songbe film expand --rewrite=keep,<frames>` asks for the new ones.
 - The writer is told not to ask for stiff or motionless acting, and to keep a still camera for the few shots meant to be still.
-- **Hair that the first frame hides.** Someone lying down was drawn with the hair out of sight behind the head, and the clip
-  that starts on that picture gave her a short crop as she sat up — twice, on two takes of the picture. A scene picture and a
-  first frame with people in them are now told that hair is as long as on the reference sheet in every pose, and is seen
-  spread beside the head of someone lying down; the shot filmed again from such a frame kept her shoulder-length hair.
-  Pictures already on a canvas keep their words; `songbe film expand --rewrite=<frame>` asks for the new ones.
 
 ## 0.34
 - **A shot of a thing alone stays empty.** The clip model walked an arm through an insert of a wall; a shot with nobody in it

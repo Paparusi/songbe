@@ -72,8 +72,10 @@ still to do.
 
 A clip model sees only its first frame: what that picture hides, the clip makes up. A first frame that hid the hair of
 someone lying down gave them a short crop when they sat up — so every picture with people in it is told that hair keeps the
-length of the reference sheet in every pose and is seen. When a shot shows a person wrong, look at its first frame before the
-clip: a new take of the clip from the same frame makes the same thing up again.
+length of the reference sheet in every pose and is seen. A man small and seen from behind in a wide frame turned round as
+someone else in another shirt — so a shot that is not close tells the clip model in words how its people look and what they
+wear (the person's `look` and `wardrobe`, as `@name` puts them into any prompt). When a shot shows a person wrong, look at its
+first frame before the clip: a new take of the clip from the same frame makes the same thing up again.
 
 `size` is one of `wide`, `full`, `medium`, `two shot`, `over shoulder`, `close`, `extreme close`, `insert`. A shot has at most one
 line, said by one person. When the speaker is in `who` they are seen saying it; when only the listener is, the voice is heard from

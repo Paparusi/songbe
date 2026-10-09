@@ -19,6 +19,8 @@ const plain = (t) => String(t ?? '').trim().replace(/@/g, '@@');      // words p
 const sheets = (people) => people.map((p) => `@${p.id}-sheet is the reference sheet of ${p.name}.`).join(' ');
 // Someone lying down was seen drawn with the hair out of sight behind the head; the clip that starts on that picture then has
 // to make the hair up when they rise, and made a short crop of shoulder-length hair. So a picture is told that hair is seen.
+// the shots in which a face fills the frame: the first frame shows the clip model all it needs of the person
+const CLOSE = new Set(['close', 'extreme close', 'insert']);
 const HAIR = 'Hair is as long as on the sheet in every pose: on someone lying down it is seen, spread loose beside the head.';
 export const shotId = (n, shot) => `e${n}-s${shot.id}`;
 
@@ -57,7 +59,9 @@ const WRITE = {
   line: (x) => ({ kind: 'voice', who: `@${x.who}`, text: x.text, ...(x.how ? { how: x.how } : {}), ...(x.toPicture ? { fit: `@e${x.n}-s${x.shot}` } : {}), group: `e${x.n}`, label: `Shot ${x.shot}: ${x.name}` }),
   clip: (x) => ({ kind: 'clip', frame: `@e${x.n}-s${x.shot}-frame`, ...(x.speech ? { voice: `@e${x.n}-s${x.shot}-line` } : {}), ...(x.speech === 'heard' ? { heard: true } : {}), ...(x.seconds ? { seconds: x.seconds } : {}), ...(x.model ? { model: x.model } : {}), ...(x.hear?.length ? { sounds: x.hear.map((h) => ({ sound: `@${h.sound}`, at: h.at ?? 0, ...(h.volume ? { volume: h.volume } : {}), ...(h.to ? { to: h.to } : {}) })) } : {}), group: `e${x.n}`, label: `Shot ${x.shot}`,
     // (a shot of a thing alone is told that nobody comes into it: a clip model was seen to walk someone through a wall insert)
-    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.acting ? ` ${sentence(x.acting)}` : ''}${x.empty ? ' Nobody is in the frame and nobody enters it.' : ''}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep` }),
+    // (a clip model sees its first frame and nothing else of the people in it: someone small in a wide frame, or seen from behind, was
+    // given another face and other clothes as he turned and came closer. A shot that is not close is told in words how its people look.)
+    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.acting ? ` ${sentence(x.acting)}` : ''}${x.empty ? ' Nobody is in the frame and nobody enters it.' : ''}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep${x.people?.length ? ` How they look, for what the first frame does not show of them: ${x.people.map((p) => `@${p}`).join('; ')}.` : ''}` }),
   // a sound of the series: made once, the same every time it is heard
   sound: (x) => (x.file ? { kind: 'sound', file: x.file, group: 'series', label: x.name || 'A sound' } : { kind: 'sound', prompt: sentence(x.prompt), ...(x.seconds ? { seconds: x.seconds } : {}), group: 'series', label: x.name || 'A sound' }),
   music: (x) => ({ kind: 'music', prompt: `Instrumental film score, no vocals, no singing. ${x.music || 'Quiet and tense, sparse piano and low strings.'}`, group: `e${x.n}`, label: `Episode ${x.n}: music` }),
@@ -91,7 +95,9 @@ export function expand(series, scripts = {}) {
       const talks = KNOWN[model || series.models?.talk], toPicture = speech === 'seen' && !!talks?.speaks && !talks.acts;
       if (shot.line) put(`${id}-line`, 'line', { n, shot: shot.id, who: shot.line.who, name: cast[shot.line.who]?.name || shot.line.who, text: shot.line.text, how: shot.line.how, ...(toPicture ? { toPicture } : {}) });
       const facts = { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model, speech, ...(shot.hear?.length ? { hear: shot.hear } : {}), ...(shot.acting ? { acting: shot.acting } : {}) };      // (a shot nothing is set into, and nobody is directed in, is written from what it always was)
-      if (who.length) put(id, 'clip', facts); else put(id, 'clip', { ...facts, empty: true }, facts);      // nobody in the frame: said to the clip model; one written before that was said keeps its words
+      // nobody in the frame: said to the clip model. A shot that is not close: its people are described to the clip model. One written
+      // before either was said keeps its words.
+      if (!who.length) put(id, 'clip', { ...facts, empty: true }, facts); else if (CLOSE.has(shot.size)) put(id, 'clip', facts); else put(id, 'clip', { ...facts, people: who }, facts);
     });
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });
     put(`e${n}`, 'cut', { n, shots: all.map(({ shot }) => shot.id), title: ep.title, notice: series.notice ?? NOTICE[String(series.language || '').toLowerCase()] ?? NOTICE.english });
