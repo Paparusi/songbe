@@ -10,6 +10,8 @@ import { run, tools } from '../util.mjs';
 
 // acts: performs to a recording handed to it ('keeps': the clip comes back with that recording as its sound)
 // speaks: says a line written in its prompt, in a voice of its own choosing
+// lasts, ends: how long a clip it makes when started from a frame (as its maker's description said in October 2026), and whether
+//      it takes a last frame — known by heart so that looking at a canvas asks nobody anything
 // usd: a list price as read in October 2026 — per picture, per second of clip at about 720p, per thousand characters spoken —
 //      for an estimate before a run. Makers change their prices and bill by their own count: the invoice decides, not this.
 export const KNOWN = {
@@ -18,15 +20,15 @@ export const KNOWN = {
   'nano-banana-pro': { kind: 'picture', by: 'Google', google: 'gemini-3-pro-image', fal: { words: 'fal-ai/nano-banana-pro', refs: 'fal-ai/nano-banana-pro/edit' } },
   'seedream-4': { kind: 'picture', by: 'ByteDance', fal: { words: 'fal-ai/bytedance/seedream/v4/text-to-image', refs: 'fal-ai/bytedance/seedream/v4/edit' } },
   // clips
-  'hailuo-h3': { kind: 'clip', by: 'MiniMax', usd: .06, fal: { frame: 'minimax/h3/image-to-video', refs: 'minimax/h3/reference-to-video' }, acts: 'keeps', sound: true },
-  'hailuo-h3-max': { kind: 'clip', by: 'MiniMax', usd: .08, fal: { frame: 'minimax/h3-max/image-to-video' }, acts: 'keeps', sound: true },
-  'veo-3.1': { kind: 'clip', by: 'Google', usd: .4, google: 'veo-3.1-generate-preview', fal: { frame: 'fal-ai/veo3.1/image-to-video', refs: 'fal-ai/veo3.1/reference-to-video' }, speaks: true, sound: true },
-  'veo-3.1-fast': { kind: 'clip', by: 'Google', usd: .15, google: 'veo-3.1-fast-generate-preview', fal: { frame: 'fal-ai/veo3.1/fast/image-to-video' }, speaks: true, sound: true },
-  'veo-3.1-lite': { kind: 'clip', by: 'Google', usd: .05, google: 'veo-3.1-lite-generate-preview', fal: { frame: 'fal-ai/veo3.1/lite/image-to-video' }, speaks: true, sound: true },
-  'seedance-2.5': { kind: 'clip', by: 'ByteDance', usd: .47, fal: { frame: 'bytedance/seedance-2.5/image-to-video', refs: 'bytedance/seedance-2.5/reference-to-video' }, speaks: true, sound: true },
-  'wan-3.0': { kind: 'clip', by: 'Alibaba', usd: .1, fal: { frame: 'alibaba/wan-3.0/image-to-video', refs: 'alibaba/wan-3.0/reference-to-video' }, speaks: true, sound: true },
-  'kling-3': { kind: 'clip', by: 'Kuaishou', usd: .17, fal: { frame: 'fal-ai/kling-video/v3/pro/image-to-video' }, sound: true },
-  'gemini-omni-flash': { kind: 'clip', by: 'Google', usd: .1, fal: { frame: 'google/gemini-omni-flash/v1.1/image-to-video', refs: 'google/gemini-omni-flash/v1.1/reference-to-video' }, speaks: true, sound: true },
+  'hailuo-h3': { kind: 'clip', by: 'MiniMax', usd: .06, lasts: { min: 5, max: 15, whole: true }, ends: true, fal: { frame: 'minimax/h3/image-to-video', refs: 'minimax/h3/reference-to-video' }, acts: 'keeps', sound: true },
+  'hailuo-h3-max': { kind: 'clip', by: 'MiniMax', usd: .08, lasts: { min: .92, max: 15 }, ends: true, fal: { frame: 'minimax/h3-max/image-to-video' }, acts: 'keeps', sound: true },
+  'veo-3.1': { kind: 'clip', by: 'Google', usd: .4, lasts: { options: [4, 6, 8] }, google: 'veo-3.1-generate-preview', fal: { frame: 'fal-ai/veo3.1/image-to-video', refs: 'fal-ai/veo3.1/reference-to-video' }, speaks: true, sound: true },
+  'veo-3.1-fast': { kind: 'clip', by: 'Google', usd: .15, lasts: { options: [4, 6, 8] }, google: 'veo-3.1-fast-generate-preview', fal: { frame: 'fal-ai/veo3.1/fast/image-to-video' }, speaks: true, sound: true },
+  'veo-3.1-lite': { kind: 'clip', by: 'Google', usd: .05, lasts: { options: [4, 6, 8] }, google: 'veo-3.1-lite-generate-preview', fal: { frame: 'fal-ai/veo3.1/lite/image-to-video' }, speaks: true, sound: true },
+  'seedance-2.5': { kind: 'clip', by: 'ByteDance', usd: .47, lasts: { min: 4, max: 30, whole: true }, ends: true, fal: { frame: 'bytedance/seedance-2.5/image-to-video', refs: 'bytedance/seedance-2.5/reference-to-video' }, speaks: true, sound: true },
+  'wan-3.0': { kind: 'clip', by: 'Alibaba', usd: .1, lasts: { min: 2, max: 30, whole: true }, ends: true, fal: { frame: 'alibaba/wan-3.0/image-to-video', refs: 'alibaba/wan-3.0/reference-to-video' }, speaks: true, sound: true },
+  'kling-3': { kind: 'clip', by: 'Kuaishou', usd: .17, lasts: { min: 3, max: 15, whole: true }, ends: true, fal: { frame: 'fal-ai/kling-video/v3/pro/image-to-video' }, sound: true },
+  'gemini-omni-flash': { kind: 'clip', by: 'Google', usd: .1, lasts: { min: 3, max: 10, whole: true }, ends: true, fal: { frame: 'google/gemini-omni-flash/v1.1/image-to-video', refs: 'google/gemini-omni-flash/v1.1/reference-to-video' }, speaks: true, sound: true },
   // voices
   'gemini-tts': { kind: 'voice', by: 'Google', usd: .045, google: 'gemini-3.8-flash-tts', fal: 'google/gemini-3.8-flash-tts', directed: true, voices: google.VOICES },
   'minimax-speech': { kind: 'voice', by: 'MiniMax', usd: .1, fal: 'fal-ai/minimax/speech-2.8-hd',
@@ -73,6 +75,7 @@ const endpointFor = (r, w) => (typeof r.id === 'string' ? r.id : (w.frame && r.i
 // { seconds: { min, max, whole, options }, end, acts, speaks, sound, resolutions } for a clip model reached as `r`
 export async function clipAbilities(r, w = { frame: true }) {
   if (r.door === 'google') return { seconds: { options: google.CLIP.seconds }, end: true, acts: false, speaks: true, sound: true, resolutions: google.CLIP.resolutions };
+  if (r.known?.lasts && w.frame && !w.refs?.length) return { seconds: r.known.lasts, end: !!r.known.ends, acts: r.known.acts || false, speaks: !!r.known.speaks, sound: !!r.known.sound, resolutions: null };
   const id = endpointFor(r, w), inputs = await fal.inputsOf(id);
   if (!inputs) throw new Error(`fal.ai's description of ${id} could not be had (no connection?)`);
   const d = inputs.duration, options = d?.options?.map((x) => parseFloat(x)).filter((x) => !Number.isNaN(x)) || null;

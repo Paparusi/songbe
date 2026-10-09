@@ -18,6 +18,8 @@ import { serve } from '../src/studio.mjs';
 import { run, sha, tools } from '../src/util.mjs';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-film-'));
+process.env.SONGBE_DATA = path.join(scratch, 'data');      // the app's own files (its list of recent projects, saved keys) are this test's, not this computer's
+delete process.env.FAL_KEY; delete process.env.GEMINI_API_KEY; delete process.env.GOOGLE_API_KEY; delete process.env.ANTHROPIC_API_KEY; delete process.env.GROQ_API_KEY;
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 const fresh = (name) => { const d = path.join(scratch, name); fs.mkdirSync(d, { recursive: true }); return d; };
 const ff = (...a) => run(tools.ffmpeg, ['-v', 'error', '-y', ...a]);
