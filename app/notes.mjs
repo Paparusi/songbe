@@ -18,7 +18,7 @@ const dir = process.argv[2], files = dir && fs.existsSync(dir) ? fs.readdirSync(
 const signing = files.includes('macos-signing.txt') ? fs.readFileSync(path.join(dir, 'macos-signing.txt'), 'utf8').trim() : 'unsigned';
 const win = has(/setup\.exe$/i), dmg = has(/\.dmg$/i), deb = has(/\.deb$/i), img = has(/\.AppImage$/i);
 const lines = [];
-if (win) lines.push(`- **Windows** — \`${win}\`. It is not code-signed yet, so Windows shows "Windows protected your PC": choose *More info*, then *Run anyway*. It installs for you alone, without administrator rights.`);
+if (win) lines.push(`- **Windows** — \`${win}\`. It is not code-signed, so Windows shows "Windows protected your PC": choose *More info*, then *Run anyway*. It installs for you alone, without administrator rights.`);
 if (dmg) lines.push(signing === 'notarized'
   ? `- **macOS (Apple silicon)** — \`${dmg}\`, signed and checked by Apple. Open it and drag Songbe to Applications. ffmpeg comes from \`brew install ffmpeg\`.`
   : `- **macOS (Apple silicon)** — \`${dmg}\`. It is not signed yet, so macOS refuses it at first: open it once, then allow it under *System Settings → Privacy & Security → Open Anyway*. ffmpeg comes from \`brew install ffmpeg\`.`);
