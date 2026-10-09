@@ -19,6 +19,8 @@ function linkWays(a, b) {
     if (A.kind === 'voice') add(B.voice ? `It is the line of this clip instead of ${bare(B.voice)}` : 'It is the line of this clip', (n) => { n.voice = at; });
     if (words) add(bring, into('prompt'));
   }
+  if (B.kind === 'clip' && A.kind === 'sound') add('Hear it in this clip (set the second in the clip’s panel)', (n) => { n.sounds = [...list(n.sounds), { sound: at, at: 0 }]; });
+  if (B.kind === 'sound' && made(B) && A.kind === 'text') add(bring, into('prompt'));
   if (B.kind === 'voice' && B.text !== undefined) { if (A.kind === 'person') add('They say this line', (n) => { n.who = at; }); if (A.kind === 'clip' && bare(A.voice) === b) add('Record the line to the lips of this clip, after it is filmed', (n) => { n.fit = at; }); }
   if (B.kind === 'music' && made(B) && A.kind === 'text') add(bring, into('prompt'));
   if (B.kind === 'cut') { if (A.kind === 'clip') add('Add it as the last shot', (n) => { n.shots = [...list(n.shots), at]; }); if (A.kind === 'music') add(B.music ? `Play it under the cut instead of ${bare(B.music)}` : 'Play it under the cut', (n) => { n.music = at; }); }
@@ -46,17 +48,19 @@ function unlinked(a, b) {
   if (bare(n.grab) === a) { delete n.grab; delete n.at; }
   if (n.refs !== undefined) { n.refs = list(n.refs).filter((r) => bare(r) !== a); if (!n.refs.length) delete n.refs; }
   if (Array.isArray(n.shots)) n.shots = n.shots.filter((s) => bare(typeof s === 'string' ? s : s?.clip) !== a);
+  if (Array.isArray(n.sounds)) { n.sounds = n.sounds.filter((x) => bare(typeof x === 'string' ? x : x?.sound) !== a); if (!n.sounds.length) delete n.sounds; }
   for (const k of ['prompt', 'text']) if (typeof n[k] === 'string') n[k] = n[k].replace(named, '').trim();
   return JSON.stringify(n) === had ? null : n;
 }
 
-// where a note, a person or a place is brought in by name: [[from, to], …]. These are many (every picture names the look), so
+// where a note, a person or a place is brought in by name, and where a sound is set into a clip: [[from, to], …]. These are many (every picture names the look), so
 // they are drawn for the chosen card only.
 function softEdges() {
   const out = [], N = S.flow.nodes;
   for (const [id, n] of Object.entries(N)) { const from = new Set();
     for (const m of String((n.kind === 'text' ? n.text : n.prompt) || '').matchAll(/@([a-z0-9]+(?:-[a-z0-9]+)*)/g)) if (N[m[1]] && WORDS.includes(N[m[1]].kind) && m[1] !== id) from.add(m[1]);
     if (n.who && N[bare(n.who)]) from.add(bare(n.who));
+    for (const x of list(n.sounds)) { const sid = bare(typeof x === 'string' ? x : x?.sound); if (N[sid]) from.add(sid); }      // the sounds set into a clip
     for (const a of from) out.push([a, id]); }
   return out;
 }

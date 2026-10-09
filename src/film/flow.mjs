@@ -1,5 +1,5 @@
-// flow.json — a film as a canvas of nodes. A node is a note, a person, a place, a picture, a spoken line, a clip, a piece of music
-// or a cut, and says what it is made from: its words, the model to ask, and the other nodes it works from. Any node can work from
+// flow.json — a film as a canvas of nodes. A node is a note, a person, a place, a picture, a spoken line, a clip, a piece of music,
+// a sound or a cut, and says what it is made from: its words, the model to ask, and the other nodes it works from. Any node can work from
 // any other: write "@name" in a prompt and a note's words are put in its place, a person or a place is described, and a picture,
 // clip or recording is handed to the model as a reference ("image 2"); a clip names its first frame, its last, and the recording
 // its actor performs to. Nothing here knows what an episode or a shot is — that is one way of filling the canvas (director.mjs),
@@ -17,7 +17,7 @@ import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
 import { costOf, nameOf, secondsOf } from './models.mjs';
-import { grave, inWords, reviewClip, reviewFit, reviewPicture, reviewVoice } from './review.mjs';
+import { grave, inWords, reviewClip, reviewFit, reviewPicture, reviewSound, reviewVoice } from './review.mjs';
 import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
 import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
@@ -32,12 +32,14 @@ export const KINDS = {
   place: { must: ['name'], may: ['look'] },
   picture: { one: ['prompt', 'file', 'grab'], may: ['model', 'aspect', 'refs', 'at', 'options'], ext: 'jpg' },
   voice: { one: ['text', 'file'], may: ['who', 'how', 'voice', 'model', 'style', 'speed', 'fit', 'options'], ext: 'wav' },
-  clip: { one: ['prompt', 'file'], may: ['frame', 'end', 'voice', 'heard', 'ownVoice', 'refs', 'model', 'seconds', 'sound', 'resolution', 'options'], ext: 'mp4' },
+  clip: { one: ['prompt', 'file'], may: ['frame', 'end', 'voice', 'heard', 'ownVoice', 'refs', 'model', 'seconds', 'sound', 'sounds', 'resolution', 'options'], ext: 'mp4' },
   music: { one: ['prompt', 'file'], may: ['model', 'options'], ext: 'mp3' },
+  // a sound made from words (a knock, a door, rain) or a recording of your own; a clip says at which second it is heard ("sounds")
+  sound: { one: ['prompt', 'file'], may: ['model', 'seconds', 'options'], ext: 'wav' },
   cut: { must: ['shots'], may: ['music', 'title', 'notice', 'subtitles', 'musicVolume'], ext: 'mp4' },
 };
 const ANY = ['kind', 'label', 'group', 'note', 'by', 'as', 'of', 'xy'];      // what every node may carry (by, as, of: the director's marks; xy: where it sits on the canvas)
-const WORD = { picture: 'image', clip: 'video', voice: 'audio', music: 'audio' };
+const WORD = { picture: 'image', clip: 'video', voice: 'audio', music: 'audio', sound: 'audio' };
 const SLOTS = { picture: ['grab'], clip: ['frame', 'end', 'voice'], voice: ['fit'], cut: ['music'] };      // the fields in which a node names another it is made from
 // a line recorded to the lips of a clip ("fit") is made after that clip, not before it
 const fitted = (flow, clip) => { const v = flow.nodes[idOf(flow.nodes[clip]?.voice)]; return !!v && idOf(v.fit) === clip; };
@@ -51,6 +53,8 @@ const ONE_WORD = .4;              // a phrase shorter than this many seconds is 
 export const idOf = (ref) => String(ref || '').replace(/^@/, '');
 const list = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
 const shotOf = (s) => (typeof s === 'string' ? { clip: s } : s || {});
+// the sounds a clip is heard with: [{ sound: "@knock", at (the second of the clip, 0 when left out), volume }]
+const soundsOf = (n) => list(n?.sounds).map((s) => (typeof s === 'string' ? { sound: s } : s || {}));
 
 // ---- the file ----
 export const flowFile = (dir) => path.join(dir, 'flow.json');
@@ -80,7 +84,7 @@ export function needs(flow, id) {
   for (const x of mentioned(flow, n.prompt)) add(x);
   for (const slot of SLOTS[n.kind] || []) if (n[slot] && !(slot === 'voice' && fitted(flow, id))) add(n[slot]);
   for (const r of list(n.refs)) add(r);
-  if (n.kind === 'cut') for (const s of list(n.shots)) { const c = idOf(shotOf(s).clip); add(c); if (flow.nodes[c]?.voice) add(flow.nodes[c].voice); }
+  if (n.kind === 'cut') for (const s of list(n.shots)) { const c = idOf(shotOf(s).clip); add(c); if (flow.nodes[c]?.voice) add(flow.nodes[c].voice); for (const x of soundsOf(flow.nodes[c])) add(x.sound); }      // (a clip is filmed without its line laid over and without its sounds: the cut puts them in)
   out.delete(id); return [...out];
 }
 // the nodes in an order in which each comes after what it works from; a node that works from itself (through others) is named
@@ -114,6 +118,9 @@ export function checkFlow(flow, dir = null) {
     const slot = (f, ...kinds) => { if (n[f] !== undefined && !is(n[f], ...kinds)) bad.push(`${id}.${f}: must name a ${kinds.join(' or ')} node, like "@${kinds[0] === 'picture' ? 'lan-face' : 'e1-s1'}"`); };
     slot('frame', 'picture'); slot('end', 'picture'); slot('grab', 'clip'); if (n.kind === 'clip') slot('voice', 'voice'); if (n.kind === 'voice') { slot('who', 'person'); slot('fit', 'clip'); if (n.fit && idOf(nodes[idOf(n.fit)]?.voice) !== id) bad.push(`${id}.fit: ${n.fit} does not have this line as its "voice"`); } if (n.kind === 'cut') slot('music', 'music');
     for (const r of list(n.refs)) if (!is(r, 'picture')) bad.push(`${id}.refs: "${r}" is not a picture node`);
+    if (n.sounds !== undefined) { if (!Array.isArray(n.sounds)) bad.push(`${id}.sounds: a list like [{ "sound": "@knock", "at": 1.5 }]`);
+      else soundsOf(n).forEach((x, i) => { if (!is(x.sound, 'sound')) bad.push(`${id}.sounds[${i}]: "${x.sound}" is not a sound node`); if (x.at !== undefined && !(typeof x.at === 'number' && x.at >= 0)) bad.push(`${id}.sounds[${i}].at: the second of the clip at which it is heard`);
+        if (x.volume !== undefined && !(typeof x.volume === 'number' && x.volume > 0 && x.volume <= 4)) bad.push(`${id}.sounds[${i}].volume: how loud, where 1 is as loud as sounds are set by themselves (up to 4)`); }); }
     if (n.kind === 'cut') { if (!Array.isArray(n.shots) || !n.shots.length) bad.push(`${id}: a cut needs its shots, in order`);
       else n.shots.forEach((s, i) => { const c = shotOf(s); if (!is(c.clip, 'clip')) bad.push(`${id}.shots[${i}]: "${c.clip}" is not a clip node`); if (c.from !== undefined && c.to !== undefined && !(c.to > c.from)) bad.push(`${id}.shots[${i}]: "to" must come after "from"`); }); }
     if (n.seconds !== undefined && !(typeof n.seconds === 'number' && n.seconds > 0 && n.seconds <= 60)) bad.push(`${id}.seconds: a number of seconds`);
@@ -275,15 +282,21 @@ function music(c, id, n) {
   const r = c.use.modelFor('music', n.model || c.flow.models?.music, c.env, c.strict), w = wordsOf(c.flow, n.prompt, () => ({}));
   return { recipe: { kind: 'music', model: r.name, prompt: w.words, options: n.options }, by: r, units: 1, make: (file, { seed }) => c.use.makeMusic(r, { prompt: w.words, seed, options: n.options }, file, c.env) };
 }
+function sound(c, id, n) {
+  const r = c.use.modelFor('sound', n.model || c.flow.models?.sound, c.env, c.strict), w = wordsOf(c.flow, n.prompt, () => ({})), seconds = n.seconds || 3;
+  return { recipe: { kind: 'sound', model: r.name, prompt: w.words, seconds, options: n.options }, by: r, units: seconds, review: (file) => reviewSound(file),
+    make: (file, { seed }) => c.use.makeSound(r, { prompt: w.words, seconds, seed, options: n.options }, file, c.env) };
+}
 function cutting(c, id, n) {
   const parts = list(n.shots).map((s) => { const x = shotOf(s), cid = idOf(x.clip), cn = c.flow.nodes[cid], got = c.got(cid), line = cn.voice ? c.flow.nodes[idOf(cn.voice)] : null, rec = line ? c.got(idOf(cn.voice)) : null;
-    return { id: cid, file: got.file, take: got.take, info: got.info || {}, from: x.from, to: x.to, text: line?.text || null, who: (line?.who && c.flow.nodes[idOf(line.who)]?.name) || null, rec, ownVoice: !!cn.ownVoice, lay: rec?.info?.fit ? rec.info.lay : null }; });
+    const sounds = soundsOf(cn).map((s) => { const g = c.got(idOf(s.sound)); return { id: idOf(s.sound), file: g.file, take: g.take, at: s.at ?? 0, volume: s.volume ?? 1 }; });
+    return { id: cid, file: got.file, take: got.take, info: got.info || {}, from: x.from, to: x.to, text: line?.text || null, who: (line?.who && c.flow.nodes[idOf(line.who)]?.name) || null, rec, ownVoice: !!cn.ownVoice, lay: rec?.info?.fit ? rec.info.lay : null, sounds }; });
   const bed = n.music ? c.got(idOf(n.music)) : null, size = FORMATS[c.flow.format] || FORMATS.tall;
   const settings = { title: n.title || null, notice: n.notice ?? null, subtitles: n.subtitles !== false, musicVolume: n.musicVolume ?? .22, size };
-  return { recipe: { kind: 'cut', parts: parts.map((p) => ({ clip: p.take, voice: take(p.rec), from: p.from, to: p.to, text: p.text, info: p.info, ownVoice: p.ownVoice, lay: p.lay })), music: take(bed), ...settings }, by: null,
+  return { recipe: { kind: 'cut', parts: parts.map((p) => ({ clip: p.take, voice: take(p.rec), from: p.from, to: p.to, text: p.text, info: p.info, ownVoice: p.ownVoice, lay: p.lay, ...(p.sounds.length ? { sounds: p.sounds.map(({ take: t, at, volume }) => ({ take: t, at, volume })) } : {}) })), music: take(bed), ...settings }, by: null,
     make: (file) => cut(file, { parts: parts.map((p) => ({ ...p, voice: p.rec?.file || null })), music: bed?.file || null, ...settings }) };
 }
-const PLAN = { picture, voice, clip, music, cut: cutting };
+const PLAN = { picture, voice, clip, music, sound, cut: cutting };
 
 // ---- the run ----
 const seedOf = (key, n) => (parseInt(key.slice(0, 7), 16) + n * 7919) % 2147483647;
@@ -413,7 +426,7 @@ export async function estimate(dir, flow, { want = null, again = [], env = proce
       if (r?.state === 'make' && r.model) { pieces.push({ id, kind: n.kind, model: r.model, units: r.units, usd: r.usd }); continue; }
       const line = n.kind === 'clip' && n.voice ? flow.nodes[idOf(n.voice)] : null, role = n.kind === 'clip' ? (line && !n.heard ? 'talk' : 'clip') : n.kind;
       const by = use.modelFor(role, n.model || (n.kind === 'voice' && flow.nodes[idOf(n.who)]?.voice?.model) || flow.models?.[role], env, false);
-      let units = n.kind === 'voice' ? String(n.text).length / 1000 * (n.fit ? 2 : 1) : 1;
+      let units = n.kind === 'voice' ? String(n.text).length / 1000 * (n.fit ? 2 : 1) : n.kind === 'sound' ? n.seconds || 3 : 1;
       if (n.kind === 'clip') { const guess = n.seconds || (line ? LEAD + speechSeconds(line.text, flow.language) * 1.15 + TAIL + .4 : 4); try { units = MODELS.fitSeconds(await use.clipAbilities(by, { frame: !!n.frame }), guess); } catch { units = Math.ceil(guess); } }
       pieces.push({ id, kind: n.kind, model: by.name, units: +(+units).toFixed(3), usd: costOf(by, units) });
     } catch (e) { pieces.push({ id, kind: n.kind, model: null, units: null, usd: null, why: e.message }); }

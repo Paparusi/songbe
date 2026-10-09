@@ -25,6 +25,8 @@ export const frameOf = (series) => ({ size: FORMATS[series.format] || FORMATS.ta
 export const LEAD = 0.3, TAIL = 0.5;      // silence before a line and after it, inside its shot
 export const PLAIN = 4;                   // a shot nobody speaks in, when the script does not say how long
 // How long a line takes to say, before it has been recorded: Vietnamese is counted in syllables, other languages in words.
+// `voiceSeconds` is the voice alone; `speechSeconds` adds the pauses its punctuation asks for.
+export const voiceSeconds = (text, language = 'English') => +(String(text).trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length / (/vietnam/i.test(language) ? 4.4 : 2.7)).toFixed(2);
 export function speechSeconds(text, language = 'English') {
   const words = String(text).trim().split(/\s+/).filter(Boolean).length, pauses = (String(text).match(/[.,;:!?…]/g) || []).length;
   return +(words / (/vietnam/i.test(language) ? 4.4 : 2.7) + pauses * .22).toFixed(2);
@@ -74,6 +76,18 @@ export function checkSeries(series, dir = null) {
       if (set === 'cast' && x.voice !== undefined && !isObject(x.voice)) bad.push(`${at}.voice: must be an object like { "voice": "Kore" }`);
     }
   }
+  // the sounds the story turns on (a knock, a phone ringing): each is made once, and shots say at which second it is heard
+  if (series.sounds !== undefined && !isObject(series.sounds)) bad.push('sounds: must be an object like { "knock": { "prompt": "one slow knock on a concrete wall" } }');
+  else for (const [id, x] of Object.entries(series.sounds || {})) {
+    const at = `sounds.${id}`;
+    if (!NAME.test(id)) bad.push(`${at}: names here are lower-case letters, digits and dashes, starting with a letter (like "knock")`);
+    if (id === 'look' || id === 'style' || id === 'keep' || /^e\d+(-|$)/.test(id) || /-(face|sheet|plate)$/.test(id)) bad.push(`${at}: "${id}" is a name the canvas uses itself; choose another`);
+    if (series.cast?.[id] || series.places?.[id]) bad.push(`${at}: "${id}" already names someone in the cast or a place`);
+    if (!isObject(x)) { bad.push(`${at}: must be an object`); continue; }
+    if (!text(x.prompt) && !text(x.file)) bad.push(`${at}: say what is heard ("prompt"), or name a recording of your own ("file")`);
+    if (text(x.file) && dir && !exists(path.resolve(dir, x.file))) bad.push(`${at}.file: ${x.file} is not there`);
+    if (x.seconds !== undefined && !(typeof x.seconds === 'number' && x.seconds > 0 && x.seconds <= 30)) bad.push(`${at}.seconds: how long the sound lasts, up to 30`);
+  }
   if (series.models !== undefined && !isObject(series.models)) bad.push('models: must be an object like { "clip": "veo-3.1-fast" }');
   if (series.episodes !== undefined && !Array.isArray(series.episodes)) bad.push('episodes: must be a list');
   else (series.episodes || []).forEach((e, i) => { if (!isObject(e) || !text(e.title)) bad.push(`episodes[${i}]: every episode planned needs a title`); });
@@ -105,6 +119,10 @@ export function checkEpisode(series, episode) {
       else for (const w of who) if (!cast[w]) bad.push(`${here}.who: "${w}" is not in the cast (${Object.keys(cast).join(', ')})`);
       if (shot.seconds !== undefined && !(typeof shot.seconds === 'number' && shot.seconds >= 1 && shot.seconds <= 15)) bad.push(`${here}.seconds: between 1 and 15`);
       if (shot.continues && k === 0) bad.push(`${here}.continues: the first shot of a scene has nothing to continue from`);
+      if (shot.hear !== undefined) { const sounds = series.sounds || {};
+        if (!Array.isArray(shot.hear)) bad.push(`${here}.hear: a list like [{ "sound": "knock", "at": 1.5 }]`);
+        else shot.hear.forEach((h, i) => { if (!isObject(h) || !sounds[h.sound]) bad.push(`${here}.hear[${i}]: "${h?.sound}" is not one of the sounds of the series (${Object.keys(sounds).join(', ') || 'it has none'})`);
+          else if (h.at !== undefined && !(typeof h.at === 'number' && h.at >= 0 && h.at <= 15)) bad.push(`${here}.hear[${i}].at: the second of the shot at which it is heard`); }); }
       if (shot.line !== undefined) {
         const l = shot.line;
         if (!isObject(l) || !text(l.text)) return bad.push(`${here}.line: must be { "who": …, "text": … }`);

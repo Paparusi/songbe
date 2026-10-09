@@ -2,6 +2,15 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.33
+- **Sounds.** A new kind of node: a sound made from a few words (a knock, a door, rain) or a recording of your own. A clip
+  names the sounds heard in it and the second each begins; the cut sets them there, over the clip's own sound, and no clip is
+  filmed again when a sound changes. The sounds a story turns on belong to the series (`"sounds"` in `series.json`, `"hear"`
+  on a shot): each is made once and is the same every time, like a face. On the canvas a sound is a card that is dragged
+  onto a clip; in the script drawer the series lists its sounds and a shot says which it hears and when. Made through fal.ai
+  (ElevenLabs' sound effects, Stable Audio, or any text-to-audio endpoint).
+- A recorded line is judged by its voice alone: a line full of pauses ("Ai... ai đang ở đó?") no longer looks cut short.
+
 ## 0.32
 - **A maker that says the money has run out is not asked again in that run.** Credit used up, a spending cap reached, an
   account locked: the piece that met the refusal says so, every other piece of that maker says it was not asked, and what

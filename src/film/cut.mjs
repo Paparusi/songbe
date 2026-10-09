@@ -1,5 +1,5 @@
 // The cut: chosen clips in order → one film (mp4). Each clip is brought to the frame and trimmed to its part; its sound is what the
-// part calls for (the clip's own, our recording of the line, or both); the lines become subtitles timed to the recordings; music
+// part calls for (the clip's own, our recording of the line, or both), with the sounds the clip names set at their seconds; the lines become subtitles timed to the recordings; music
 // goes under everything and gives way to speech; the whole is levelled like the other videos Songbe makes. Beside the film it
 // writes the subtitles (.srt) and the timeline (.json: where each part starts and ends, and where its line is).
 import { spawnSync } from 'node:child_process';
@@ -11,6 +11,8 @@ import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { run, tools } from '../util.mjs';
 
 const SR = 48000, FPS = 30, SPEECH = -21;      // dB the lines are brought to before the mix
+const EFFECT = -5;      // dB the loudest moment of a sound is brought to (a knock is meant to be heard); its own "volume" is counted from there
+const peakOf = (file) => parseFloat(run(tools.ffmpeg, ['-hide_banner', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'], { stderr: true }).match(/max_volume: ([-\d.]+)/)?.[1] ?? 'NaN');
 const ff = (args, cwd) => { const r = spawnSync(tools.ffmpeg, ['-v', 'error', '-y', ...args], { encoding: 'utf8', cwd, windowsHide: true, maxBuffer: 1 << 26 }); if (r.status !== 0) throw new Error('ffmpeg failed: ' + String(r.stderr || r.error?.message).trim().split('\n').slice(-3).join(' | ')); };
 const meanOf = (file) => parseFloat(run(tools.ffmpeg, ['-hide_banner', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'], { stderr: true }).match(/mean_volume: ([-\d.]+)/)?.[1] ?? 'NaN');
 const stamp = (t, sep = ',') => { const ms = Math.max(0, Math.round(t * 1000)); return `${String(Math.floor(ms / 3600000)).padStart(2, '0')}:${String(Math.floor(ms / 60000) % 60).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}${sep}${String(ms % 1000).padStart(3, '0')}`; };
@@ -33,7 +35,8 @@ export function timeline(parts) {
     const from = Math.max(0, p.from ?? (lay ? lay[0].at - LEAD : 0)), to = Math.min(have + 2, p.to ?? (lay ? Math.max(ends + TAIL, from + (p.info?.length || 0)) : p.info?.length ? from + p.info.length : have)), length = +Math.max(.2, Math.min(to, lay ? have : to) - from).toFixed(3);
     const said = p.voice && !lay ? secondsOf(p.voice) : null, at = Math.max(0, LEAD - from);
     const line = !p.text ? null : lay ? [t + lay[0].at - from, Math.min(t + length, t + ends - from + .12)] : said !== null && how !== 'native' ? [t + at, Math.min(t + length, t + at + said + .15)] : [t + .2, t + length - .15];
-    const row = { id: p.id, start: +t.toFixed(3), end: +(t + length).toFixed(3), from: +from.toFixed(3), length, pad: +Math.max(0, from + length - have).toFixed(3), how, text: p.text || null, who: p.who || null, line: line && line.map((x) => +x.toFixed(3)), ...(lay ? { lay, placed: !!ready } : {}) };
+    const heard = (p.sounds || []).map((s) => ({ id: s.id, at: +(t + s.at - from).toFixed(3) })).filter((s) => s.at < t + length - .05);      // where in the film each of its sounds begins
+    const row = { id: p.id, start: +t.toFixed(3), end: +(t + length).toFixed(3), from: +from.toFixed(3), length, pad: +Math.max(0, from + length - have).toFixed(3), how, text: p.text || null, who: p.who || null, line: line && line.map((x) => +x.toFixed(3)), ...(lay ? { lay, placed: !!ready } : {}), ...(heard.length ? { sounds: heard } : {}) };
     t += length; return row;
   });
 }
@@ -81,6 +84,15 @@ export function cut(file, { parts, music = null, title = null, notice = null, su
       // lines are brought to one level, so a voice does not jump between a shot that carries it and one it was laid into
       const mean = r.text ? meanOf(raw) : NaN, gain = Number.isFinite(mean) ? Math.max(-12, Math.min(12, SPEECH - mean)) : 0;
       ff(['-i', raw, '-af', `volume=${gain.toFixed(2)}dB,afade=t=in:d=0.02,afade=t=out:st=${Math.max(0, r.length - .03).toFixed(3)}:d=0.03`, '-t', String(r.length), '-ar', String(SR), '-ac', '2', out]);
+      // the sounds this clip names, each set at its second (counted in the clip, so a part trimmed at its start moves them with it)
+      const set = (p.sounds || []).map((s) => ({ ...s, pos: s.at - r.from })).filter((s) => s.pos < r.length - .05 && s.pos > .1 - secondsOf(s.file));
+      if (set.length) {
+        const mixed = path.join(work, `m${n}.wav`), ins = ['-i', out], chain = ['[0:a]anull[b]'], names = ['[b]'];
+        set.forEach((s, k) => { const peak = peakOf(s.file), gain = (Number.isFinite(peak) ? EFFECT - peak : 0) + 20 * Math.log10(s.volume || 1), skip = Math.max(0, -s.pos), at = Math.max(0, s.pos);
+          ins.push(...(skip > 0 ? ['-ss', skip.toFixed(3)] : []), '-i', s.file); chain.push(`[${k + 1}:a]aresample=${SR},aformat=channel_layouts=stereo,volume=${gain.toFixed(2)}dB${at > 0 ? `,adelay=${Math.round(at * 1000)}:all=1` : ''}[e${k}]`); names.push(`[e${k}]`); });
+        ff([...ins, '-filter_complex', `${chain.join(';')};${names.join('')}amix=inputs=${names.length}:normalize=0:duration=first,afade=t=out:st=${Math.max(0, r.length - .03).toFixed(3)}:d=0.03[o]`, '-map', '[o]', '-t', String(r.length), '-ar', String(SR), '-ac', '2', mixed]);
+        fs.renameSync(mixed, out);
+      }
     });
     const names = (kind, ext) => parts.map((_, i) => `file '${kind}${String(i).padStart(3, '0')}.${ext}'`).join('\n') + '\n';
     fs.writeFileSync(path.join(work, 'v.txt'), names('v', 'mp4')); fs.writeFileSync(path.join(work, 'a.txt'), names('a', 'wav'));

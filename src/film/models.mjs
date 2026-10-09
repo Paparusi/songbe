@@ -37,10 +37,14 @@ export const KNOWN = {
   // music
   'lyria-3.5': { kind: 'music', by: 'Google', google: 'lyria-3.5' },
   'lyria-2': { kind: 'music', by: 'Google', fal: 'fal-ai/lyria2' },
+  // sounds: a knock, a door, rain — made from words, to be set at a moment of a shot
+  'elevenlabs-sfx': { kind: 'sound', by: 'ElevenLabs', fal: 'fal-ai/elevenlabs/sound-effects/v2' },
+  'stable-audio-2.5': { kind: 'sound', by: 'Stability AI', fal: 'fal-ai/stable-audio-25/text-to-audio' },
+  'cassette-sfx': { kind: 'sound', by: 'CassetteAI', fal: 'cassetteai/sound-effects-generator' },
 };
 // What each kind of work is given when nothing says otherwise: the first of these that can be reached with the keys at hand.
 // (`talk` is a clip in which someone seen in the frame speaks.)
-export const PREFER = { picture: ['nano-banana-2.1', 'seedream-4'], clip: ['hailuo-h3', 'veo-3.1-fast'], talk: ['hailuo-h3', 'veo-3.1-fast'], voice: ['gemini-tts', 'minimax-speech'], music: ['lyria-3.5', 'lyria-2'] };
+export const PREFER = { picture: ['nano-banana-2.1', 'seedream-4'], clip: ['hailuo-h3', 'veo-3.1-fast'], talk: ['hailuo-h3', 'veo-3.1-fast'], voice: ['gemini-tts', 'minimax-speech'], music: ['lyria-3.5', 'lyria-2'], sound: ['elevenlabs-sfx', 'stable-audio-2.5'] };
 const DOORS = { google: { has: google.available, key: 'GEMINI_API_KEY' }, fal: { has: (env) => !!env.FAL_KEY, key: 'FAL_KEY' } };
 const kindOf = (role) => (role === 'talk' ? 'clip' : role);
 
@@ -121,6 +125,22 @@ export async function makeVoice(r, w, file, env = process.env) {
 export async function makeMusic(r, w, file, env = process.env) {
   if (r.door === 'google') { const s = await google.music({ model: r.id, prompt: w.prompt }, env); return keep(s.bytes, file, 'mp3'); }
   await fal.music(w.prompt, { model: r.id, seconds: w.seconds, seed: w.seed, options: w.options }, file); convert(file, 'mp3');
+}
+
+// { prompt, seconds } → a sound (wav) that begins the moment the file begins, so that it can be set to the second
+export async function makeSound(r, w, file, env = process.env) {
+  if (r.door !== 'fal') throw new Error(`${r.name} cannot be reached: sounds are made through fal.ai (FAL_KEY)`);
+  const id = typeof r.id === 'string' ? r.id : Object.values(r.id)[0], inputs = await fal.inputsOf(id);
+  if (!inputs) throw new Error(`fal.ai's description of ${id} could not be had (no connection?)`);
+  const has = (n) => n in inputs, said = ['text', 'prompt'].find(has), long = ['duration_seconds', 'duration', 'seconds_total'].find(has), a = {};
+  if (!said) throw new Error(`${id} does not look like a model that makes a sound from words (it takes: ${Object.keys(inputs).join(', ')})`);
+  a[said] = w.prompt;
+  if (long && w.seconds) a[long] = Math.min(inputs[long].max ?? 30, Math.max(inputs[long].min ?? .5, w.seconds));
+  if (has('negative_prompt')) a.negative_prompt = 'music, melody, speech, voices, singing';
+  if (has('seed') && w.seed !== undefined) a.seed = w.seed;
+  await fal.run(id, { ...a, ...(w.options || {}) }, file, 300); convert(file, 'wav');
+  const tight = file + '.tight.wav';      // what silence the model left before the sound is taken off: the sound is set by where it begins
+  try { ff('-i', file, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.01', '-ar', '48000', '-ac', '1', tight); if (fs.statSync(tight).size > 2000) fs.renameSync(tight, file); } finally { fs.rmSync(tight, { force: true }); }
 }
 
 const PIXELS = { '2k': 1440, '4k': 2160 }, pixels = (x) => PIXELS[String(x).toLowerCase()] || parseInt(x, 10) || 0;

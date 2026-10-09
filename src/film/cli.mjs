@@ -152,7 +152,7 @@ export async function main(cmd, args) {
   if (sub === 'help') return log(HELP);
   if (sub === 'models') {
     keys(null);
-    for (const kind of ['picture', 'clip', 'voice', 'music']) { log(`${kind}:`); for (const [name, m] of Object.entries(KNOWN)) if (m.kind === kind) log(`  ${name.padEnd(20)} ${m.by.padEnd(10)} ${[m.google && 'Google\'s API', m.fal && 'fal.ai'].filter(Boolean).join(' or ')}${m.acts ? ' · acts to a recording' : ''}${m.speaks ? ' · speaks the line itself' : ''}`); }
+    for (const kind of ['picture', 'clip', 'voice', 'music', 'sound']) { log(`${kind}:`); for (const [name, m] of Object.entries(KNOWN)) if (m.kind === kind) log(`  ${name.padEnd(20)} ${m.by.padEnd(10)} ${[m.google && 'Google\'s API', m.fal && 'fal.ai'].filter(Boolean).join(' or ')}${m.acts ? ' · acts to a recording' : ''}${m.speaks ? ' · speaks the line itself' : ''}`); }
     const chosen = (role) => { try { return modelFor(role).name; } catch { return 'none (no key)'; } };
     return log(`used when nothing is named: ${Object.keys(PREFER).map((role) => `${role} → ${chosen(role)}`).join(', ')}`);
   }

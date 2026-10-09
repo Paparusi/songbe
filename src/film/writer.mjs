@@ -26,11 +26,12 @@ THE OBJECT
 { "title": "…", "logline": "…", "style": "…", "look": "…", "tone": "…", "accent": "…",
   "cast": { "<id>": { "name": "…", "gender": "female" | "male", "role": "…", "look": "…", "wardrobe": "…", "manner": "…", "voice": { ${voices ? '"voice": "…", ' : ''}"style": "…" } } },
   "places": { "<id>": { "name": "…", "look": "…" } },
+  "sounds": { "<id>": { "name": "…", "prompt": "…", "seconds": 2 } },
   "episodes": [ { "title": "…", "summary": "…" } ] }
 
 LANGUAGES
-- In ${language}: title, logline, the names of people and places, role, and each episode's title and summary.
-- In English, because the picture models read English best: style, look, tone, accent, and each look, wardrobe, manner and voice.style.
+- In ${language}: title, logline, the names of people, places and sounds, role, and each episode's title and summary.
+- In English, because the picture models read English best: style, look, tone, accent, each look, wardrobe, manner and voice.style, and each sound's prompt.
 
 FIELDS
 - style: the medium, in a few words: "Photorealistic live action, natural skin, a still from a 35mm film", or "3D animation in the manner of a family feature film", or "Hand-drawn anime, clean line, flat shading". Nothing about light or mood.
@@ -45,6 +46,7 @@ FIELDS
   voice.voice: the voice that suits the person, by name from this list, a different one for each person:
   ${voiceList(voices)}` : ''}
 - places: 2 to 4. look: a set designer's note — size, furniture, materials, colours, where the light comes from, what is seen through the windows. No people in it.
+- sounds: leave this out unless the story turns on a sound that must be the same every time it is heard — a knock on a wall, a phone ringing, a gunshot. At most three. prompt: exactly what is heard, one sound, in a few words, with nothing before or after it; seconds: how long it lasts. Shots then say at which second it is heard. Ordinary background (rain, room tone, footsteps) does not belong here.
 - episodes: exactly ${episodes}. Each summary is two or three sentences: what happens, the image or line it opens on, and the question it ends on. Every episode runs about ${seconds} seconds on screen — one or two scenes, one turn of the story — opens on something that stops a thumb, and ends before its question is answered.
 
 ${CANNOT}`;
@@ -57,7 +59,7 @@ Reply with one JSON object and nothing else: no explanation, no code fence.
 THE OBJECT
 { "title": "…", "summary": "…", "music": "…",
   "scenes": [ { "where": "<place id>", "time": "…", "staging": "…",
-    "shots": [ { "id": "1", "size": "…", "camera": "…", "who": ["<cast id>"], "action": "…", "line": { "who": "<cast id>", "text": "…", "how": "…" }, "sound": "…", "seconds": 3 } ] } ] }
+    "shots": [ { "id": "1", "size": "…", "camera": "…", "who": ["<cast id>"], "action": "…", "line": { "who": "<cast id>", "text": "…", "how": "…" }, "sound": "…", "hear": [ { "sound": "<sound id>", "at": 1.0 } ], "seconds": 3 } ] } ] }
 
 LANGUAGES
 - In ${language}: title, summary, and every line's text. Lines are spoken language the way people really talk: short, with the everyday particles and contractions of ${language}, never bookish.
@@ -82,6 +84,7 @@ SHOTS
   When the speaker is in "who" we see them say it. To lay a line over the person listening, put only the listener in "who": the voice is then heard from off screen — good for reactions.
   how: the delivery, for example "quiet, hurt, holding back anger".
 - sound: what is heard besides voices — room tone, rain, a door, footsteps. No music here.
+- hear: only when the series has sounds of its own (you are given them): each time one of them is heard in this shot, with the second of the shot at which it begins. Three knocks are three entries. Give such a shot "seconds" enough for what is heard, and do not describe that sound again in "sound". Leave "hear" out everywhere else.
 - seconds: for shots without a line, 2 to 5. Leave it out of shots with a line; they last as long as the line.
 - "continues": true on a shot that carries straight on from the last frame of the shot before it (same framing, the action goes on). Use it rarely.
 - Everyone wears their one outfit from the first shot to the last: nobody puts on or takes off a garment, and nothing is carried that the staging does not mention.
@@ -132,7 +135,7 @@ export async function writeSeries(dir, idea, { episodes = 3, seconds = 60, forma
   if (exists(seriesFile(dir)) && !force) throw new Error(`${dir} already has a series.json (use --force to write over it)`);
   const lang = languageOf(language, idea), using = { ...chosen(env), ...(models || {}) };
   const settle = (d) => ({ title: d.title, language: lang, format, ...(d.logline ? { logline: d.logline } : {}), ...(d.style ? { style: d.style } : {}), look: d.look, ...(d.tone ? { tone: d.tone } : {}), ...(d.accent ? { accent: d.accent } : {}), seconds, ...(Object.keys(using).length ? { models: using } : {}),
-    cast: d.cast, places: d.places, episodes: Array.isArray(d.episodes) ? d.episodes : [] });
+    cast: d.cast, places: d.places, ...(d.sounds && typeof d.sounds === 'object' && Object.keys(d.sounds).length ? { sounds: d.sounds } : {}), episodes: Array.isArray(d.episodes) ? d.episodes : [] });
   const r = await drafted({ system: bibleSystem({ language: lang, episodes, seconds, voices: voicesFor(using, env) }), first: `THE IDEA\n${idea.trim()}\n\nSETTINGS\nLanguage: ${lang}. Frame: ${format === 'tall' ? 'tall 9:16, for phones' : format === 'wide' ? 'wide 16:9' : 'square'}. Episodes: ${episodes}, about ${seconds} seconds each.`,
     check: (d) => { const s = settle(d), bad = checkSeries(s); if (!bad.length && s.episodes.length !== episodes) bad.push(`episodes: there are ${s.episodes.length}, and ${episodes} were asked for`); return bad; }, rounds, ask, env, onStep, what: 'series' });
   const series = castVoices(settle(r.value), env);
@@ -150,7 +153,8 @@ export async function writeEpisode(dir, series, n, { rounds = 3, force = false, 
   for (let k = 1; k < n; k++) { const done = hasEpisode(dir, k) ? readEpisode(dir, k) : null, last = done ? shotsOf(done).slice(-3).map(({ shot }) => `${shot.action}${shot.line ? ` — ${series.cast[shot.line.who]?.name || shot.line.who}: "${shot.line.text}"` : ''}`) : null;
     before.push(`Episode ${k}: ${done?.title || series.episodes[k - 1].title}. ${done?.summary || series.episodes[k - 1].summary}${last ? `\n  It ended on: ${last.join(' / ')}` : ''}`); }
   const bible = { title: series.title, logline: series.logline, tone: series.tone, cast: Object.fromEntries(Object.entries(series.cast).map(([id, c]) => [id, { name: c.name, role: c.role, look: c.look, manner: c.manner }])),
-    places: Object.fromEntries(Object.entries(series.places).map(([id, p]) => [id, { name: p.name, look: p.look }])) };
+    places: Object.fromEntries(Object.entries(series.places).map(([id, p]) => [id, { name: p.name, look: p.look }])),
+    ...(series.sounds && Object.keys(series.sounds).length ? { sounds: Object.fromEntries(Object.entries(series.sounds).map(([id, x]) => [id, { name: x.name, heard: x.prompt, seconds: x.seconds }])) } : {}) };
   const first = `THE SERIES\n${JSON.stringify(bible)}\n\n${before.length ? `THE STORY SO FAR\n${before.join('\n')}\n\n` : ''}WRITE EPISODE ${n} OF ${series.episodes.length}: ${outline.title}\n${outline.summary}${n < series.episodes.length ? `\n\n(The next episode will be: ${series.episodes[n].summary})` : '\n\n(This is the last episode.)'}`;
   const r = await drafted({ system: scriptSystem({ language: series.language || 'English', seconds }), first, rounds, ask, env, onStep, what: 'script',
     check: (d) => { const bad = checkEpisode(series, d); if (bad.length) return bad; const runs = scriptSeconds(series, d);

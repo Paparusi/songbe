@@ -28,7 +28,7 @@ main { display: grid; grid-template-columns: 1fr 400px; height: calc(100% - 56px
 .nb .none { position: absolute; inset: 0; display: grid; place-items: center; color: #5B6878; font-size: 12px; text-align: center; padding: 8px; }
 .nb .words { padding: 8px 10px; font-size: 12px; line-height: 1.4; color: #C4CEDA; height: 100%; overflow: hidden; } .nb .words b { color: #fff; }
 .nb .play { position: absolute; right: 8px; bottom: 8px; width: 28px; height: 28px; border-radius: 50%; background: #000A; display: grid; place-items: center; font-size: 12px; color: #fff; }
-.k-voice .nb .words { color: #fff; border-left: 3px solid #6EA8FF; } .k-music .nb .words { border-left: 3px solid #C9A23A; }
+.k-voice .nb .words { color: #fff; border-left: 3px solid #6EA8FF; } .k-music .nb .words { border-left: 3px solid #C9A23A; } .k-sound .nb .words { border-left: 3px solid #E07A5F; }
 #side { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 14px 14px 60px; }
 #side h2 { font-size: 16px; margin-bottom: 2px; word-break: break-all; } #side .kind { color: var(--soft); font-size: 12px; margin-bottom: 10px; }
 .f { margin-top: 10px; } .f > label { display: block; font-size: 12px; font-weight: 600; color: var(--soft); margin-bottom: 4px; }
@@ -91,7 +91,7 @@ const frameRatio = () => ({ tall: 9 / 16, wide: 16 / 9, square: 1 }[S.flow.forma
 function sizeOf(id) {      // [width, height] of a card, header included
   const n = S.flow.nodes[id], r = n.kind === 'picture' ? (n.grab ? frameRatio() : RATIO[n.aspect] || frameRatio()) : frameRatio();
   if (n.kind === 'picture' || n.kind === 'clip' || n.kind === 'cut') { const w = r > 1.2 ? 300 : 190; return [w, 30 + Math.round(w / r)]; }
-  return n.kind === 'voice' ? [210, 30 + 78] : n.kind === 'music' ? [210, 30 + 62] : [240, 30 + 104];
+  return n.kind === 'voice' ? [210, 30 + 78] : n.kind === 'music' || n.kind === 'sound' ? [210, 30 + 62] : [240, 30 + 104];
 }
 function arrange() {      // a tidy first layout for nodes that were never moved: notes, cast, places, then each cut with its shots in order
   const N = S.flow.nodes, at = {}, ids = Object.keys(N), of = (kind) => ids.filter((id) => N[id].kind === kind), put = (id, x, y) => { if (N[id] && !(id in at)) { at[id] = [x, y]; return sizeOf(id); } return [0, 0]; };
@@ -212,8 +212,14 @@ function panel() {
     pick('Recorded', 'fit', Object.keys(S.flow.nodes).filter((id) => S.flow.nodes[id].kind === 'clip' && bare(S.flow.nodes[id].voice) === sel).map((id) => ['@' + id, `to the lips of ${id}, after it is filmed`]), 'first; the clip acts to it or it is laid over'), line('Model', 'model', S.flow.models?.voice || 'the series’ voice model', models('voice')));
   if (n.kind === 'clip') kids.push(text('Prompt', 'prompt', 6), el('div', { class: 'rowf' }, pick('Starts on', 'frame', nodes('picture')), pick('Ends on', 'end', nodes('picture'))), el('div', { class: 'rowf' }, pick('Line', 'voice', nodes('voice'), 'nobody speaks'),
     n.voice ? field('The speaker is', 'heard', el('select', { onchange: (e) => { set('heard', e.target.value === 'heard'); set('ownVoice', e.target.value === 'own'); } }, el('option', { value: '', text: 'seen speaking' }), el('option', { value: 'heard', text: 'only heard', selected: !!n.heard }), el('option', { value: 'own', text: 'seen, in the model’s own voice', selected: !!n.ownVoice }))) : null),
-    el('div', { class: 'rowf' }, field('Seconds', 'seconds', el('input', { type: 'number', min: 1, max: 30, step: .5, value: n.seconds ?? '', placeholder: 'auto', title: 'Left empty, a shot lasts as long as its line, or four seconds when nobody speaks', oninput: (e) => set('seconds', e.target.value ? +e.target.value : undefined) })), line('Model', 'model', S.flow.models?.[n.voice && !n.heard ? 'talk' : 'clip'] || 'the series’ clip model', models('clip'))));
+    el('div', { class: 'rowf' }, field('Seconds', 'seconds', el('input', { type: 'number', min: 1, max: 30, step: .5, value: n.seconds ?? '', placeholder: 'auto', title: 'Left empty, a shot lasts as long as its line, or four seconds when nobody speaks', oninput: (e) => set('seconds', e.target.value ? +e.target.value : undefined) })), line('Model', 'model', S.flow.models?.[n.voice && !n.heard ? 'talk' : 'clip'] || 'the series’ clip model', models('clip'))),
+    // the sounds set into this clip: one per line, the sound and the second it begins (and, after an x, how loud)
+    field('Sounds heard in it (one per line: @sound and the second it begins, like @knock 1.5)', 'sounds', el('textarea', { rows: 2, placeholder: 'none', oninput: (e) => { const all = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const m = /^@?([a-z0-9-]+)(?:\s+([\d.]+))?(?:\s+x\s*([\d.]+))?$/.exec(l); return m ? { sound: '@' + m[1], at: +(m[2] || 0), ...(m[3] ? { volume: +m[3] } : {}) } : { sound: l }; }); set('sounds', all.length ? all : undefined); } },
+      document.createTextNode(list(n.sounds).map((x) => (typeof x === 'string' ? x : `${x.sound} ${x.at ?? 0}${x.volume ? ' x' + x.volume : ''}`)).join('\n')))));
   if (n.kind === 'music') kids.push(text('Prompt', 'prompt', 4), line('Model', 'model', S.flow.models?.music || '', models('music')));
+  if (n.kind === 'sound') { if (n.file !== undefined) kids.push(line('A recording of yours (path in the project)', 'file')); else kids.push(text('What is heard: one sound, in a few words', 'prompt', 3),
+    el('div', { class: 'rowf' }, field('Seconds', 'seconds', el('input', { type: 'number', min: .5, max: 30, step: .5, value: n.seconds ?? '', placeholder: '3', oninput: (e) => set('seconds', e.target.value ? +e.target.value : undefined) })), line('Model', 'model', S.flow.models?.sound || 'the first your keys reach', models('sound'))),
+    el('div', { class: 'hint', text: 'A clip says at which second this is heard: drag this card onto a clip, or write it in the clip’s “Sounds heard in it”.' })); }
   if (n.kind === 'cut') kids.push(field('Shots, in order (one per line: @clip, or @clip 0.4-3.1 to keep a part)', 'shots', el('textarea', { rows: 8, oninput: (e) => { const shots = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const m = /^(@?[a-z0-9-]+)\s+([\d.]+)\s*-\s*([\d.]+)$/.exec(l); return m ? { clip: '@' + bare(m[1]), from: +m[2], to: +m[3] } : '@' + bare(l.split(/\s/)[0]); }); n.shots = shots; save(); } },
     document.createTextNode(list(n.shots).map((s) => (typeof s === 'string' ? s : `${s.clip}${s.from !== undefined || s.to !== undefined ? ` ${s.from ?? 0}-${s.to ?? ''}` : ''}`)).join('\n')))), pick('Music', 'music', nodes('music'), 'none'), line('Title', 'title'), line('Notice shown throughout', 'notice'));
   if (/prompt|text/.test((K.one || K.must || []).join())) kids.push(el('div', { class: 'hint', text: 'Write @name to bring another node in: a note’s words, a person or place described, or a picture handed to the model as a reference.' }));
@@ -288,7 +294,7 @@ $('#go').addEventListener('click', () => { const over = plan && plan.usd > plan.
 $('#stop').addEventListener('click', () => api('/api/stop', { method: 'POST', body: '{}' }));
 
 // ---- a new node ----
-const FIRST = { text: () => ({ text: 'Write here.' }), person: (name) => ({ name }), place: (name) => ({ name }), picture: () => ({ prompt: 'Describe the picture.' }), voice: () => ({ text: 'The line.' }), clip: () => ({ prompt: 'Describe what happens.' }), music: () => ({ prompt: 'Instrumental, no vocals.' }) };
+const FIRST = { text: () => ({ text: 'Write here.' }), person: (name) => ({ name }), place: (name) => ({ name }), picture: () => ({ prompt: 'Describe the picture.' }), voice: () => ({ text: 'The line.' }), clip: () => ({ prompt: 'Describe what happens.' }), music: () => ({ prompt: 'Instrumental, no vocals.' }), sound: () => ({ prompt: 'Describe the sound.' }) };
 $('#addb').addEventListener('click', () => {
   const menu = $('#menu'); if (!menu.hidden) return (menu.hidden = true);
   let kind = 'picture'; const name = el('input', { type: 'text', placeholder: 'its name, like rain-on-glass' }), kinds = el('div', { class: 'kinds' }), msg = el('div', { class: 'msg bad' });

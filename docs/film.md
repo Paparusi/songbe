@@ -36,6 +36,9 @@ other makers through fal.ai. With both, each model is asked at its maker when th
   in a voice of its own choosing; the line is then **recorded to picture** the way a film is dubbed — to last as long as the lips
   moved, set exactly where they moved — and the model's voice is turned down there. Either way the voice in the film is the
   person's own, in every shot and every episode. A voice that is only heard is laid over a shot in which nobody speaks.
+- **Sounds.** A sound the story turns on — a knock on a wall, a phone ringing — belongs to the series like a face does: it is
+  made once (`"sounds"` in `series.json`) and is the same every time. A shot says at which second it is heard (`"hear"`), and
+  the cut sets it there, over the clip's own sound. Ordinary background stays in the shot's `sound`, for the clip model.
 - **The look.** One note describes the medium and one the light and colours; every picture prompt carries them. A clip starts
   from a picture that already has the look, so it is told the medium and to keep what its first frame shows — told the palette
   again, a clip model has been seen to paint one of its colours onto a face.
@@ -83,6 +86,7 @@ the order of mention. Write `@@` for a plain @.
 | `voice` | `text`, `who: "@person"`, `how` (and `voice`, `model`, `style`, `speed`); `fit: "@clip"` records it to the lips of that clip, after the clip is filmed — or `file` | wav |
 | `clip` | `prompt`, `frame: "@picture"`, `end: "@picture"`, `voice: "@voice"`, `heard: true` (the speaker is not seen), `ownVoice: true` (keep the model's voice), `refs`, `seconds`, `model`, `resolution`, `sound`, `options` — or `file` | mp4 |
 | `music` | `prompt` (and `model`) — or `file` | mp3 |
+| `sound` | `prompt`: one sound in a few words (and `seconds`, `model`) — or `file`, a recording of your own. A clip names the sounds heard in it: `sounds: [{ "sound": "@knock", "at": 1.5, "volume": 1 }]`, the second counted in the clip | wav |
 | `cut` | `shots: ["@clip", { "clip": "@clip", "from": 0.4, "to": 3.1 }]`, `music: "@music"`, `title`, `notice`, `subtitles`, `musicVolume` | mp4, srt |
 
 Any node may carry `label`, `group` and `note`. Nothing else is special: "an episode" is a cut and the nodes it works from.
@@ -164,7 +168,8 @@ newer Songbe that words its prompts differently; `songbe film expand --rewrite` 
 
 A model is named by a short name (`songbe flow models` lists them) or, for anything else, by its door: `fal:<endpoint>` for any
 endpoint on fal.ai, `google:<model id>` for any model of Google's API. The series names one per kind of work in `models`
-(`picture`, `clip`, `talk` — a clip in which someone seen speaks —, `voice`, `music`); any node may name its own in `model`.
+(`picture`, `clip`, `talk` — a clip in which someone seen speaks —, `voice`, `music`, `sound`); any node may name its own in `model`.
+Sounds are made through fal.ai (ElevenLabs' sound effects, Stable Audio, or any text-to-audio endpoint named by its door).
 
 What a clip model can do decides how a line reaches the screen: one that takes a recording (an input called `target_audio_url`,
 `audio_url` or `driving_audio_url`) acts to it; one known to speak (`veo-3.1`, `seedance-2.5`, `wan-3.0`, …) is told the line,
@@ -196,5 +201,7 @@ Claude.ai sign-in or to run on a person's Pro or Max plan, and xAI publishes no 
   place; a voice cannot always be brought that close — it pauses where the words pause, not where the actor's lips did — and a
   line that still had to be stretched as far as sounds right is pointed at ("listen to it"). In the test film that was three
   of the eight lines a speaking model filmed.
+- A sound is set at the second the script says, not where the picture shows the blow land: when a take calls for it, move the
+  second on the clip.
 - The review measures; it does not understand. It finds a colour that was not there, a cut, a freeze, a silence — not a face
   that is no longer the person's, a hand with six fingers, or the wrong person speaking. Those are still for your eyes.

@@ -41,7 +41,9 @@ function standIns({ refuse = null } = {}) {
       ff('-f', 'lavfi', '-t', String(told ? +told[1] * 1.5 : Math.max(.6, w.text.split(/\s+/).length * .3)), '-i', 'sine=frequency=220:sample_rate=48000', file); },
     makeClip: async (r, w, file) => { asked.push({ kind: 'clip', model: r.name, ...w, heard: w.voice ? secondsOf(w.voice) : null });
       ff('-f', 'lavfi', '-t', String(w.seconds), '-i', 'testsrc2=s=180x320:r=24', '-f', 'lavfi', '-t', String(w.seconds), '-i', 'sine=frequency=330:sample_rate=48000', ...(r.name === 'speaker' ? ['-af', "volume=0:enable='lt(t,1)+gt(t,2.2)'"] : []), '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', file); },
-    makeMusic: async (r, w, file) => { asked.push({ kind: 'music', ...w }); ff('-f', 'lavfi', '-t', '6', '-i', 'sine=frequency=110:sample_rate=44100', '-b:a', '64k', file); } };
+    makeMusic: async (r, w, file) => { asked.push({ kind: 'music', ...w }); ff('-f', 'lavfi', '-t', '6', '-i', 'sine=frequency=110:sample_rate=44100', '-b:a', '64k', file); },
+    // a sound: a short high tone, to be found again in the film by its pitch
+    makeSound: async (r, w, file) => { asked.push({ kind: 'sound', ...w }); ff('-f', 'lavfi', '-t', '0.3', '-i', 'sine=frequency=2000:sample_rate=48000', '-af', 'volume=0.2', file); } };
 }
 // a canvas small enough to follow by eye: a note, a person with a face and a sheet, one shot with a line, music, and the cut
 const small = () => ({ format: 'tall', language: 'Vietnamese', nodes: {
@@ -247,6 +249,55 @@ test('a maker that answers that the money has run out is not asked again in that
     const x = await runFlow(fresh('no-' + said.length), { format: 'tall', nodes: { a: flow.nodes.a } }, { use: u, pause: 0 }); assert.equal(n, 1, said); assert.equal(x.failed[0].error, said); }
 });
 
+test('a sound is made once and set at a second of a clip: the cut puts it there, and no clip is filmed again for it', async () => {
+  const dir = fresh('sound'), flow = small(), use = standIns();
+  flow.nodes.knock = { kind: 'sound', prompt: 'One slow knock on a wall. @look', seconds: 1 };
+  flow.nodes.s2.sounds = [{ sound: '@knock', at: .4 }, { sound: '@knock', at: 1, volume: .5 }, { sound: '@knock', at: 3 }];      // the third falls after the part of s2 the cut keeps (to 1.5 s)
+  assert.deepEqual(checkFlow(flow), []); assert.ok(needs(flow, 'film').includes('knock')); assert.ok(!needs(flow, 's2').includes('knock'), 'a clip is filmed without its sounds');
+  assert.deepEqual((await estimate(dir, flow, { use })).pieces.find((x) => x.id === 'knock'), { id: 'knock', kind: 'sound', model: 'stand-in-sound', units: 1, usd: null });
+  const r = await runFlow(dir, flow, { use }); assert.deepEqual(r.failed, []);
+  const made = use.asked.filter((a) => a.kind === 'sound'); assert.equal(made.length, 1, 'made once, heard twice'); assert.deepEqual([made[0].prompt, made[0].seconds], ['One slow knock on a wall. Soft window light.', 1]);
+  // the timeline says where each begins in the film …
+  const film = r.out.get('film').file, part = JSON.parse(fs.readFileSync(film.replace(/\.mp4$/, '.json'), 'utf8')).parts[1];
+  assert.deepEqual(part.sounds.map((x) => x.id), ['knock', 'knock'], 'what falls outside the part is left out'); assert.ok(Math.abs(part.sounds[0].at - (part.start + .4)) < .01 && Math.abs(part.sounds[1].at - (part.start + 1)) < .01);
+  // … and that is where the film has it: the sound is a tone at 2000 Hz, the clips hum at 330
+  const raw = run(tools.ffmpeg, ['-v', 'error', '-i', film, '-vn', '-ac', '1', '-ar', '16000', '-af', 'highpass=f=1500,lowpass=f=2600', '-f', 's16le', '-'], { binary: true }), x = new Int16Array(raw.buffer, raw.byteOffset, raw.length >> 1), loud = [];
+  for (let at = 0; at + 320 <= x.length; at += 320) { let e = 0; for (let i = 0; i < 320; i++) e += x[at + i] ** 2; loud.push(Math.sqrt(e / 320)); }      // fifty times a second
+  const top = Math.max(...loud), on = loud.map((v, i) => (v > top * .2 ? i / 50 : -1)).filter((t) => t >= 0), begins = on.filter((t, i) => i === 0 || t - on[i - 1] > .1);
+  assert.equal(begins.length, 2, `two bursts, at ${begins}`); part.sounds.forEach((snd, i) => assert.ok(Math.abs(begins[i] - snd.at) < .08, `${begins[i]} is about ${snd.at}`));
+  const level = (t) => Math.max(...loud.slice(Math.round(t * 50), Math.round(t * 50) + 14)); assert.ok(level(begins[1]) < level(begins[0]) * .75 && level(begins[1]) > level(begins[0]) * .3, 'the second at half the volume');
+  // other words for the sound: the sound and the cut are made again, no clip is
+  const clips = use.asked.filter((a) => a.kind === 'clip').length; flow.nodes.knock.prompt = 'Two knocks.';
+  assert.equal(madeOf(await runFlow(dir, flow, { use })), 'film knock'); assert.equal(use.asked.filter((a) => a.kind === 'clip').length, clips);
+  // a recording of your own stands in for it; and what is wrong is said
+  fs.mkdirSync(path.join(dir, 'media')); ff('-f', 'lavfi', '-t', '0.5', '-i', 'sine=frequency=2000:sample_rate=48000', path.join(dir, 'media', 'k.wav')); flow.nodes.knock = { kind: 'sound', file: 'media/k.wav' };
+  assert.equal((await look(dir, flow, { use })).find((y) => y.id === 'knock').state, 'own'); assert.equal(madeOf(await runFlow(dir, flow, { use })), 'film');
+  const bad = (change) => { const f = structuredClone(flow); change(f.nodes); return checkFlow(f).join('\n'); };
+  assert.match(bad((n) => { n.s2.sounds = [{ sound: '@music' }]; }), /s2\.sounds\[0\]: "@music" is not a sound node/); assert.match(bad((n) => { n.s2.sounds = [{ sound: '@knock', at: -1 }]; }), /s2\.sounds\[0\]\.at: the second of the clip/);
+  assert.match(bad((n) => { n.s2.sounds = '@knock'; }), /s2\.sounds: a list like/); assert.match(bad((n) => { n.knock = { kind: 'sound' }; }), /knock: a sound needs "prompt" or "file"/);
+});
+
+test('the sounds a story turns on belong to the series: the director makes each once and sets it where the shots say', async () => {
+  const noisy = { ...SERIES, sounds: { knock: { name: 'Tiếng gõ', prompt: 'One slow knock on a concrete wall', seconds: 2 } } }, heard = structuredClone(EPISODE);
+  heard.scenes[0].shots[1].hear = [{ sound: 'knock', at: 1 }, { sound: 'knock', at: 2.2 }];
+  assert.deepEqual(checkSeries(noisy), []); assert.deepEqual(checkEpisode(noisy, heard), []);
+  const flow = expand(noisy, { 1: heard }), n = flow.nodes, plain = expand(SERIES, { 1: EPISODE }).nodes; assert.deepEqual(checkFlow(flow), []);
+  const { of, ...knock } = n.knock; assert.deepEqual(knock, { kind: 'sound', prompt: 'One slow knock on a concrete wall.', seconds: 2, group: 'series', label: 'Tiếng gõ' });
+  assert.deepEqual(n['e1-s2'].sounds, [{ sound: '@knock', at: 1 }, { sound: '@knock', at: 2.2 }]); assert.equal(n['e1-s1'].sounds, undefined);
+  assert.equal(n['e1-s1'].of, plain['e1-s1'].of, 'a shot nothing is set into is written from what it always was'); assert.notEqual(n['e1-s2'].of, plain['e1-s2'].of); assert.ok(needs(flow, 'e1').includes('knock'));
+  // what is wrong is said
+  assert.match(checkSeries({ ...SERIES, sounds: { lan: { prompt: 'x' } } }).join(), /sounds\.lan: "lan" already names someone in the cast or a place/); assert.match(checkSeries({ ...SERIES, sounds: { knock: {} } }).join(), /sounds\.knock: say what is heard/);
+  assert.match(checkSeries({ ...SERIES, sounds: { knock: { prompt: 'x', seconds: 90 } } }).join(), /sounds\.knock\.seconds: how long the sound lasts/);
+  assert.match(checkEpisode(SERIES, heard).join(), /shots\[1\]\.hear\[0\]: "knock" is not one of the sounds of the series \(it has none\)/);
+  const late = structuredClone(heard); late.scenes[0].shots[1].hear = [{ sound: 'knock', at: -2 }]; assert.match(checkEpisode(noisy, late).join(), /hear\[0\]\.at: the second of the shot at which it is heard/);
+  // the writer is told about them, keeps the ones it writes, and is handed them again when it writes the shots
+  const dir = fresh('noisy'), env = { GEMINI_API_KEY: 'x' }, draft = { title: SERIES.title, style: SERIES.style, look: SERIES.look, cast: structuredClone(SERIES.cast), places: SERIES.places, sounds: noisy.sounds, episodes: SERIES.episodes };
+  const bible = scripted(draft), written = await writeSeries(dir, 'Lan nghe tiếng gõ từ bức tường mỗi đêm.', { episodes: 2, seconds: 12, ask: bible.ask, env });
+  assert.match(bible.asked[0].system, /sounds: leave this out unless the story turns on a sound that must be the same every time/); assert.deepEqual(written.series.sounds, noisy.sounds);
+  const shots = scripted(heard); await writeEpisode(dir, written.series, 1, { ask: shots.ask, env });
+  assert.match(shots.asked[0].system, /hear: only when the series has sounds of its own/); assert.match(shots.asked[0].prompt, /"sounds":\{"knock":\{"name":"Tiếng gõ","heard":"One slow knock on a concrete wall","seconds":2\}\}/); assert.deepEqual(readEpisode(dir, 1).scenes[0].shots[1].hear, heard.scenes[0].shots[1].hear);
+});
+
 // ---- the review: what is odd about a take, found by looking at it ----
 test('a take is looked at without asking any model: a clip that grows a colour, cuts, freezes, goes black or stays silent; a line that is not the line; a picture in another shape', () => {
   const dir = fresh('review'), at = (name) => path.join(dir, name), what = (found) => found.map((f) => f.what).join(' ');
@@ -278,6 +329,7 @@ test('a take is looked at without asking any model: a clip that grows a colour, 
   ff('-f', 'lavfi', '-t', '2', '-i', 'anullsrc=r=48000:cl=mono', at('none.wav')); assert.deepEqual(said(at('none.wav')).map((f) => [f.what, f.grave]), [['nothing', true]]);
   assert.match(inWords(said(tone('long.wav', 9))), /^the recording holds 9\.0 s of voice for a line that takes about 2\.\d s to say: more than the line was said$/); assert.equal(grave(said(at('long.wav'))).length, 1);
   assert.match(inWords(said(tone('part.wav', .9))), /part of the line is missing$/); assert.deepEqual(reviewVoice(tone('word.wav', .5), { text: 'Minh?', language: 'Vietnamese' }), [], 'a word is not held to a stopwatch');
+  assert.deepEqual(reviewVoice(tone('whisper.wav', .8), { text: 'Ai... ai đang ở đó?', language: 'Vietnamese' }), [], 'five syllables in 0.8 s: the dots of a line are pauses, not missing words');
   assert.deepEqual(said(tone('pause.wav', 5.2, "volume=0:enable='between(t,1.4,3.6)'")).map((f) => [f.what, !!f.grave]), [['pause', false]]);
   // a picture: the shape asked for, another shape, one flat colour, plain bars above and below
   const pic = (name, source, filter) => { ff('-f', 'lavfi', '-i', source, ...(filter ? ['-vf', filter] : []), '-frames:v', '1', '-q:v', '2', at(name)); return at(name); };
@@ -348,6 +400,9 @@ test('lines by hand on the canvas: what dropping one card on another means, what
   assert.deepEqual(says('lan', 's1-line'), ['They say this line']); assert.deepEqual(says('s1', 's1-line'), ['Record the line to the lips of this clip, after it is filmed']); assert.deepEqual(says('s2', 's1-line'), [], 'only the clip that has this line');
   assert.deepEqual(says('rain', 'film'), []); assert.deepEqual(says('s1', 'film'), ['Add it as the last shot']); assert.deepEqual(after('s1', 'film').shots, ['@s1', { clip: '@s2', to: 1.5 }, '@s1']); assert.deepEqual(says('music', 'film'), ['Play it under the cut instead of music']);
   assert.deepEqual(says('s1', 'last'), ['Take the frame from this clip instead of s2']); assert.deepEqual(says('s1', 'rain'), [], 'a drawn picture is not a frame of a clip'); assert.deepEqual(says('s1-line', 'rain'), []); assert.deepEqual(says('rain', 'rain'), []);
+  // a sound is set into a clip, and taken out again
+  flow.nodes.knock = { kind: 'sound', prompt: 'A knock.' }; assert.deepEqual(says('knock', 's2'), ['Hear it in this clip (set the second in the clip’s panel)']); assert.deepEqual(after('knock', 's2').sounds, [{ sound: '@knock', at: 0 }]); assert.deepEqual(says('knock', 'film'), [], 'a cut hears what its clips hear');
+  flow.nodes.s2.sounds = [{ sound: '@knock', at: 1 }]; assert.equal(plain(rules.unlinked('knock', 's2')).sounds, undefined); assert.ok(plain(rules.softEdges()).some(([x, y]) => x === 'knock' && y === 's2')); assert.deepEqual(plain(rules.linkNew('knock')), []); delete flow.nodes.s2.sounds; delete flow.nodes.knock;
   // dropped on nothing: something new, named after what it is made from
   const made = (a) => plain(rules.linkNew(a));
   assert.deepEqual(made('rain').map((m) => [m.says, m.nodes[0][0]]), [['A clip that starts on it', 'rain-clip'], ['Another picture made from it', 'rain-next']]); assert.deepEqual(made('rain')[0].nodes[0][1], { kind: 'clip', frame: '@rain', prompt: 'Describe what happens.' });
@@ -479,9 +534,9 @@ test('a model is reached at its maker when that key is set and through fal.ai ot
   assert.deepEqual(reach('fal:some/new/endpoint', { FAL_KEY: 'f' }), { name: 'fal:some/new/endpoint', door: 'fal', id: 'some/new/endpoint', known: null }); assert.throws(() => reach('google:veo-9', {}), /google:veo-9 needs GEMINI_API_KEY/);
   assert.equal(reach('hailuo-h3', {}, false).door, 'fal', 'looked at without its key'); assert.equal(modelFor('clip', null, {}, false).name, 'hailuo-h3');
   assert.deepEqual(chosen({ GEMINI_API_KEY: 'g' }), { picture: 'nano-banana-2.1', clip: 'veo-3.1-fast', talk: 'veo-3.1-fast', voice: 'gemini-tts', music: 'lyria-3.5' });
-  assert.deepEqual(chosen({ FAL_KEY: 'f' }), { picture: 'nano-banana-2.1', clip: 'hailuo-h3', talk: 'hailuo-h3', voice: 'gemini-tts', music: 'lyria-2' }); assert.deepEqual(chosen({}), {});
+  assert.deepEqual(chosen({ FAL_KEY: 'f' }), { picture: 'nano-banana-2.1', clip: 'hailuo-h3', talk: 'hailuo-h3', voice: 'gemini-tts', music: 'lyria-2', sound: 'elevenlabs-sfx' }); assert.deepEqual(chosen({}), {});
   assert.throws(() => modelFor('voice', 'veo-3.1', { GEMINI_API_KEY: 'g' }), /veo-3\.1 makes a clip, not a voice/); assert.throws(() => modelFor('clip', null, {}), /nothing can make a clip with the keys that are set/);
-  for (const [name, m] of Object.entries(KNOWN)) assert.ok(['picture', 'clip', 'voice', 'music'].includes(m.kind) && (m.google || m.fal), name);
+  for (const [name, m] of Object.entries(KNOWN)) assert.ok(['picture', 'clip', 'voice', 'music', 'sound'].includes(m.kind) && (m.google || m.fal), name);
   assert.deepEqual([fitSeconds({ seconds: { min: 5, max: 15, whole: true } }, 2.2), fitSeconds({ seconds: { min: 5, max: 15, whole: true } }, 6.1), fitSeconds({ seconds: { options: [4, 6, 8] } }, 4.6), fitSeconds({ seconds: { options: [4, 6, 8] } }, 11), fitSeconds({ seconds: { min: .92, max: 15 } }, 3.456), fitSeconds({}, 3)], [5, 7, 6, 8, 3.46, 3]);
   const cast = castVoices({ models: { voice: 'minimax-speech' }, cast: { a: { gender: 'male' }, b: { gender: 'male', voice: { voice: 'Kore' } } } }, { FAL_KEY: 'f' }).cast; assert.deepEqual([cast.a.voice.voice, cast.b.voice.voice], ['Casual_Guy', 'Patient_Man'], 'a voice of another model is replaced by one of this model');
 });

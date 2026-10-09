@@ -6,7 +6,7 @@
 // is always set as text, never as markup.)
 (() => {
   const box = $('#script'), body = $('#sbody'), tabs = $('#stabs'), tag = $('#sstate'), told = $('#snote');
-  const ROLES = [['picture', 'Pictures'], ['clip', 'Clips nobody speaks in'], ['talk', 'Clips someone speaks in'], ['voice', 'Voices'], ['music', 'Music']];
+  const ROLES = [['picture', 'Pictures'], ['clip', 'Clips nobody speaks in'], ['talk', 'Clips someone speaks in'], ['voice', 'Voices'], ['music', 'Music'], ['sound', 'Sounds']];
   let W = null, tab = 'series', timer = null, sending = false, again = false, problems = [];
 
   // ---- small parts ----
@@ -65,7 +65,7 @@
       row(f('An episode runs about (seconds)', num(s, 'seconds', '60', { min: 5, max: 600 })), f('A run may spend ($)', num(s, 'budget', '5', { min: 0, step: 1 })), f('Asked again by itself when a take cannot be used', num(s, 'retakes', '1', { min: 0, max: 3 }))));
     kids.push(h3('Models'), el('div', { class: 'msg note', text: 'One for each kind of work; any card on the canvas may name its own. A short name from the list, or fal:<endpoint>, or google:<model id>.' }));
     s.models ||= {};
-    kids.push(row(...ROLES.slice(0, 3).map(([role, label]) => f(label, inp(s.models, role, 'the first your keys reach', { list: modelList(role === 'talk' ? 'clip' : role) })))), row(...ROLES.slice(3).map(([role, label]) => f(label, inp(s.models, role, 'the first your keys reach', { list: modelList(role) }))), el('div', {})));
+    kids.push(row(...ROLES.slice(0, 3).map(([role, label]) => f(label, inp(s.models, role, 'the first your keys reach', { list: modelList(role === 'talk' ? 'clip' : role) })))), row(...ROLES.slice(3).map(([role, label]) => f(label, inp(s.models, role, 'the first your keys reach', { list: modelList(role) })))));
     kids.push(h3('Cast'));
     for (const [id, c] of Object.entries(s.cast || {})) {
       const voices = W.voices ? Object.entries(W.voices[c.gender === 'male' ? 'male' : 'female'] || {}).map(([name, sounds]) => [name, `${name} — ${sounds}`]) : null; c.voice ||= {};
@@ -79,6 +79,12 @@
     for (const [id, p] of Object.entries(s.places || {})) kids.push(el('div', { class: 'scard' }, el('div', { class: 'hd' }, el('b', { text: p.name || id }), el('span', { class: 'tag', text: id }), el('div', { class: 'gap' }), sure('Remove', () => { const used = usedIn('place', id); if (used.length) return note(`${p.name || id} is where ${used.join('; ')} ${used.length > 1 ? 'are' : 'is'} set. Move those scenes first.`); delete s.places[id]; render(); touch(); })),
       f('Name', inp(p, 'name')), f('A set designer’s note: size, furniture, materials, colours, where the light comes from. No people', area(p, 'look', 3))));
     kids.push(adder('A new place: its name', (name) => { const id = slug(name); if (!id) return 'Give it a name.'; if (s.cast?.[id] || s.places?.[id]) return 'That name is taken.'; (s.places ||= {})[id] = { name: name.trim() }; }));
+    // the sounds the story turns on: each is made once and is the same every time; shots say at which second it is heard
+    kids.push(h3('Sounds'), el('div', { class: 'msg note', text: 'Only a sound the story turns on and that must be the same every time: a knock on a wall, a phone ringing. Each is made once; a shot says at which second it is heard. Ordinary background belongs to the shots.' }));
+    for (const [id, x] of Object.entries(s.sounds || {})) kids.push(el('div', { class: 'scard' }, el('div', { class: 'hd' }, el('b', { text: x.name || id }), el('span', { class: 'tag', text: id }), el('div', { class: 'gap' }), sure('Remove', () => { const used = Object.entries(W.episodes).map(([n, ep]) => { const at = shotsOf(ep).filter((sh) => (sh.hear || []).some((h) => h.sound === id)).map((sh) => sh.id); return at.length ? `episode ${n}: shots ${at.join(', ')}` : null; }).filter(Boolean);
+        if (used.length) return note(`${x.name || id} is heard in ${used.join('; ')}. Take it out of those shots first.`); delete s.sounds[id]; if (!Object.keys(s.sounds).length) delete s.sounds; render(); touch(); })),
+      row(f('Name', inp(x, 'name')), f('Seconds', num(x, 'seconds', '3', { min: .5, max: 30, step: .5 }), 'narrow')), f('What is heard: one sound, in a few words of English, with nothing before or after it', area(x, 'prompt', 2))));
+    kids.push(adder('A new sound: its name', (name) => { const id = slug(name); if (!id) return 'Give it a name.'; if (s.cast?.[id] || s.places?.[id] || s.sounds?.[id]) return 'That name is taken.'; (s.sounds ||= {})[id] = { name: name.trim() }; }));
     kids.push(h3('Episodes planned'), el('div', { class: 'msg note', text: 'What happens in each, in two or three sentences. The writer writes an episode’s shots from this; the tabs above hold the shots.' }));
     (s.episodes ||= []).forEach((e, i) => kids.push(el('div', { class: 'scard' }, el('div', { class: 'hd' }, el('b', { text: `Episode ${i + 1}` }), el('span', { class: 'tag' + (W.episodes[i + 1] ? ' on' : ''), text: W.episodes[i + 1] ? 'has its script' : 'no script yet' }), el('div', { class: 'gap' }),
       i === s.episodes.length - 1 && !W.episodes[i + 1] && i > 0 ? sure('Remove', () => { s.episodes.pop(); render(); touch(); }) : null), f('Title', inp(e, 'title')), f('What happens, what it opens on, the question it ends on', area(e, 'summary', 2)))));
@@ -152,7 +158,10 @@
         el('div', { class: 'sr' }, f('In the frame', who), ki > 0 ? f('', el('label', { class: 'tick', title: 'It starts on the last frame of the shot before it' }, el('input', { type: 'checkbox', checked: !!shot.continues, onchange: (e) => set(shot, 'continues', e.target.checked || undefined) }), ' carries on from the shot before'), 'fix') : null),
         f('What is seen: one simple action, beginning with the person’s name', area(shot, 'action', 2)),
         el('div', { class: 'sr' }, f('Says it', pick(speaker, cast.map(([id, c]) => [id, c.name || id]), (v) => { if (!v) delete shot.line; else shot.line = { ...(shot.line || { text: '' }), who: v }; lineText.disabled = lineHow.disabled = !v; lineText.placeholder = v ? 'What they say' : 'Nobody speaks in this shot'; model.placeholder = theirs(); if (v) lineText.focus(); touch(); }, 'nobody'), 'narrow2'), f(shot.line && !(shot.who || []).includes(speaker) ? 'The line (heard from off screen)' : 'The line', lineText, 'wide'), f('How it is said', lineHow)),
-        f('Heard besides voices', inp(shot, 'sound', 'room tone, rain, a door'))), thumb));
+        f('Heard besides voices', inp(shot, 'sound', 'room tone, rain, a door')),
+        // the sounds of the series set into this shot: which, and the second each begins
+        Object.keys(W.series.sounds || {}).length ? f(`Sounds of the series heard in it, and the second each begins (${Object.keys(W.series.sounds).join(', ')}) — like: ${Object.keys(W.series.sounds)[0]} 1, ${Object.keys(W.series.sounds)[0]} 2.5`, el('input', { type: 'text', value: (shot.hear || []).map((h) => `${h.sound} ${h.at ?? 0}`).join(', '), placeholder: 'none',
+          oninput: (e) => { const all = e.target.value.split(',').map((p) => p.trim()).filter(Boolean).map((p) => { const [id, at] = p.split(/\s+/); return { sound: id, at: +at || 0 }; }); set(shot, 'hear', all.length ? all : undefined); } })) : null), thumb));
   }
   const focusShot = (id) => { const r = body.querySelector(`[data-shot="${CSS.escape(String(id))}"] textarea`); if (r) { r.scrollIntoView({ block: 'center' }); r.focus(); } };
 

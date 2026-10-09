@@ -9,7 +9,7 @@
 //   to look at everything else. The take is used, and the canvas, the board and the command line point at it.
 // A finding is { what, says, grave?, at?, to? } — `says` in words a person can act on, `at` and `to` in seconds.
 import { secondsOf } from './models.mjs';
-import { speechSeconds } from './series.mjs';
+import { voiceSeconds } from './series.mjs';
 import { speechSpans } from './speech.mjs';
 import { run, tools } from '../util.mjs';
 
@@ -57,7 +57,7 @@ function strange(f, h) {
 export function reviewClip(file, { start = null, how = null, spoke = null, text = null, language = null, asked = null } = {}) {
   const found = [], secs = (i) => +(i / FPS).toFixed(1);
   if (how === 'native' && spoke && text) {      // the model was to say the line itself
-    const heard = spoke.reduce((t, [a, b]) => t + b - a, 0), takes = speechSeconds(text, language || 'English');
+    const heard = spoke.reduce((t, [a, b]) => t + b - a, 0), takes = voiceSeconds(text, language || 'English');      // voice against voice: the pauses of a line are not counted on either side
     if (!spoke.length) found.push({ what: 'silent', grave: true, says: 'nobody is heard saying the line' });
     else if (takes >= 1 && heard < takes * .35) found.push({ what: 'silent', grave: true, says: `only ${heard.toFixed(1)} s of voice is heard, and the line takes about ${takes.toFixed(1)} s to say` });
   }
@@ -83,10 +83,10 @@ export function reviewClip(file, { start = null, how = null, spoke = null, text 
 
 // ---- a recorded line ----
 export function reviewVoice(file, { text, language = null } = {}) {
-  const spans = speechSpans(file), said = spans.reduce((t, [a, b]) => t + b - a, 0), takes = speechSeconds(text, language || 'English'), found = [];
+  const spans = speechSpans(file), said = spans.reduce((t, [a, b]) => t + b - a, 0), takes = voiceSeconds(text, language || 'English'), found = [];      // voice against voice (a line full of pauses is not short for having them)
   if (!spans.length) return [{ what: 'nothing', grave: true, says: 'no voice is heard in the recording' }];
-  if (said > takes * 2.3 + .6) found.push({ what: 'long', grave: true, says: `the recording holds ${said.toFixed(1)} s of voice for a line that takes about ${takes.toFixed(1)} s to say: more than the line was said` });
-  else if (takes >= .7 && said < takes * .4) found.push({ what: 'cut', grave: true, says: `the recording holds ${said.toFixed(1)} s of voice for a line that takes about ${takes.toFixed(1)} s to say: part of the line is missing` });
+  if (said > takes * 2.6 + .6) found.push({ what: 'long', grave: true, says: `the recording holds ${said.toFixed(1)} s of voice for a line that takes about ${takes.toFixed(1)} s to say: more than the line was said` });
+  else if (takes >= .7 && said < takes * .45) found.push({ what: 'cut', grave: true, says: `the recording holds ${said.toFixed(1)} s of voice for a line that takes about ${takes.toFixed(1)} s to say: part of the line is missing` });
   const pause = Math.max(0, ...spans.slice(1).map((s, i) => s[0] - spans[i][1]));
   if (pause > 1.8) found.push({ what: 'pause', says: `there is a pause of ${pause.toFixed(1)} s inside the line` });
   return found;
@@ -100,6 +100,12 @@ export function reviewFit(found) {
   if (!hard.length) return [];
   const fast = hard.some((l) => l.tempo >= 1.2), at = hard[0].at;
   return [{ what: 'stretched', at: +at.toFixed(1), says: `the recording was ${fast ? 'sped up' : 'slowed down'} as far as sounds right to fit the lips at ${at.toFixed(1)} s, and may still not sit on them; listen to it` }];
+}
+
+// ---- a sound ----
+export function reviewSound(file) {
+  const peak = parseFloat(run(tools.ffmpeg, ['-hide_banner', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'], { stderr: true }).match(/max_volume: ([-\d.]+)/)?.[1] ?? 'NaN');
+  return peak > -50 ? [] : [{ what: 'silent', grave: true, says: 'nothing is heard in it' }];
 }
 
 // ---- a picture ----
