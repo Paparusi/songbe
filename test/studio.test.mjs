@@ -251,7 +251,8 @@ test('Linux: a menu entry that starts Songbe with this Node, and leaves when the
 let ready = true; try { tools.chrome; tools.ffmpeg; tools.ffprobe; } catch { ready = false; }
 test('every project gets a poster of its opening scene', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
   let h;
-  for (let i = 0; i < 90; i++) { h = await fetch(u + '/api/home').then(J); if (h.projects.every((p) => p.poster.state !== 'pending')) break; await new Promise((r) => setTimeout(r, 500)); }
+  // one browser start per project, one after another: a few seconds on a desk, a minute and more on a loaded test machine
+  for (let i = 0; i < 480; i++) { h = await fetch(u + '/api/home').then(J); if (h.projects.every((p) => p.poster.state !== 'pending')) break; await new Promise((r) => setTimeout(r, 500)); }
   for (const p of h.projects) {
     assert.equal(p.poster.state, 'ready', p.name);
     const r = await fetch(u + p.poster.url); assert.equal(r.headers.get('content-type'), 'image/jpeg');
@@ -267,14 +268,17 @@ test('clicking words in the preview puts the cursor in their field; undo and red
   const until = async (what, expr) => { for (let i = 0; i < 80; i++) { if (await page.evaluate(expr).catch(() => false)) return; await wait(150); } assert.fail('never happened: ' + what); };
   try {
     await until('the preview is drawn', `!!document.querySelector('#pv')?.contentDocument?.querySelector('#s0 .hl') && !!document.querySelector('#strip div')`);
+    // A person clicks when the picture is there; a script can be faster than the page, which listens for clicks only once it has
+    // drawn. So: click, look, and click again if nothing came of it.
+    const clickUntil = async (what, click, landed) => { for (let i = 0; i < 40; i++) { await page.evaluate(click).catch(() => {}); for (let k = 0; k < 5; k++) { if (await page.evaluate(landed).catch(() => false)) return; await wait(150); } } assert.fail('never happened: ' + what); };
     // the highlighted words of the first scene's headline
-    await page.evaluate(`document.querySelector('#pv').contentDocument.querySelector('#s0 .hl').click()`);
-    await until('the headline box has the cursor', `document.activeElement?.tagName === 'TEXTAREA' && document.activeElement.closest('[data-path]')?.dataset.path === 'title'`);
+    await clickUntil('the headline box has the cursor', `document.querySelector('#pv').contentDocument.querySelector('#s0 .hl').click()`,
+      `document.activeElement?.tagName === 'TEXTAREA' && document.activeElement.closest('[data-path]')?.dataset.path === 'title'`);
     assert.equal(await page.evaluate(`document.activeElement.value.slice(document.activeElement.selectionStart, document.activeElement.selectionEnd)`), 'có ngay', 'and the clicked words are selected');
     // a scene that is not open: show it, click its price
     await page.evaluate(`document.querySelectorAll('#strip div')[1].click()`); await wait(700);
-    await page.evaluate(`document.querySelector('#pv').contentDocument.querySelector('#s1 .pr span').click()`);
-    await until('the price box of scene 2 has the cursor', `document.activeElement?.closest('[data-path]')?.dataset.path === 'price' && document.querySelector('.card.open .n').textContent === '2'`);
+    await clickUntil('the price box of scene 2 has the cursor', `document.querySelector('#pv').contentDocument.querySelector('#s1 .pr span').click()`,
+      `document.activeElement?.closest('[data-path]')?.dataset.path === 'price' && document.querySelector('.card.open .n').textContent === '2'`);
     // change it, wait for the save, undo, redo
     await page.evaluate(`(() => { const b = document.activeElement; b.value = '19k'; b.dispatchEvent(new Event('input', { bubbles: true })); b.blur(); })()`);
     const saved = () => JSON.parse(fs.readFileSync(path.join(process.env.SONGBE_HOME, 'Bấm để sửa', 'video.json'), 'utf8')).scenes[1].price;
