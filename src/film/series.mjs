@@ -114,6 +114,7 @@ export function checkEpisode(series, episode) {
       else if (seen.has(shot.id)) bad.push(`${here}.id: "${shot.id}" names two shots`); else seen.add(shot.id);
       if (!SIZES[shot.size]) bad.push(`${here}.size: "${shot.size}" is not one of ${Object.keys(SIZES).join(', ')}`);
       if (!text(shot.action)) bad.push(`${here}.action: say what is seen happening`);
+      if (shot.acting !== undefined && !text(shot.acting)) bad.push(`${here}.acting: how it is played, in a sentence — or leave it out`);
       const who = shot.who ?? [];
       if (!Array.isArray(who)) bad.push(`${here}.who: must be a list of the cast seen in the frame`);
       else for (const w of who) if (!cast[w]) bad.push(`${here}.who: "${w}" is not in the cast (${Object.keys(cast).join(', ')})`);

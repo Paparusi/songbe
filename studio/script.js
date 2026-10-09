@@ -157,6 +157,7 @@
       el('div', { class: 'sbx' }, el('div', { class: 'col' },
         el('div', { class: 'sr' }, f('In the frame', who), ki > 0 ? f('', el('label', { class: 'tick', title: 'It starts on the last frame of the shot before it' }, el('input', { type: 'checkbox', checked: !!shot.continues, onchange: (e) => set(shot, 'continues', e.target.checked || undefined) }), ' carries on from the shot before'), 'fix') : null),
         f('What is seen: one simple action, beginning with the person’s name', area(shot, 'action', 2)),
+        f('How it is played: the feeling, and how the face and the body show it as the shot goes on', area(shot, 'acting', 2, 'Startled: she flinches, her eyes widen and search the doorway, she holds her breath.')),
         el('div', { class: 'sr' }, f('Says it', pick(speaker, cast.map(([id, c]) => [id, c.name || id]), (v) => { if (!v) delete shot.line; else shot.line = { ...(shot.line || { text: '' }), who: v }; lineText.disabled = lineHow.disabled = !v; lineText.placeholder = v ? 'What they say' : 'Nobody speaks in this shot'; model.placeholder = theirs(); if (v) lineText.focus(); touch(); }, 'nobody'), 'narrow2'), f(shot.line && !(shot.who || []).includes(speaker) ? 'The line (heard from off screen)' : 'The line', lineText, 'wide'), f('How it is said', lineHow)),
         f('Heard besides voices', inp(shot, 'sound', 'room tone, rain, a door')),
         // the sounds of the series set into this shot: which, and the second each begins

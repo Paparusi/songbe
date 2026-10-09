@@ -25,8 +25,11 @@ const WRITE = {
   style: (x) => ({ kind: 'text', text: sentence(x.style), group: 'series', label: 'The medium: what kind of picture this is' }),
   look: (x) => ({ kind: 'text', text: [x.medium ? '@style' : null, sentence(x.look)].filter(Boolean).join(' '), group: 'series', label: 'The look of every picture' }),
   // A clip starts from a picture that already has the look. Told the palette again, a clip model has been seen to paint one of
-  // its colours onto a face halfway through; so a clip is told the medium, and to keep what its first frame shows.
-  keep: (x) => ({ kind: 'text', text: `${x.medium ? '@style ' : ''}The light and the colours stay as they are in the first frame, and so do everyone's face, hair and clothes.`, group: 'series', label: 'What every clip keeps from its first frame' }),
+  // its colours onto a face halfway through; so a clip is told the medium, and to keep what its first frame shows — the light,
+  // the colours, who everyone is. Not how their faces stand: told that "everyone's face stays as in the first frame", a model
+  // froze them (the picture of a whole episode moved half as much as that of a film made without those words). So it is also
+  // told that the people are alive.
+  keep: (x) => ({ kind: 'text', text: `${x.medium ? '@style ' : ''}The light and the colours stay as they are in the first frame, and everyone stays the same person, with the same hair and clothes. The acting is alive: people blink and breathe, their eyes move, and what they feel shows in the face and changes as the shot goes on.`, group: 'series', label: 'What every clip keeps from its first frame, and what it does not' }),
   person: (x) => ({ kind: 'person', name: x.name, ...(x.look ? { look: x.look } : {}), ...(x.wardrobe ? { wardrobe: x.wardrobe } : {}), ...(x.manner ? { manner: x.manner } : {}), ...(x.voice ? { voice: x.voice } : {}), group: 'cast' }),
   // A face is who someone is: it is drawn from what they look like and never from what they wear, so that giving someone other
   // clothes leaves them the same person (their sheet is drawn again from the same face). Faces are drawn in the medium, in plain
@@ -45,13 +48,13 @@ const WRITE = {
     prompt: `@look One moment of a film scene, in a wide shot that shows the whole space and everyone in it. The place is @${x.where}-plate: its walls, furniture and layout are kept.${x.time ? ` The hour and the light are this moment's, not that picture's: ${plain(x.time).replace(/\.$/, '')}. Any window shows the sky of that hour.` : ''} ${String(x.staging || '').trim()} ${sheets(x.people)}${x.people.length ? ' Everyone keeps exactly the face, hair, build and clothes of their reference sheet.' : ''} ${NO_TEXT}` }),
   frame: (x) => (x.after ? { kind: 'picture', grab: `@e${x.n}-s${x.after}`, at: 'end', group: `e${x.n}`, label: `Shot ${x.shot}: first frame (where shot ${x.after} ends)` }
     : { kind: 'picture', group: `e${x.n}`, label: `Shot ${x.shot}: first frame`,
-      prompt: `@e${x.n}-scene${x.s} is a wide view of one moment in a film: the place, the light, and where everyone is. ${sheets(x.who)} Show that same moment from another camera position. ${SIZES[x.size] || SIZES.medium}. ${String(x.action).trim()} `
+      prompt: `@e${x.n}-scene${x.s} is a wide view of one moment in a film: the place, the light, and where everyone is. ${sheets(x.who)} Show that same moment from another camera position. ${SIZES[x.size] || SIZES.medium}. This picture is the first frame of a film shot in which this happens: ${String(x.action).trim()} Show the instant before it happens — the pose and the expression it starts from — so that the shot has it still to do. `
         + `${x.who.length ? `In the frame: ${names(x.who.map((p) => p.name))}${x.others.length ? `; ${names(x.others)} ${x.others.length > 1 ? 'are' : 'is'} outside the frame` : ''}.` : 'Nobody is in the frame.'}`
         + `${x.speaker ? ` ${x.speaker}'s mouth is closed, about to speak.` : ''} Same place, same light and same time of day as the wide view${x.who.length ? '; everyone keeps exactly the face, hair and clothes of their reference sheet' : ''}. @look A frame from a film, not a posed photograph: nobody looks into the camera. ${NO_TEXT}` }),
   line: (x) => ({ kind: 'voice', who: `@${x.who}`, text: x.text, ...(x.how ? { how: x.how } : {}), ...(x.toPicture ? { fit: `@e${x.n}-s${x.shot}` } : {}), group: `e${x.n}`, label: `Shot ${x.shot}: ${x.name}` }),
   clip: (x) => ({ kind: 'clip', frame: `@e${x.n}-s${x.shot}-frame`, ...(x.speech ? { voice: `@e${x.n}-s${x.shot}-line` } : {}), ...(x.speech === 'heard' ? { heard: true } : {}), ...(x.seconds ? { seconds: x.seconds } : {}), ...(x.model ? { model: x.model } : {}), ...(x.hear?.length ? { sounds: x.hear.map((h) => ({ sound: `@${h.sound}`, at: h.at ?? 0, ...(h.volume ? { volume: h.volume } : {}), ...(h.to ? { to: h.to } : {}) })) } : {}), group: `e${x.n}`, label: `Shot ${x.shot}`,
     // (a shot of a thing alone is told that nobody comes into it: a clip model was seen to walk someone through a wall insert)
-    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.empty ? ' Nobody is in the frame and nobody enters it.' : ''}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep` }),
+    prompt: `${(SIZES[x.size] || SIZES.medium).split(':')[0]}${x.camera ? `, ${x.camera}` : ''}. ${String(x.action).trim()}${x.acting ? ` ${sentence(x.acting)}` : ''}${x.empty ? ' Nobody is in the frame and nobody enters it.' : ''}${x.sound ? ` Sound: ${String(x.sound).trim().replace(/\.$/, '')}.` : ''} @keep` }),
   // a sound of the series: made once, the same every time it is heard
   sound: (x) => (x.file ? { kind: 'sound', file: x.file, group: 'series', label: x.name || 'A sound' } : { kind: 'sound', prompt: sentence(x.prompt), ...(x.seconds ? { seconds: x.seconds } : {}), group: 'series', label: x.name || 'A sound' }),
   music: (x) => ({ kind: 'music', prompt: `Instrumental film score, no vocals, no singing. ${x.music || 'Quiet and tense, sparse piano and low strings.'}`, group: `e${x.n}`, label: `Episode ${x.n}: music` }),
@@ -84,7 +87,7 @@ export function expand(series, scripts = {}) {
       // a model that acts to a recording gets the line recorded first; one that only speaks films first, and the line is recorded to its lips
       const talks = KNOWN[model || series.models?.talk], toPicture = speech === 'seen' && !!talks?.speaks && !talks.acts;
       if (shot.line) put(`${id}-line`, 'line', { n, shot: shot.id, who: shot.line.who, name: cast[shot.line.who]?.name || shot.line.who, text: shot.line.text, how: shot.line.how, ...(toPicture ? { toPicture } : {}) });
-      const facts = { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model, speech, ...(shot.hear?.length ? { hear: shot.hear } : {}) };      // (a shot nothing is set into is written from what it always was)
+      const facts = { n, shot: shot.id, size: shot.size, camera: shot.camera, action: shot.action, sound: shot.sound, seconds: shot.seconds, model, speech, ...(shot.hear?.length ? { hear: shot.hear } : {}), ...(shot.acting ? { acting: shot.acting } : {}) };      // (a shot nothing is set into, and nobody is directed in, is written from what it always was)
       if (who.length) put(id, 'clip', facts); else put(id, 'clip', { ...facts, empty: true }, facts);      // nobody in the frame: said to the clip model; one written before that was said keeps its words
     });
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });

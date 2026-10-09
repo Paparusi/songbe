@@ -36,7 +36,7 @@ LANGUAGES
 FIELDS
 - style: the medium, in a few words: "Photorealistic live action, natural skin, a still from a 35mm film", or "3D animation in the manner of a family feature film", or "Hand-drawn anime, clean line, flat shading". Nothing about light or mood.
 - look: two sentences on the light, the lens, a palette of three or four named colours, the era and the country. Together with the style it is put in front of every picture prompt, so it must fit every scene. Do not mention the shape or size of the frame.
-- tone: one sentence for the music and the acting.
+- tone: one sentence for the music and the acting. Never ask for stiff, frozen or motionless acting: restraint is played in small living things — the eyes, the breath, the hands.
 - accent: how the voices sound, for example "Southern Vietnamese (Saigon) accent"; "" when it does not matter.
 - cast: 2 to 4 people. The id is lower-case letters, digits and dashes ("lan", "ong-tu").
   look: face and body only — age, build, face shape, skin, hair (colour, length, how it is worn), and one feature that sets them apart (a mole, glasses, a scar, a grey streak). Concrete enough that two painters would paint the same person. No clothes here.
@@ -59,7 +59,7 @@ Reply with one JSON object and nothing else: no explanation, no code fence.
 THE OBJECT
 { "title": "…", "summary": "…", "music": "…",
   "scenes": [ { "where": "<place id>", "time": "…", "staging": "…",
-    "shots": [ { "id": "1", "size": "…", "camera": "…", "who": ["<cast id>"], "action": "…", "line": { "who": "<cast id>", "text": "…", "how": "…" }, "sound": "…", "hear": [ { "sound": "<sound id>", "at": 1.0 } ], "seconds": 3 } ] } ] }
+    "shots": [ { "id": "1", "size": "…", "camera": "…", "who": ["<cast id>"], "action": "…", "acting": "…", "line": { "who": "<cast id>", "text": "…", "how": "…" }, "sound": "…", "hear": [ { "sound": "<sound id>", "at": 1.0 } ], "seconds": 3 } ] } ] }
 
 LANGUAGES
 - In ${language}: title, summary, and every line's text. Lines are spoken language the way people really talk: short, with the everyday particles and contractions of ${language}, never bookish.
@@ -77,9 +77,10 @@ SCENES
 SHOTS
 - id: "1", "2", "3", … through the whole episode.
 - size: one of ${Object.keys(SIZES).map((s) => `"${s}"`).join(', ')}. Vary them. Dialogue is covered in alternating close-ups and over-the-shoulder shots, with a wider shot when someone moves.
-- camera: how the camera moves, a few words: "static", "slow push in", "slow pull back", "handheld, slight sway", "slow pan left to right", "tilt up".
+- camera: how the camera moves, a few words: "slow push in", "handheld, slight sway", "slow pull back", "slow pan left to right", "tilt up", "static". A camera that moves a little keeps a shot alive: keep "static" for inserts and for the few shots that are meant to be dead still.
 - who: the cast ids visible in this frame, and nobody else. "over shoulder" and "two shot" list both; "insert" lists nobody.
-- action: present tense, only what is seen: posture, gesture, expression, where the eyes go. Begin with the person's name. ONE simple action per shot. No dialogue in it, no camera words, no thoughts.
+- action: present tense, only what is seen happening: ONE simple thing that changes during the shot (someone looks up, sits down, turns away, opens their eyes). Begin with the person's name. No dialogue in it, no camera words, no thoughts. The first frame is drawn as the instant before it.
+- acting: how it is played, in one sentence that begins with the feeling: what the person feels, and how the face and the body show it as the shot goes on — where the eyes go, the breath, the hands, what changes from the first second to the last. This is what the actor is told; a shot in which someone only stands and stares is dead. Leave it out of inserts.
 - line: at most one per shot, said by one person, at most about fourteen words. Leave "line" out of shots nobody speaks in.
   When the speaker is in "who" we see them say it. To lay a line over the person listening, put only the listener in "who": the voice is then heard from off screen — good for reactions.
   how: the delivery, for example "quiet, hurt, holding back anger".

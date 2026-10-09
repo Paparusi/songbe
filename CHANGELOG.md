@@ -2,6 +2,19 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.35
+- **Acting.** An episode came out stiff: its picture moved half as much as that of the film before it, on the same clip
+  model. Three things in what the model was told, all changed:
+  - a clip was told that "everyone's face stays as in the first frame" — it is now told who everyone stays, and that the
+    acting is alive (people blink and breathe, their eyes move, what they feel shows and changes);
+  - a first frame was drawn as the action already done (eyes open, hand raised), which left the clip nothing to do — it is
+    now drawn as the instant before;
+  - a shot said what happens and not how it is played — a script's shot has `acting` (the feeling, and how face and body
+    show it), the writer writes it, the script drawer shows it, and it goes to the clip model.
+  Tried on three shots of that episode: the picture moves two to two and a half times as much, and each face goes somewhere.
+  Films already made keep their words; `songbe film expand --rewrite=keep,<frames>` asks for the new ones.
+- The writer is told not to ask for stiff or motionless acting, and to keep a still camera for the few shots meant to be still.
+
 ## 0.34
 - **A shot of a thing alone stays empty.** The clip model walked an arm through an insert of a wall; a shot with nobody in it
   is now told that nobody is in the frame and nobody enters it. Shots already on a canvas keep their words.

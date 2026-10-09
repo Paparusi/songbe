@@ -58,12 +58,17 @@ A shot in a script:
 ```json
 { "id": "5", "size": "over shoulder", "camera": "static", "who": ["minh", "lan"],
   "action": "Lan stands with her arms crossed, looking at Minh's back.",
+  "acting": "Hurt and holding it in: her jaw is set, her eyes shine, and she takes one breath before she speaks.",
   "line": { "who": "lan", "text": "Đêm nào anh cũng lẻn đi. Anh giấu em chuyện gì?", "how": "firm, holding back tears" },
   "sound": "room tone", "model": "veo-3.1-fast" }
 ```
 
 An episode's script may name its own models at the top — `"models": { "clip": "veo-3.1-lite", "talk": "veo-3.1-fast" }` — for
 its shots nobody speaks in and those somebody does; they are written onto that episode's shots, so other episodes stay as made.
+
+`acting` says how a shot is played — the feeling, and how the face and the body show it as the shot goes on — and goes to the
+clip model with the action; the first frame of a shot is drawn as the instant before its action, so that the clip has it
+still to do.
 
 `size` is one of `wide`, `full`, `medium`, `two shot`, `over shoulder`, `close`, `extreme close`, `insert`. A shot has at most one
 line, said by one person. When the speaker is in `who` they are seen saying it; when only the listener is, the voice is heard from
