@@ -59,7 +59,7 @@ What has been checked so far:
 | | Built | Started and checked |
 | --- | --- | --- |
 | Windows 11 | on Windows 11 | `smoke.mjs`, and by hand: install, a full build of a video, uninstall |
-| Linux, AppImage and `.deb` | by the release workflow (Ubuntu 22.04) | the AppImage of 0.17 on Ubuntu 24.04 under WSL: engine up, home page in the window; the `.deb` not yet |
+| Linux, AppImage and `.deb` | by the release workflow (Ubuntu 22.04) | on that runner: the `.deb` installed with `apt` (ffmpeg came with it), `songbe doctor` from the installed program, then `smoke.mjs` on it and on the AppImage; the AppImage also by hand on Ubuntu 24.04 under WSL |
 | macOS | not yet | not yet: the workflow is written and has never run (its minutes cost ten times the others while the repository is private) |
 
 If the window stays blank on Linux, that is WebKitGTK and the graphics driver disagreeing; `WEBKIT_DISABLE_DMABUF_RENDERER=1 songbe`
@@ -87,8 +87,14 @@ the engine in the system's browser, from a fixed list.
 
 For looking inside the window of a built app, `SONGBE_DEVTOOLS_PORT=9333` exposes it to a DevTools client (Windows only).
 
-## The icon
+## The logo
 
-`app/icon.png` (1024×1024, from `studio/icon.svg`) is a placeholder. To replace it: put a new 1024×1024 PNG there, run
-`cargo tauri icon icon.png` in `app/`, and keep `32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`, `icon.ico` and `icon.png`
-in `src-tauri/icons/`.
+`app/icon.png` is the logo: 1024×1024, transparent, the mark at its own pixels. Everything else is made from it.
+
+- `src-tauri/icons/` — the window, the taskbar, the installers: run `cargo tauri icon icon.png` in `app/` and keep `32x32.png`,
+  `128x128.png`, `128x128@2x.png`, `icon.icns`, `icon.ico` and `icon.png`.
+- `studio/logo.png` (256 px: the pages' header, the tab, the Linux menu entry), `app/splash/logo.png` (192 px, the opening page)
+  and `docs/img/logo.png` (320 px): any resizer will do, for example `ffmpeg -i app/icon.png -vf scale=256:-1:flags=lanczos studio/logo.png`.
+
+In all of these the transparent pixels carry the colour of the nearest visible one, so a resizer that ignores transparency
+cannot pull a dark rim into the edge.

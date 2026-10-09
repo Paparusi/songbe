@@ -3,8 +3,9 @@
 <style>
 html, body { height: 100%; margin: 0; background: #0D1117; color: #E7ECF2; font: 15px/1.55 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 body { display: grid; place-items: center; user-select: none; }
+[hidden] { display: none !important; }
 main { text-align: center; max-width: 560px; padding: 24px; }
-svg { width: 84px; height: 84px; }
+img { width: 96px; height: 96px; }
 h1 { font-size: 30px; font-weight: 800; letter-spacing: -.6px; margin: 18px 0 6px; } h1 span { color: #4FE0D6; }
 p { margin: 0; color: #9AA7B6; } p.bad { color: #E7ECF2; }
 code { display: block; margin-top: 14px; padding: 10px 12px; border: 1px solid #2A3441; border-radius: 9px; background: #151B23; color: #9AA7B6; font: 12.5px/1.5 ui-monospace, Consolas, monospace; user-select: text; word-break: break-all; }
@@ -12,7 +13,7 @@ code { display: block; margin-top: 14px; padding: 10px 12px; border: 1px solid #
 @keyframes b { 30% { opacity: 1; } 60% { opacity: .25; } }
 </style></head>
 <body><main>
-<svg viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14274A"/><stop offset="1" stop-color="#070D18"/></linearGradient><linearGradient id="s" x1=".2" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#6FF0E4"/><stop offset=".55" stop-color="#4FE0D6"/><stop offset="1" stop-color="#3B82F6"/></linearGradient></defs><rect width="1024" height="1024" rx="228" fill="url(#g)"/><path d="M674 322C604 262 468 256 398 318c-76 68-34 152 114 190s190 126 112 198c-70 64-206 56-280-4" fill="none" stroke="url(#s)" stroke-width="116" stroke-linecap="round"/></svg>
+<img src="logo.png" alt="">
 <h1>Song<span>be</span></h1>
 <p id="msg">Starting…</p><div class="dots" id="dots"><i></i><i></i><i></i></div><code id="log" hidden></code>
 </main>

@@ -9,7 +9,7 @@ a { color: inherit; }
 * { scrollbar-width: thin; scrollbar-color: #364252 transparent; }
 header.bar { height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; letter-spacing: -.3px; text-decoration: none; flex: none; }
-.logo img { width: 26px; height: 26px; display: block; } .logo b { font-weight: 800; } .logo span { color: var(--accent); }
+.logo img { width: 30px; height: 30px; display: block; } .logo b { font-weight: 800; } .logo span { color: var(--accent); }
 .gap { flex: 1; }
 .tag { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--raise); color: var(--soft); border: 1px solid var(--line); text-decoration: none; white-space: nowrap; }
 .tag.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }

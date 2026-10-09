@@ -1,4 +1,5 @@
-# Songbe
+<p align="center"><img src="docs/img/logo.png" width="104" alt="Songbe"></p>
+<h1 align="center">Songbe</h1>
 
 <p align="center">
   <img src="docs/img/promotion.webp" width="232" alt="A promotion built by Songbe, playing">
@@ -11,7 +12,7 @@ motion graphics, captions, music and sound effects, and then checks its own work
 line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
 people who would rather click than type.
 
-> Version 0.18. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.18.1. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux and Windows 11; on macOS
 > the tests pass and the app has not been built. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 

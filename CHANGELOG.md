@@ -2,6 +2,12 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.18.1
+- **The logo.** Songbe has its mark: in the app's header and opening page, as the icon of the window and the installers, in the
+  Windows setup wizard, in the Linux menu entry, and at the top of the README. The placeholder is gone.
+- The app's opening page no longer shows an empty box under "Starting…".
+- The release workflow's Linux half has run: the `.deb` installs with `apt` and both packages pass `app/smoke.mjs` on the runner.
+
 ## 0.18
 - The voice can be any text-to-speech model on fal.ai (`voice.model`), not only the default.
 - **Linux packages.** The engine's runtime is now called `songbe-engine` on every system, so the `.deb` no longer claims

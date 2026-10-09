@@ -21,7 +21,7 @@
     "longDescription": "Songbe turns one description file into a finished short ad: voice, footage, motion graphics, music and a self-check.",
     "copyright": "Apache-2.0",
     "windows": {
-      "nsis": { "installMode": "currentUser" },
+      "nsis": { "installMode": "currentUser", "installerIcon": "icons/icon.ico", "sidebarImage": "installer/sidebar.bmp", "headerImage": "installer/header.bmp" },
       "webviewInstallMode": { "type": "downloadBootstrapper" }
     },
     "linux": {

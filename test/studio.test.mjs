@@ -53,7 +53,7 @@ test('the home screen starts empty, with starters to pick from', async () => {
   assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'sale-vi', 'classic/quan-ca-phe', 'blank']);
   for (const st of h.starters.filter((x) => x.id !== 'blank')) { assert.ok(st.poster, `${st.id} has a poster`); assert.equal((await fetch(u + st.poster)).headers.get('content-type'), 'image/jpeg'); }
   assert.deepEqual(h.keys, { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null });
-  for (const page of ['/home', '/studio/ui.css', '/studio/icon.svg', '/kit/fonts/fonts.css']) assert.equal((await fetch(u + page)).status, 200, page);
+  for (const page of ['/home', '/studio/ui.css', '/studio/logo.png', '/kit/fonts/fonts.css']) assert.equal((await fetch(u + page)).status, 200, page);
   assert.equal((await fetch(u + '/', { redirect: 'manual' })).headers.get('location'), '/home');
   assert.equal(h.writer, null);
   const refused = await post('/api/projects', { name: 'x', starter: 'write', brief: 'A long enough description of an ad.' });
@@ -227,8 +227,9 @@ test('Linux: a menu entry that starts Songbe with this Node, and leaves when the
     assert.match(launcher(true), /added Songbe to the applications menu/);
     const entry = fs.readFileSync(path.join(scratch, 'share', 'applications', 'songbe.desktop'), 'utf8');
     assert.ok(entry.includes(`Exec="${process.execPath}" "${path.join(ROOT, 'bin', 'songbe.mjs')}" app --exit-with-window`) && entry.includes('Icon=songbe') && entry.includes('Terminal=false'));
-    assert.ok(fs.existsSync(path.join(scratch, 'share', 'icons', 'hicolor', 'scalable', 'apps', 'songbe.svg')));
-    assert.match(launcher(false), /removed/); assert.ok(!fs.existsSync(path.join(scratch, 'share', 'applications', 'songbe.desktop')));
+    const icon = path.join(scratch, 'share', 'icons', 'hicolor', '256x256', 'apps', 'songbe.png');
+    assert.deepEqual([...fs.readFileSync(icon).subarray(16, 24)], [0, 0, 1, 0, 0, 0, 1, 0], 'the logo, 256 by 256');
+    assert.match(launcher(false), /removed/); assert.ok(!fs.existsSync(path.join(scratch, 'share', 'applications', 'songbe.desktop')) && !fs.existsSync(icon));
   } finally { process.env.XDG_DATA_HOME = was.XDG_DATA_HOME; if (was.SONGBE_CHROME === undefined) delete process.env.SONGBE_CHROME; else process.env.SONGBE_CHROME = was.SONGBE_CHROME; if (was.XDG_DATA_HOME === undefined) delete process.env.XDG_DATA_HOME; tools.reset(); }
 });
 
