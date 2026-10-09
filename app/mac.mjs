@@ -40,7 +40,7 @@ export function packageMac(env = process.env) {
 
   // Apple's check of one file: send it, wait for the verdict, and show Apple's own list of problems when it says no
   const checked = (file) => {
-    const r = run('xcrun', ['notarytool', 'submit', file, ...notary, '--wait', '--output-format', 'json'], { quiet: true, allowFail: true });
+    const r = run('xcrun', ['notarytool', 'submit', file, ...notary, '--wait', '--timeout', '90m', '--output-format', 'json'], { quiet: true, allowFail: true });
     let verdict = {}; try { verdict = JSON.parse(r.stdout); } catch {}
     if (verdict.status !== 'Accepted') {
       const why = verdict.id ? run('xcrun', ['notarytool', 'log', verdict.id, ...notary], { quiet: true, allowFail: true }).stdout : r.stderr || r.stdout;

@@ -89,7 +89,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read }
     env:
-      HAVE_APPLE: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_API_KEY_P8 != '' }}
+      HAVE_APPLE: ${{ vars.SIGN_MACOS != 'false' && secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_API_KEY_P8 != '' }}      # the repository variable SIGN_MACOS=false holds signing back without touching the secrets
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

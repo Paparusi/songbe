@@ -14,8 +14,8 @@ line with no interactive step, so an AI coding agent can drive it from start to 
 people who would rather click than type.
 
 > Version 0.19.1. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
-> that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux and Windows 11; on macOS
-> the tests pass and the app has not been built. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
+> that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux, Windows and macOS (the tests
+> and each installer run on all three for every release). Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 
 ```
 songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.mp4  (+ sheet.jpg, check.json)
@@ -297,13 +297,19 @@ the kit, never serves an `.env`, and never sends a key back to the page.
 shows exactly the pages above; the shell only starts the engine — Node, shipped next to it — and goes to the address the engine
 prints.
 
+**[Download the latest release](https://github.com/Paparusi/songbe/releases/latest)**: a setup program for Windows, a disk image
+for macOS (Apple silicon), a `.deb` and an AppImage for Linux, with their checksums. Each was installed and started on a clean
+machine before it was published. The `.deb` brings ffmpeg with it and puts `songbe` on the path, where it is the command line as
+well as the app. The Windows installer is not code-signed, so Windows asks before running it; the macOS app is signed and checked
+by Apple from the release whose notes say so (until then: *System Settings → Privacy & Security → Open Anyway*).
+
+To build it yourself (Rust and `cargo install tauri-cli`; see `app/README.md`):
+
 ```bash
-node app/build.mjs          # Windows: Songbe_<version>_x64-setup.exe · Linux: an AppImage and a .deb (the paths are printed at the end)
+node app/build.mjs          # the installer for this system (the paths are printed at the end)
 node app/smoke.mjs          # start what was built and check that it works
 ```
 
-Needs Rust and `cargo install tauri-cli`; see `app/README.md`. The `.deb` brings ffmpeg with it and puts `songbe` on the path,
-where it is the command line as well as the app. Nothing is code-signed yet, so Windows asks before running the installer.
 From a checkout on Linux, `songbe app --add-launcher` puts the app in the applications menu without building anything.
 
 ## Checks
@@ -336,8 +342,8 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 - One provider (fal.ai), though any of its picture, clip, music and voice models can be used. The writer also takes an Anthropic key.
 - Frames between the three named shapes (4:5, 21:9…) use the nearest layout family and have not been tuned.
 - The editor edits fields and reorders scenes; there is no free-form canvas or keyframe timeline.
-- Installers are built for Windows and Linux (AppImage, `.deb`), unsigned, and none is published as a release yet; no macOS app
-  has been built. *Open a folder* takes a typed path rather than a system dialog.
+- The Windows installer is not code-signed. The macOS app is for Apple silicon only. *Open a folder* takes a typed path rather
+  than a system dialog.
 
 ## More to read
 

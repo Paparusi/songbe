@@ -42,8 +42,39 @@ script next to it as the engine's runtime together with Node's licence, and runs
 Tauri crates listed in `Cargo.lock`, and on Windows the bundler fetches NSIS, the tool that makes the installer.
 
 The version comes from the repository's `package.json`. On Windows the installer installs for the current user, without
-administrator rights. Nothing is code-signed: Windows SmartScreen asks before running the installer, and macOS will refuse an
-unsigned app that was downloaded until the person allows it in System Settings. Signing needs certificates and is not set up.
+administrator rights; it is not code-signed, so Windows SmartScreen asks before running it.
+
+On macOS the bundler makes only `Songbe.app`; `app/mac.mjs` (run by `build.mjs`) makes the disk image from it, for the kind of Mac
+it was built on (the release workflow builds for Apple silicon).
+
+## Signing the macOS app
+
+A Mac refuses a downloaded app that Apple has not seen. When `app/mac.mjs` finds a signing identity it signs the app with the
+hardened runtime (`src-tauri/entitlements.plist` asks for the two rights Node's JIT needs and nothing else), sends it to Apple's
+notary service, attaches the ticket that comes back, makes the disk image and does the same for the image. Without an identity
+it makes an unsigned image and says so.
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"      # a certificate in your keychain
+export APPLE_API_KEY=… APPLE_API_ISSUER=… APPLE_API_KEY_PATH=/path/to/AuthKey.p8   # an App Store Connect API key; the Developer role is enough
+node app/build.mjs
+```
+
+In the release workflow this is the `mac` job. It runs on a machine that compiled nothing: it receives the finished app and
+runs Apple's tools and `app/mac.mjs`, so the identity is never near other people's build scripts. It signs when the repository
+has these Actions secrets, and makes an unsigned image when it does not (a fork, for instance) or when the repository variable
+`SIGN_MACOS` is `false`:
+
+| Secret | What it holds |
+| --- | --- |
+| `APPLE_CERTIFICATE` | the Developer ID Application certificate with its private key: a `.p12`, base64 on one line |
+| `APPLE_CERTIFICATE_PASSWORD` | the password of that `.p12` |
+| `APPLE_API_KEY`, `APPLE_API_ISSUER` | the id of an App Store Connect API key, and the issuer id shown above the list of keys |
+| `APPLE_API_KEY_P8` | the contents of that key's `.p8` file |
+
+The `.p12` can be made without a Mac: `openssl genrsa` and `openssl req -new` for the key and the request, the request uploaded
+at developer.apple.com (Certificates → Developer ID Application, G2 Sub-CA; only the account holder can), the certificate that
+comes back joined to the key with `openssl pkcs12 -export -legacy` (macOS cannot read OpenSSL 3's default encryption).
 
 ## Checking a built app
 
@@ -58,9 +89,9 @@ What has been checked so far:
 
 | | Built | Started and checked |
 | --- | --- | --- |
-| Windows 11 | on Windows 11 | `smoke.mjs`, and by hand: install, a full build of a video, uninstall |
-| Linux, AppImage and `.deb` | by the release workflow (Ubuntu 22.04) | on that runner: the `.deb` installed with `apt` (ffmpeg came with it), `songbe doctor` from the installed program, then `smoke.mjs` on it and on the AppImage; the AppImage also by hand on Ubuntu 24.04 under WSL |
-| macOS | not yet | not yet: the workflow is written and has never run (its minutes cost ten times the others while the repository is private) |
+| Windows | by the release workflow (Windows Server runner), and on Windows 11 | on the runner: silent install, ffmpeg fetched the way the app's button does, `smoke.mjs` on the installed program. By hand on Windows 11: install, a full build of a video, uninstall |
+| Linux, AppImage and `.deb` | by the release workflow (Ubuntu 22.04) | on the runner: the `.deb` installed with `apt` (ffmpeg came with it), `songbe doctor` from the installed program, then `smoke.mjs` on it and on the AppImage; the AppImage also by hand on Ubuntu 24.04 under WSL |
+| macOS (Apple silicon) | by the release workflow (macOS runner) | on the runner: the disk image mounted, the app copied out of it and checked with `smoke.mjs`. Signing with a Developer ID worked there too; Apple's first check of the account had not come back when this was written, so 0.19.1 ships unsigned |
 
 If the window stays blank on Linux, that is WebKitGTK and the graphics driver disagreeing; `WEBKIT_DISABLE_DMABUF_RENDERER=1 songbe`
 is the usual way round it.

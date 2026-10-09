@@ -18,10 +18,10 @@ A picture or clip made in ArtCraft is a fine thing to put into a Songbe scene.
 | Checks its own output | — | Layout before drawing; black frames, flashes, sound, length and a transcript after |
 | Licence | "Fair source", work in progress: free to use; not for resale or for building a competing product | Apache-2.0 |
 | Extending it | In its monorepo, under that licence | Packs: looks and starters as folders with their own licence, no code |
-| Installers | Windows and macOS; Linux from source | Windows and Linux (AppImage, `.deb`), built and checked but not yet published; macOS from source (`songbe app`) |
+| Installers | Windows and macOS; Linux from source | Windows, macOS (Apple silicon) and Linux (AppImage, `.deb`), each installed and started by the release workflow before it is published |
 | Written in | Rust and TypeScript (Tauri) | JavaScript without dependencies; a small Rust shell for the window (Tauri) |
 | Maturity | An established project with a large community | Young: started in October 2026 |
 
 Where ArtCraft is clearly ahead: control over generation (a canvas, 3D staging, posing), kinds of generation Songbe
-does not do at all (3D meshes, worlds), its community, and a macOS build. Where Songbe is ahead: a licence with no conditions on use, running from one file with no interactive step, producing the
+does not do at all (3D meshes, worlds), and its community. Where Songbe is ahead: a licence with no conditions on use, running from one file with no interactive step, producing the
 whole ad rather than its footage, and refusing to hand over work its own checks object to.

@@ -21,7 +21,7 @@ const lines = [];
 if (win) lines.push(`- **Windows** — \`${win}\`. It is not code-signed, so Windows shows "Windows protected your PC": choose *More info*, then *Run anyway*. It installs for you alone, without administrator rights.`);
 if (dmg) lines.push(signing === 'notarized'
   ? `- **macOS (Apple silicon)** — \`${dmg}\`, signed and checked by Apple. Open it and drag Songbe to Applications. ffmpeg comes from \`brew install ffmpeg\`.`
-  : `- **macOS (Apple silicon)** — \`${dmg}\`. It is not signed yet, so macOS refuses it at first: open it once, then allow it under *System Settings → Privacy & Security → Open Anyway*. ffmpeg comes from \`brew install ffmpeg\`.`);
+  : `- **macOS (Apple silicon)** — \`${dmg}\`. It is not signed, so macOS refuses it at first: open it once, then allow it under *System Settings → Privacy & Security → Open Anyway*. ffmpeg comes from \`brew install ffmpeg\`.`);
 if (deb) lines.push(`- **Debian and Ubuntu** — \`sudo apt install ./${deb}\`. It brings ffmpeg, and puts \`songbe\` on the path: the app, and the command line as well.`);
 if (img) lines.push(`- **Other Linux** — \`${img}\`: make it executable and run it. It needs ffmpeg from your package manager.`);
 lines.push('- **No installer** — clone the repository and run `node bin/songbe.mjs app`. Node 22 or newer, ffmpeg, and Chrome, Chromium or Edge.');

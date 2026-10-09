@@ -3,8 +3,13 @@
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
 ## 0.19.1
-- The first public version. The phone number in every example, starter and template is now `0123 456 789`, which no network can
-  ring, and a plan says so while a video still shows it.
+- The first public version, and the first with installers to download: Windows, macOS (Apple silicon) and Linux. The macOS
+  app is new: built by the release workflow, opened from its disk image and checked there.
+- The release workflow publishes only when every system's installer was installed and started, with checksums and notes
+  (`app/notes.mjs`). The macOS app is signed and sent to Apple in a job of its own (`app/mac.mjs`) when the repository holds a
+  Developer ID; in this version it is still unsigned, because Apple's first check of the account had not come back.
+- The phone number in every example, starter and template is now `0123 456 789`, which no network can ring, and a plan says so
+  while a video still shows it.
 - The recruitment example sets its AI notice on every scene with a generated picture and fits its own places.
 - The logo is under the same licence as the rest (README, NOTICE).
 
