@@ -39,8 +39,10 @@ const WRITE = {
   place: (x) => ({ kind: 'place', name: x.name, ...(x.look ? { look: x.look } : {}), group: 'places' }),
   plate: (x) => (x.own ? { kind: 'picture', file: x.own, group: 'places', label: `${x.name}: plate` }
     : { kind: 'picture', prompt: `@look @${x.id}. A wide establishing view of the whole place with nobody in it. ${NO_TEXT}`, aspect: '16:9', group: 'places', label: `${x.name}: plate` }),
+  // The plate of a place is drawn in a light of its own (a room by day). A scene at another hour was seen to keep that light — a
+  // bright window at midnight — when the hour was only named beside the place; so the scene is told that the hour is its own.
   scene: (x) => ({ kind: 'picture', group: `e${x.n}`, label: `Episode ${x.n}, scene ${x.s}: the whole scene`, aspect: '16:9',
-    prompt: `@look One moment of a film scene, in a wide shot that shows the whole space and everyone in it. The place is @${x.where}-plate${x.time ? `, ${x.time}` : ''}. ${String(x.staging || '').trim()} ${sheets(x.people)}${x.people.length ? ' Everyone keeps exactly the face, hair, build and clothes of their reference sheet.' : ''} ${NO_TEXT}` }),
+    prompt: `@look One moment of a film scene, in a wide shot that shows the whole space and everyone in it. The place is @${x.where}-plate: its walls, furniture and layout are kept.${x.time ? ` The hour and the light are this moment's, not that picture's: ${plain(x.time).replace(/\.$/, '')}. Any window shows the sky of that hour.` : ''} ${String(x.staging || '').trim()} ${sheets(x.people)}${x.people.length ? ' Everyone keeps exactly the face, hair, build and clothes of their reference sheet.' : ''} ${NO_TEXT}` }),
   frame: (x) => (x.after ? { kind: 'picture', grab: `@e${x.n}-s${x.after}`, at: 'end', group: `e${x.n}`, label: `Shot ${x.shot}: first frame (where shot ${x.after} ends)` }
     : { kind: 'picture', group: `e${x.n}`, label: `Shot ${x.shot}: first frame`,
       prompt: `@e${x.n}-scene${x.s} is a wide view of one moment in a film: the place, the light, and where everyone is. ${sheets(x.who)} Show that same moment from another camera position. ${SIZES[x.size] || SIZES.medium}. ${String(x.action).trim()} `
