@@ -17,7 +17,7 @@ import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
 import { costOf, nameOf, secondsOf } from './models.mjs';
-import { grave, inWords, reviewClip, reviewPicture, reviewVoice } from './review.mjs';
+import { grave, inWords, reviewClip, reviewFit, reviewPicture, reviewVoice } from './review.mjs';
 import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
 import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
@@ -42,6 +42,8 @@ const SLOTS = { picture: ['grab'], clip: ['frame', 'end', 'voice'], voice: ['fit
 // a line recorded to the lips of a clip ("fit") is made after that clip, not before it
 const fitted = (flow, clip) => { const v = flow.nodes[idOf(flow.nodes[clip]?.voice)]; return !!v && idOf(v.fit) === clip; };
 const made = (node) => !!KINDS[node?.kind]?.ext;
+const NEAR = Math.log(1.12);      // a recording within this of the place it goes (about a tenth, either way) is stretched to it unheard
+const ONE_WORD = .4;              // a phrase shorter than this many seconds is a single word
 export const idOf = (ref) => String(ref || '').replace(/^@/, '');
 const list = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
 const shotOf = (s) => (typeof s === 'string' ? { clip: s } : s || {});
@@ -198,28 +200,40 @@ function voice(c, id, n) {
   const spoken = String(n.text).length / 1000;      // thousands of characters, which is what voices are priced by
   if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, units: spoken, make: (file) => say(style, file), review: (file) => reviewVoice(file, { text: n.text, language }) };
   // Recorded to picture, the way a line is dubbed: the clip was filmed first with the actor speaking in a voice of the model's
-  // choosing; the line is now recorded in the person's own voice to last as long as the lips moved (asked for again when it
-  // comes out too long or too short to be stretched), and set exactly where they moved. The result is as long as the clip.
+  // choosing; the line is now recorded in the person's own voice to last as long as the lips moved, and set exactly where they
+  // moved. The result is as long as the clip.
+  //
+  // A recording is stretched to its place, and stretching is heard: sped up by a fifth, a whispered line is no longer made out
+  // (measured: a transcriber that understood the model's own voice word for word got half of ours). So the line is asked for
+  // again — a recording costs next to nothing — until every phrase is within about a tenth of the place it goes, phrase by
+  // phrase when the voice pauses where the lips paused; only what is left after four tries is stretched further.
   const clip = c.got(idOf(n.fit)), spoke = spokenPart(clip.info?.spoke || [], speechSeconds(n.text, language)), target = +spoke.reduce((t, [a, b]) => t + b - a, 0).toFixed(2);
   return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options, fit: { clip: clip.take, spoke } }, by: r, units: spoken * 2,
     make: async (file) => {
       if (!spoke.length) { await say(style, file); return { fit: false }; }      // nobody was heard speaking in the clip: the line is recorded as it is and laid over
-      let best = null, ask = target;
+      const place = spoke.map(([a, b]) => b - a), NTH = ['first', 'second', 'third', 'fourth', 'fifth'], within = (x, i) => Math.min(place[i] * 2, Math.max(place[i] * .5, x));
+      let best = null, ask = [...place];
       for (let tries = 1; tries <= 4; tries++) {
         // first as the line comes naturally (a voice told to hurry speaks less clearly); only when that does not fit is it told how long to take
-        const tmp = `${file}.${tries}.wav`, pace = `Pace: ${spoke.length > 1 ? `in ${spoke.length} phrases with a short pause between them` : 'in one breath, with no pause inside the line'}. From the first word to the last, the line lasts about ${ask.toFixed(1)} seconds.`;
+        const tmp = `${file}.${tries}.wav`, pace = place.length > 1 && place.length <= 5 ? `Pace: in ${place.length} phrases with a clear pause between them. ${ask.map((x, i) => `The ${NTH[i]} phrase takes about ${x.toFixed(1)} seconds to say`).join('; ')}.`
+          : `Pace: in one breath, with no pause inside the line. From the first word to the last, the line lasts about ${ask.reduce((t, x) => t + x, 0).toFixed(1)} seconds.`;
         await say(r.known?.directed && tries > 1 ? `${style}\n${pace}` : style, tmp);
-        const said = speechSpans(tmp), lasts = said.reduce((t, [a, b]) => t + b - a, 0), off = lasts ? Math.abs(Math.log(lasts / target)) : Infinity;
+        const said = speechSpans(tmp), each = said.map(([a, b]) => b - a), lasts = each.reduce((t, x) => t + x, 0), alike = each.length === place.length && place.length <= 5;
+        // how far the recording is from its place: by its worst phrase when it pauses where the lips paused (a phrase of one
+        // syllable aside: no voice can be told how long to take over a single word, and stretched it sounds no different);
+        // as a whole otherwise — and then a pause of its own may fall where the lips moved, which counts against it
+        const long = place.map((x, i) => i).filter((i) => place[i] >= ONE_WORD), far = (i) => Math.abs(Math.log(each[i] / place[i]));
+        const off = !lasts ? Infinity : alike ? Math.max(...(long.length ? long : place.map((x, i) => i)).map(far)) : Math.abs(Math.log(lasts / target)) + .25;
         if (!best || off < best.off) { if (best) fs.rmSync(best.tmp, { force: true }); best = { tmp, said, lasts, off, tries }; } else fs.rmSync(tmp, { force: true });
-        if (lasts >= target * .84 && lasts <= target * 1.22) break;
-        ask = Math.min(target * 2, Math.max(target * .5, ask * target / (lasts || target)));      // too slow: ask for less time; too quick: for more
+        if (off <= NEAR) break;
+        ask = alike ? ask.map((x, i) => within(x * place[i] / each[i], i)) : ask.map((x, i) => within(x * target / (lasts || target), i));      // too slow: ask for less time; too quick: for more
       }
       const lay = layLine(spoke, best.said), total = secondsOf(clip.file);
       try { ff(...lay.flatMap((l) => ['-ss', String(l.from), '-t', String(+(l.to - l.from).toFixed(3)), '-i', best.tmp]), '-filter_complex',
         lay.map((l, i) => `[${i}:a]atempo=${l.tempo}${l.at > 0 ? `,adelay=${Math.round(l.at * 1000)}:all=1` : ''}[p${i}]`).join(';') + `;${lay.map((_, i) => `[p${i}]`).join('')}amix=inputs=${lay.length}:normalize=0,apad=whole_dur=${total}[o]`, '-map', '[o]', '-t', String(total), '-ar', '48000', '-ac', '1', file); }
       finally { fs.rmSync(best.tmp, { force: true }); }
       return { fit: true, lay, takes: best.tries };
-    } };
+    }, review: (file, found) => reviewFit(found) };
 }
 async function clip(c, id, n) {
   const line = n.voice ? c.flow.nodes[idOf(n.voice)] : null, seen = !!line && !n.heard, r = c.use.modelFor(seen ? 'talk' : 'clip', n.model || c.flow.models?.[seen ? 'talk' : 'clip'], c.env, c.strict);

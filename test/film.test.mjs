@@ -12,7 +12,7 @@ import { timeline } from '../src/film/cut.mjs';
 import { expand, stageNodes, sync } from '../src/film/director.mjs';
 import { checkFlow, estimate, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
 import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
-import { grave, inWords, reviewClip, reviewPicture, reviewVoice } from '../src/film/review.mjs';
+import { grave, inWords, reviewClip, reviewFit, reviewPicture, reviewVoice } from '../src/film/review.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, episodeFile, lengthOf, readEpisode, readSeries, seriesFile, speechSeconds, writeJson, written } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
@@ -195,12 +195,16 @@ test('a line recorded to picture: the clip is filmed first with the model speaki
   assert.ok(Math.abs(secondsOf(r.out.get('s1-line').file) - secondsOf(r.out.get('s1').file)) < .06, 'the recording is as long as the clip, the voice set where the lips moved');
   assert.deepEqual(speechSpans(r.out.get('s1-line').file).map(([a, b]) => [Math.round(a * 10) / 10, Math.round(b * 10) / 10]), [[1, 2.2]]);
   const part = JSON.parse(fs.readFileSync(r.out.get('film').file.replace(/\.mp4$/, '.json'), 'utf8')).parts[0]; assert.equal(part.how, 'dub'); assert.equal(part.placed, true); assert.ok(Math.abs(part.line[0] - LEAD) < .1 && Math.abs(part.from - .7) < .1);
-  // a longer line for the same lips: as it comes it takes 2.1 s, too long to be squeezed into 1.2 s, so it is asked for again
-  // and told how long to take (less than the place it goes, since it ran over)
+  // a longer line for the same lips: as it comes it takes 2.1 s, far too long for 1.2 s, so it is asked for again and told how
+  // long to take (less than the place it goes, since it ran over); that comes within a seventh, which is still heard when
+  // stretched, so it is asked for once more, and then it fits
   flow.nodes['s1-line'].text = 'Anh về rồi à? Em chờ anh.'; const more = standIns(), again = await runFlow(dir, flow, { use: more }); assert.deepEqual(again.failed, []);
   const told = more.asked.filter((a) => a.kind === 'voice').map((a) => +(/in one breath, with no pause inside the line\. From the first word to the last, the line lasts about ([\d.]+) seconds/.exec(a.style)?.[1] ?? 0));
-  assert.equal(told.length, 2); assert.equal(told[0], 0); assert.ok(told[1] > .6 && told[1] < .9, `told ${told}`);
-  const fitted = JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')), last = Object.values(fitted.takes).flat().filter((t) => t.info?.fit).at(-1); assert.equal(last.info.takes, 2); assert.ok(last.info.lay[0].tempo >= .84 && last.info.lay[0].tempo <= 1.22);
+  assert.equal(told.length, 3); assert.equal(told[0], 0); assert.ok(told[1] > .6 && told[1] < .75 && told[2] > told[1] && told[2] < 1, `told ${told}`);
+  const fitted = JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')), last = Object.values(fitted.takes).flat().filter((t) => t.info?.fit).at(-1); assert.equal(last.info.takes, 3); assert.ok(last.info.lay[0].tempo >= .9 && last.info.lay[0].tempo <= 1.12, 'near enough that the stretching is not heard'); assert.deepEqual(last.review, []);
+  // a recording that still had to be stretched as far as sounds right is pointed at
+  assert.deepEqual(reviewFit({ fit: true, lay: [{ from: 0, to: 1, at: 1, tempo: 1.05, lasts: .95 }] }), []); assert.deepEqual(reviewFit({ fit: true, lay: [{ from: 0, to: .2, at: .55, tempo: .84, lasts: .24 }, { from: 1.2, to: 2.1, at: 2.5, tempo: 1.02, lasts: .88 }] }), [], 'one word, slowed: nobody hears that');
+  assert.match(inWords(reviewFit({ fit: true, lay: [{ from: 0, to: .2, at: .55, tempo: .9, lasts: .22 }, { from: 1.2, to: 2.3, at: 2.49, tempo: 1.22, lasts: .89 }] })), /^the recording was sped up as far as sounds right to fit the lips at 2\.5 s, and may still not sit on them; listen to it$/);
   // what cannot be: a line recorded to a clip whose model acts to a recording, or to a clip that is not its own
   flow.nodes.s1.model = 'actor'; assert.match((await runFlow(dir, flow, { use })).failed[0].error, /actor does not speak a line by itself, so the line cannot be recorded to its lips: take "fit" off @s1-line/);
   flow.nodes['s1-line'].fit = '@s2'; assert.match(checkFlow(flow).join('\n'), /s1-line\.fit: @s2 does not have this line as its "voice"/);

@@ -144,7 +144,7 @@ and nothing is built on it; its takes are kept, and choosing one (`songbe flow p
 it is. What is only **odd** is used and pointed at — a mark on the card, a line in the panel (click it and the clip jumps to
 that moment), a tag on the board, a line in `songbe flow`: a strong colour that appears in a clip and is not in its first
 frame, a jump as if cut to another shot, a stretch of black, a clip that does not begin on its picture or is shorter than
-asked, a long pause inside a line, a picture in another shape, with plain bars, or of one flat colour.
+asked, a long pause inside a line, a line recorded to picture that had to be stretched hard to fit the lips, a picture in another shape, with plain bars, or of one flat colour.
 Takes made before Songbe did this are looked at once when the film is opened in the app, or by `songbe flow review`.
 
 Every result is a **take**, kept under a key made from everything it was made from — the words, the model, and the takes of the
@@ -190,6 +190,9 @@ Claude.ai sign-in or to run on a person's Pro or Max plan, and xAI publishes no 
 - Reference pictures for clips go to fal.ai endpoints only; Google's Veo is asked with a first frame (and a last one).
 - A clip is taken from its start; `from` and `to` in a cut choose the part to keep by hand.
 - A line recorded to picture is fitted in time to where the lips moved, phrase by phrase; the lips themselves are not redrawn
-  (no lip-sync model is run), so a model that paces a line very differently from the recording can still look a little off.
+  (no lip-sync model is run). The line is recorded again, up to four times, until every phrase is within about a tenth of its
+  place; a voice cannot always be brought that close — it pauses where the words pause, not where the actor's lips did — and a
+  line that still had to be stretched as far as sounds right is pointed at ("listen to it"). In the test film that was three
+  of the six lines a speaking model filmed.
 - The review measures; it does not understand. It finds a colour that was not there, a cut, a freeze, a silence — not a face
   that is no longer the person's, a hand with six fingers, or the wrong person speaking. Those are still for your eyes.

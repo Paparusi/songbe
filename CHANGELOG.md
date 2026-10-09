@@ -2,6 +2,14 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.31
+- **A line recorded to picture comes closer to the lips before it is stretched.** Stretching is heard: sped up by a fifth, a
+  whispered line was no longer made out. The line is now asked for again until every phrase is within about a tenth of the
+  place it goes — judged phrase by phrase, a single word aside — and told how long each phrase takes; a recording that still
+  had to be stretched as far as sounds right is pointed at.
+- Tried against the models (Veo 3.1 fast, at Google): a clip told to keep what its first frame shows, without the palette,
+  came back without the yellow patch the same shot had before — one take, so a sign and not a proof.
+
 ## 0.30
 - **Lines by hand on the canvas.** Drag from the dot on a card's right edge onto another card to use it there — a picture as
   the frame a clip starts or ends on or as a reference, a line as what a clip says, a note, a person or a place into a prompt,

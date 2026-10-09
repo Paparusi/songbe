@@ -92,6 +92,16 @@ export function reviewVoice(file, { text, language = null } = {}) {
   return found;
 }
 
+// ---- a line recorded to picture ----
+// `found` is what fitting it learnt: where each phrase went and how far it had to be stretched. Stretched as far as sounds right,
+// a line may no longer sit on the lips, and a fast one is harder to make out: worth listening to.
+export function reviewFit(found) {
+  const lay = found?.lay || [], hard = lay.filter((l) => l.lasts >= .4 && (l.tempo >= 1.2 || l.tempo <= .86));      // (a single word stretched sounds no different)
+  if (!hard.length) return [];
+  const fast = hard.some((l) => l.tempo >= 1.2), at = hard[0].at;
+  return [{ what: 'stretched', at: +at.toFixed(1), says: `the recording was ${fast ? 'sped up' : 'slowed down'} as far as sounds right to fit the lips at ${at.toFixed(1)} s, and may still not sit on them; listen to it` }];
+}
+
 // ---- a picture ----
 const ratioOf = (aspect) => { const [a, b] = String(aspect).split(':').map(Number); return a > 0 && b > 0 ? a / b : null; };
 export function reviewPicture(file, { aspect = null } = {}) {
