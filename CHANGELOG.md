@@ -2,6 +2,15 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.27
+- **Continue with ChatGPT.** A person can sign in with their ChatGPT account and have Songbe write on their Plus or Pro plan
+  instead of an API key — OpenAI's published flow for apps on the person's own computer: a loopback sign-in with PKCE, tokens
+  in a file only they can read, renewed by themselves, the grant taken back on sign-out. It covers writing only. (OpenAI offers
+  this to open-source projects and to apps people run for themselves; a paid app must be accepted first.)
+- **OpenAI and Grok as writers**, each with your own API key (`OPENAI_API_KEY`, `XAI_API_KEY`), beside Claude, Gemini and fal.ai.
+- **Who writes can be chosen**: *Use for writing* in the settings, `songbe account writer <name>`, or `SONGBE_WRITER`.
+  `songbe account` says who would write and why.
+
 ## 0.26
 - **Licence keys.** A copy runs as a trial for 14 days from its first start. After that it still opens, plays and exports
   everything and lets it be changed, but makes nothing new until a key is entered (*Settings → Licence*, or

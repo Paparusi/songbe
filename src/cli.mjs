@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { renderVideo, stills, writePage, lintLayout, poster } from './render.mjs';
 import { makeAudio, mux } from './audio.mjs';
 import { check } from './check.mjs';
-import { tools, loadDotEnv, exists, log, mkdir, dataDir, projectsHome, ROOT, WIN } from './util.mjs';
+import { tools, loadDotEnv, exists, log, mkdir, dataDir, openOutside, projectsHome, ROOT, WIN } from './util.mjs';
 import { validate, jsonSchema, STYLES, FORMATS } from './spec.mjs';
 import { enter, forget, inWords, licence, mayMake } from './licence.mjs';
 
@@ -19,6 +19,8 @@ const HELP = `Songbe — short ads from a single video.json
 
   songbe doctor                   check that ffmpeg, ffprobe and a browser are found and which keys are set (songbe --version: which Songbe)
   songbe licence [<key>|remove]   how this copy is licensed; with a key, enter it for this computer
+  songbe account                  who writes scripts: which keys are set, and whether you are signed in with ChatGPT
+                                  (songbe account signin chatgpt | signout chatgpt | writer <name>|auto)
   songbe setup ffmpeg             Windows: fetch ffmpeg into Songbe's own folder (elsewhere: says which package to install)
   songbe write <dir> "<brief>"    draft video.json from a description of the ad, check the draft and fix what the checks find
                                   (--style= --format= --no-captions --footage --brief=FILE --force; needs a key, see below)
@@ -44,7 +46,8 @@ const HELP = `Songbe — short ads from a single video.json
 
 Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage, the
 writer, and for films the models of every maker on fal.ai), GEMINI_API_KEY (films: Google's pictures, clips, voices and music asked
-directly; the writer too), ANTHROPIC_API_KEY (optional: the writer then uses Claude directly), GROQ_API_KEY (optional transcript check).
+directly; the writer too), ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY (optional: the writer then asks Claude, OpenAI or Grok
+directly), GROQ_API_KEY (optional transcript check). The writer can also run on your ChatGPT plan, with no key: songbe account signin chatgpt.
 Without keys the build still works: no voice, no music, plain backgrounds where footage would be generated.`;
 
 
@@ -75,6 +78,20 @@ export async function main(argv) {
   if (cmd === 'licence' || cmd === 'license') {
     const l = !target ? licence() : target === 'remove' ? forget() : enter(target);
     return log(`${inWords(l)}${l.email ? ` <${l.email}>` : ''}${l.kind === 'licensed' ? ` · plan ${l.plan}` : l.kind === 'trial' ? '. A licence key keeps Songbe making things after that: songbe licence <key>' : '. Everything you made still opens; to make more, enter a key: songbe licence <key>'}`);
+  }
+  if (cmd === 'account') {
+    loadDotEnv(dataDir());
+    const chatgpt = await import('./providers/chatgpt.mjs'), { WRITERS, chooseWriter, chosenWriter, writerFor, writersFor } = await import('./providers/llm.mjs'), [what] = rest;
+    if (target === 'signin' && what === 'chatgpt') {
+      const who = await chatgpt.signIn({ open: (url) => { log(`Sign in with ChatGPT in your browser. If it did not open, go to:\n  ${url}`); openOutside(url); } });
+      return log(`Signed in${who.email ? ' as ' + who.email : ''}. You're using your ChatGPT plan: what Songbe writes now counts against it, and you can manage that in ChatGPT's settings.`);
+    }
+    if (target === 'signout' && what === 'chatgpt') return log((await chatgpt.signOut()) ? 'Signed out of ChatGPT.' : 'Nobody was signed in, or OpenAI could not be told; the sign-in is gone from this computer either way.');
+    if (target === 'writer') { chooseWriter(!what || what === 'auto' ? null : what); return log(`writer: ${chosenWriter() || 'automatic'}`); }
+    if (target) throw new Error('songbe account | signin chatgpt | signout chatgpt | writer <name>|auto');
+    const can = writersFor(), using = writerFor(), a = chatgpt.account();
+    for (const [id, words] of Object.entries(WRITERS)) log(`${can.includes(id) ? (id === using ? '→' : '·') : ' '} ${id.padEnd(10)} ${words}${id === 'chatgpt' && a ? ` — ${a.email || 'signed in'}` : ''}${can.includes(id) ? '' : '  (not set up)'}`);
+    return log(using ? `${WRITERS[using]} writes${chosenWriter() ? ' (chosen)' : ' (the first that is set up; songbe account writer <name> chooses another)'}.` : 'Nothing is set up to write with yet: set a key, or songbe account signin chatgpt.');
   }
   if (cmd === 'model') {
     if (!target || target.startsWith('--')) return log('Which model? For example: songbe model fal-ai/nano-banana/edit');

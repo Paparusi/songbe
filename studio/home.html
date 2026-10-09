@@ -133,6 +133,12 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
     <div class="keyrow"><input type="text" id="lkey" autocomplete="off" spellcheck="false" placeholder="Paste a licence key (SB1.…)"><button class="btn" id="lset">Enter key</button></div>
     <div class="msg note" id="lmsg" style="margin-top:6px">A key lets this copy make things. Without one, everything you made still opens.</div>
   </div>
+  <div class="sec"><h3>Writer</h3>
+    <div class="lead" style="margin-bottom:6px">Who writes series, scripts and ads. Pictures, clips and voices are separate work and always need the keys below.</div>
+    <div class="row"><div class="k">ChatGPT plan <span class="tag" id="cgtag"></span></div><div class="d" id="cgmore"></div><div class="v" id="cgdo"></div></div>
+    <div class="msg note" id="cgmsg" hidden></div>
+    <label for="wpick" style="margin-top:12px">Use for writing</label><select id="wpick"></select>
+  </div>
   <div class="sec"><h3>Keys</h3>
     <div class="lead" style="margin-bottom:6px">Voice, music, generated footage and the script writer are services you pay yourself. Songbe adds nothing on top. Without a key a video still builds: silent, with motion graphics and sound effects.</div>
     <div id="keys"></div>
@@ -161,6 +167,8 @@ const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.crea
 const api = (where, o = {}) => fetch(where, { ...o, headers: { 'X-Songbe': '1', ...(o.headers || {}) } });
 const post = (where, data) => api(where, { method: 'POST', body: JSON.stringify(data || {}) }).then(async (r) => ({ ok: r.ok, ...(await r.json()) }));
 const KEYS = [['fal', 'FAL_KEY', 'fal.ai', 'Voice-over, music, generated footage, and the script writer.'], ['anthropic', 'ANTHROPIC_API_KEY', 'Anthropic', 'Optional. The script writer then uses Claude directly instead of going through fal.ai.'],
+  ['openai', 'OPENAI_API_KEY', 'OpenAI', 'Optional. The script writer on your OpenAI API account (apart from a ChatGPT plan, which needs no key: see Writer above).'],
+  ['xai', 'XAI_API_KEY', 'xAI', 'Optional. The script writer with Grok, on your xAI API account.'],
   ['gemini', 'GEMINI_API_KEY', 'Google', 'For films: pictures, clips, voices and music asked at Google directly. The script writer can use it too.'],
   ['groq', 'GROQ_API_KEY', 'Groq', 'Optional. After a build, listens to the video and writes down what is actually audible.']];
 const SPARK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l1.8 4.7L16.5 9.5l-4.7 1.8L10 16l-1.8-4.7L3.5 9.5l4.7-1.8z"/><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z"/></svg>';
@@ -249,8 +257,28 @@ async function setLicence(method, body) {
   if (!r.ok) { $('#lmsg').textContent = j.error; $('#lmsg').className = 'msg bad'; return; }
   H.licence = j; $('#lkey').value = ''; licensing(); $('#lmsg').textContent = method === 'PUT' ? 'Thank you. This copy is licensed.' : 'The key was removed from this computer.'; $('#lmsg').className = 'msg note';
 }
+// Who writes. With a ChatGPT sign-in the writing counts against the person's own ChatGPT plan; the wording follows OpenAI's guidelines.
+function writing() {
+  const A = H.accounts; if (!A) return;
+  const c = A.chatgpt, tag = $('#cgtag'), go = el('button', { className: 'btn small', textContent: c.pending ? 'Finish in your browser…' : 'Continue with ChatGPT', disabled: !!c.pending });
+  tag.textContent = c.signedIn ? 'Using ChatGPT plan' : 'not signed in'; tag.classList.toggle('on', !!c.signedIn);
+  $('#cgmore').textContent = c.signedIn ? `${c.email || 'Signed in'}${c.model ? ' · ' + c.model : ''}. What Songbe writes counts against your ChatGPT plan.` : 'Sign in with your ChatGPT account and Songbe writes on your Plus or Pro plan, with no API key.';
+  go.onclick = async () => { const r = await post('/api/accounts/chatgpt/signin'); if (r.error) { said(r.error, true); return; } watch(); };
+  const manage = el('button', { className: 'btn small', textContent: 'Manage usage' }), out = el('button', { className: 'btn small', textContent: 'Sign out' });
+  manage.onclick = () => post('/api/open', { what: 'chatgpt' }); out.onclick = async () => { H.accounts = await post('/api/accounts/chatgpt/signout'); writing(); load(); };
+  $('#cgdo').replaceChildren(...(c.signedIn ? [manage, out] : [go]));
+  if (c.error && !c.pending) said(c.error, true);
+  if (c.first) said('You\u2019re using your ChatGPT plan. What Songbe writes now counts against it; you can manage that in ChatGPT\u2019s settings.');
+  const pick = $('#wpick'), names = A.writer.names, auto = A.writer.using && names[A.writer.using] ? `Automatic — now: ${names[A.writer.using]}` : 'Automatic — nothing is set up yet';
+  pick.replaceChildren(el('option', { value: '', textContent: auto }), ...Object.entries(names).map(([id, words]) => el('option', { value: id, textContent: words + (A.writer.can.includes(id) ? '' : ' (not set up)'), disabled: !A.writer.can.includes(id), selected: A.writer.chosen === id })));
+}
+const said = (words, bad) => { const m = $('#cgmsg'); m.hidden = false; m.textContent = words; m.className = 'msg ' + (bad ? 'bad' : 'note'); };
+async function watch() {      // while the person is in their browser: look until the sign-in has ended one way or the other
+  for (;;) { H.accounts = await (await fetch('/api/accounts')).json(); writing(); if (!H.accounts.chatgpt.pending) break; await new Promise((ok) => setTimeout(ok, 1000)); }
+  load();
+}
 function settings() {
-  licensing();
+  licensing(); writing();
   const k = H.keys, from = { environment: 'set in the environment', project: 'set', saved: 'saved' };
   if (!$('#keys').children.length) for (const [n, , title, about] of KEYS) {      // drawn once, so a key being typed is not wiped by the next refresh
     const get = el('button', { className: 'btn small', textContent: 'Get a key' }), off = el('button', { className: 'btn small', id: 'x' + n, textContent: 'Remove', hidden: true });
@@ -362,6 +390,7 @@ async function putKeys(data, done) {
   if (!r.ok) { $('#kmsg').textContent = j.error; $('#kmsg').className = 'msg bad'; return; }
   H.keys = j; for (const [n] of KEYS) $('#k' + n).value = ''; load(); $('#kmsg').textContent = done; $('#kmsg').className = 'msg note';
 }
+$('#wpick').onchange = async (e) => { const r = await api('/api/writer', { method: 'PUT', body: JSON.stringify({ writer: e.target.value }) }), j = await r.json(); if (r.ok) { H.accounts = j; writing(); load(); } };
 $('#lset').onclick = () => { const key = $('#lkey').value.trim(); if (!key) { $('#lmsg').textContent = 'Paste the key first.'; $('#lmsg').className = 'msg bad'; return; } setLicence('PUT', { key }); };
 $('#lrem').onclick = () => setLicence('DELETE'); $('#klic').onclick = () => showSettings();
 $('#ksave').onclick = () => { const d = {}; for (const [n, name] of KEYS) if ($('#k' + n).value.trim()) d[name] = $('#k' + n).value.trim();

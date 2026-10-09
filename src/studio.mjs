@@ -17,6 +17,8 @@ import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES, refreshStyles } from
 import { rewriteScene, writeSpec, writerFor } from './write.mjs';
 import { canvasRoutes, filmCard } from './film/canvas.mjs';
 import { enter, forget, inWords, licence, mayMake } from './licence.mjs';
+import * as chatgpt from './providers/chatgpt.mjs';
+import { WRITERS, chooseWriter, chosenWriter, writersFor } from './providers/llm.mjs';
 import { sync } from './film/director.mjs';
 import { readEpisode } from './film/series.mjs';
 import { writeEpisode, writeSeries } from './film/writer.mjs';
@@ -27,9 +29,10 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 const MEDIA = /\.(png|jpe?g|svg|webp|gif|mp4|mov|webm|wav|mp3)$/i;
 const PAGES = path.join(ROOT, 'studio');
-const KEYS = { FAL_KEY: 'fal', GROQ_API_KEY: 'groq', ANTHROPIC_API_KEY: 'anthropic', GEMINI_API_KEY: 'gemini' };
+const KEYS = { FAL_KEY: 'fal', GROQ_API_KEY: 'groq', ANTHROPIC_API_KEY: 'anthropic', GEMINI_API_KEY: 'gemini', OPENAI_API_KEY: 'openai', XAI_API_KEY: 'xai' };
 // the only places outside this computer the app ever sends a person to
-const LINKS = { fal: 'https://fal.ai/dashboard/keys', groq: 'https://console.groq.com/keys', anthropic: 'https://console.anthropic.com/settings/keys', ffmpeg: 'https://ffmpeg.org/download.html' };
+const LINKS = { fal: 'https://fal.ai/dashboard/keys', groq: 'https://console.groq.com/keys', anthropic: 'https://console.anthropic.com/settings/keys', gemini: 'https://aistudio.google.com/apikey', openai: 'https://platform.openai.com/api-keys', xai: 'https://console.x.ai/',
+  chatgpt: chatgpt.MANAGE, ffmpeg: 'https://ffmpeg.org/download.html' };
 const NOT_COPIED = /[\\/](\.songbe|out|starter\.json|poster\.jpg)([\\/]|$)/;      // what a new project does not take from its starter
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
@@ -56,10 +59,14 @@ export function trusted(req) {
 // The plan carries file:// addresses for the renderer; a page served over http gets the same files through `link`.
 export const forBrowser = (plan, link) => JSON.parse(JSON.stringify(plan), (k, v) => (typeof v === 'string' && v.startsWith('file://') ? link(fileURLToPath(v)) : v));
 
-export async function serve({ port: wantPort = 4173, project = null, film = null, home = projectsHome(), ask = null, describeModel = describe, licencePublic = undefined } = {}) {      // (`licencePublic`: the tests issue keys of their own)      // `ask` stands in for the language model in tests, `describeModel` for fal.ai's catalogue
+export async function serve({ port: wantPort = 4173, project = null, film = null, home = projectsHome(), ask = null, describeModel = describe, licencePublic = undefined, browse = openOutside } = {}) {      // (`licencePublic`: the tests issue keys of their own)      // `ask` stands in for the language model in tests, `describeModel` for fal.ai's catalogue
   const pinned = project ? path.resolve(project) : null;      // `songbe studio <dir>`: this project is the front door
   const pinnedFilm = film ? path.resolve(film) : null;        // `songbe flow open <dir>`: the canvas of this film is
   const registry = path.join(dataDir(), 'projects.json');
+  // Signing in with ChatGPT happens in the person's own browser; this only remembers that it is under way, and how it ended.
+  let signing = { pending: false, error: null };
+  const accounts = () => ({ chatgpt: { signedIn: chatgpt.signedIn(), ...(chatgpt.account() || {}), pending: signing.pending, error: signing.error, first: chatgpt.signedIn() && chatgpt.firstTime() },
+    writer: { chosen: chosenWriter(), using: ask ? 'custom' : writerFor(keyEnv()), can: writersFor(keyEnv()), names: WRITERS } });
   const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map(), filming = new Map();
   let setup = { running: false, step: null, done: 0, total: 0, error: null, version: null }, toolsSeen = null, toolsAt = 0;
 
@@ -358,13 +365,22 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
       if (route === 'GET /api/home') {
         refreshStyles();      // a pack may have been added since the last look
         return send(res, 200, { packs: listPacks().map((p) => ({ id: p.id, name: p.name, version: p.version, about: p.about, licence: p.licence, where: p.where, styles: p.styles.map((x) => x.name), starters: p.starters.length })), packsDir: installedPacksDir(), version: VERSION, home, data: dataDir(), shell: process.env.SONGBE_SHELL || null, pinned: pinned ? idOf(pinned) : null,
-          licence: standing(), projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), films: [...films()].map(([id, dir]) => filmCard(id, dir, home)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
+          licence: standing(), accounts: accounts(), projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), films: [...films()].map(([id, dir]) => filmCard(id, dir, home)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
           setup: { ...setup, canFetch: WIN, advice: ffmpegAdvice(), pick: { version: FFMPEG_WINDOWS.version, megabytes: Math.round(FFMPEG_WINDOWS.bytes / 1e6), from: FFMPEG_WINDOWS.from, licence: FFMPEG_WINDOWS.licence } } });
       }
       if (route === 'GET /api/model') {      // what one model takes: the editor's "settings of this model"
         try { const d = await describeModel(u.searchParams.get('id') || ''); return d ? send(res, 200, settingsOf(d)) : send(res, 502, { error: 'fal.ai did not say what this model takes (no connection?). Its settings can still be written in the JSON tab.' }); }
         catch (e) { return send(res, 404, { error: e.message }); }
       }
+      if (route === 'GET /api/accounts') return send(res, 200, accounts());
+      if (route === 'POST /api/accounts/chatgpt/signin') {
+        if (signing.pending) return send(res, 409, { error: 'A sign-in is already under way: finish it in your browser.' });
+        signing = { pending: true, error: null };
+        chatgpt.signIn({ open: (url) => browse(url) }).catch((e) => { signing.error = e.message; }).finally(() => { signing.pending = false; });
+        return send(res, 200, { started: true });
+      }
+      if (route === 'POST /api/accounts/chatgpt/signout') { await chatgpt.signOut(); signing.error = null; return send(res, 200, accounts()); }
+      if (route === 'PUT /api/writer') { try { chooseWriter((await json(req)).writer || null); return send(res, 200, accounts()); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (route === 'PUT /api/licence') { try { enter((await json(req)).key, lic()); return send(res, 200, standing()); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (route === 'DELETE /api/licence') { forget(lic()); return send(res, 200, standing()); }
       if (route === 'POST /api/films' && mayNot(res)) return;

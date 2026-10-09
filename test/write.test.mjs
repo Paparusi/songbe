@@ -11,6 +11,7 @@ import { SCENES, STYLES, validate } from '../src/spec.mjs';
 import { ROOT } from '../src/util.mjs';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-write-'));
+process.env.SONGBE_DATA = path.join(scratch, 'data');      // a ChatGPT sign-in or a chosen writer on this computer is not this test's
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 const BRIEF = 'Quán cà phê Mộc ở Thủ Dầu Một, rang hạt tại quán mỗi sáng. Mở cửa từ 6 giờ. Giao miễn phí trong khu cho đơn từ 2 ly. Đặt qua Zalo 0900 111 222.';
 const GOOD = { style: 'soft', brand: { name: 'Mộc', ink: '#2A1A12', primary: '#8A4B2A', accent: '#F2C879', paper: '#FBF5EC', muted: '#7A6A5E' }, voice: { language: 'Vietnamese' },

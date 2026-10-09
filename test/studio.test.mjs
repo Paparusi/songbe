@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-app-'));
 process.env.SONGBE_DATA = path.join(scratch, 'data'); process.env.SONGBE_HOME = path.join(scratch, 'videos');
-delete process.env.FAL_KEY; delete process.env.GROQ_API_KEY; delete process.env.ANTHROPIC_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.GOOGLE_API_KEY;
+delete process.env.FAL_KEY; delete process.env.GROQ_API_KEY; delete process.env.ANTHROPIC_API_KEY; delete process.env.GEMINI_API_KEY; delete process.env.GOOGLE_API_KEY; delete process.env.OPENAI_API_KEY; delete process.env.XAI_API_KEY;
 const { serve, tidyName, trusted, forBrowser, idOf } = await import('../src/studio.mjs');
 const { ROOT, tools } = await import('../src/util.mjs');
 
@@ -57,7 +57,7 @@ test('the home screen starts empty, with starters to pick from', async () => {
   assert.equal(h.home, process.env.SONGBE_HOME);
   assert.deepEqual(h.starters.map((x) => x.id), ['app-launch-en', 'recruitment-vi', 'sale-vi', 'classic/quan-ca-phe', 'blank']);
   for (const st of h.starters.filter((x) => x.id !== 'blank')) { assert.ok(st.poster, `${st.id} has a poster`); assert.equal((await fetch(u + st.poster)).headers.get('content-type'), 'image/jpeg'); }
-  assert.deepEqual(h.keys, { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null, gemini: false, geminiFrom: null });
+  assert.deepEqual(h.keys, { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null, gemini: false, geminiFrom: null, openai: false, openaiFrom: null, xai: false, xaiFrom: null });
   for (const page of ['/home', '/studio/ui.css', '/studio/logo.png', '/kit/fonts/fonts.css']) assert.equal((await fetch(u + page)).status, 200, page);
   assert.equal((await fetch(u + '/', { redirect: 'manual' })).headers.get('location'), '/home');
   assert.equal(h.writer, null);
@@ -154,7 +154,7 @@ test('a model says what it takes: what Songbe fills in, and the settings that ar
 test('keys are saved on this computer and never sent back', async () => {
   const put = (data) => fetch(u + '/api/keys', { method: 'PUT', headers: mine, body: JSON.stringify(data) });
   const r = await put({ FAL_KEY: 'test-key-0123456789' }), text = await r.text();
-  assert.deepEqual(JSON.parse(text), { fal: true, falFrom: 'saved', groq: false, groqFrom: null, anthropic: false, anthropicFrom: null, gemini: false, geminiFrom: null });
+  assert.deepEqual(JSON.parse(text), { fal: true, falFrom: 'saved', groq: false, groqFrom: null, anthropic: false, anthropicFrom: null, gemini: false, geminiFrom: null, openai: false, openaiFrom: null, xai: false, xaiFrom: null });
   assert.ok(!text.includes('0123456789') && !(await fetch(u + '/api/home').then((x) => x.text())).includes('0123456789'));
   const file = path.join(process.env.SONGBE_DATA, '.env');
   assert.equal(fs.readFileSync(file, 'utf8'), 'FAL_KEY=test-key-0123456789\n');
@@ -162,7 +162,7 @@ test('keys are saved on this computer and never sent back', async () => {
   assert.equal((await put({ FAL_KEY: 'two words' })).status, 400); assert.equal((await put({ FAL_KEY: 'a\nINJECTED=1' })).status, 400);
   assert.equal((await put({ GROQ_API_KEY: 'gsk_test_0123456789' }).then(J)).groq, true);
   assert.equal(fs.readFileSync(file, 'utf8'), 'FAL_KEY=test-key-0123456789\nGROQ_API_KEY=gsk_test_0123456789\n', 'saving one key keeps the other');
-  assert.deepEqual(await put({ FAL_KEY: '', GROQ_API_KEY: '' }).then(J), { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null, gemini: false, geminiFrom: null });
+  assert.deepEqual(await put({ FAL_KEY: '', GROQ_API_KEY: '' }).then(J), { fal: false, falFrom: null, groq: false, groqFrom: null, anthropic: false, anthropicFrom: null, gemini: false, geminiFrom: null, openai: false, openaiFrom: null, xai: false, xaiFrom: null });
 });
 
 test('a folder from elsewhere can join the list and leave it again', async () => {

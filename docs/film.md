@@ -134,6 +134,20 @@ and the person's own voice is recorded to its lips afterwards (the director sets
 keeps the model's voice instead); for any other the recording is laid over the shot. For endpoints named by their door this is
 read from fal's description of them.
 
+## Who writes
+
+The series and the scripts are written by a text model on your own account. With a key: Claude (`ANTHROPIC_API_KEY`), Gemini
+(`GEMINI_API_KEY`), OpenAI (`OPENAI_API_KEY`), Grok (`XAI_API_KEY`), or fal.ai's (`FAL_KEY`). Without one: **your ChatGPT plan**
+— *Continue with ChatGPT* in the app's settings, or `songbe account signin chatgpt` — after which what Songbe writes counts
+against your Plus or Pro plan; you manage Songbe's share in ChatGPT's settings and sign out the same way you signed in.
+`songbe account` says who would write; the first that is set up does, unless you choose one (`songbe account writer xai`, or
+*Use for writing* in the settings).
+
+A plan covers writing only. Pictures, clips, voices and music are separate work, paid by use with the keys above.
+
+Claude subscriptions and Grok subscriptions cannot be used this way: Anthropic does not permit other products to offer
+Claude.ai sign-in or to run on a person's Pro or Max plan, and xAI publishes no way for other apps to. Both work with an API key.
+
 ## What it cannot do yet
 
 - In the canvas window a node is wired to another by writing `@name` or choosing it in a list; lines cannot be dragged yet.
