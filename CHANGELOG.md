@@ -2,6 +2,12 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.19.1
+- The first public version. The phone number in every example, starter and template is now `0123 456 789`, which no network can
+  ring, and a plan says so while a video still shows it.
+- The recruitment example sets its AI notice on every scene with a generated picture and fits its own places.
+- The logo is under the same licence as the rest (README, NOTICE).
+
 ## 0.19
 - **Start from a picture of your own.** `generate.from` names a photo of yours: with a description, a model that takes pictures
   makes a new one from it — the same product in another place — and with only `motion` your photo itself is set in motion.

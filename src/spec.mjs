@@ -10,6 +10,9 @@ import { styleNames } from './packs.mjs';
 
 const COLOUR = 'str';
 const PICTURE = /\.(png|jpe?g|webp)$/i;
+// The phone number of every example, starter and template: one that no network can ring (Vietnamese numbers do not start with 01).
+// A video that still shows it is not finished, and the plan says so.
+export const NO_SUCH_NUMBER = '0123456789';
 // what "generate" may hold; anything else is a slip of the pen and is said so
 const GENERATE = ['image', 'motion', 'from', 'imageModel', 'videoModel', 'model', 'seconds', 'resolution', 'seed', 'aspect', 'imageOptions', 'videoOptions'];
 const common = { say: 'text', duration: 'num', minDuration: 'num', notice: 'str' };
@@ -34,8 +37,8 @@ export const TEMPLATES = {
   list: { type: 'list', say: 'Name three benefits, in the order they appear.', label: 'What you get', title: ['Three things', 'that matter'],
     items: [{ icon: 'check', text: 'First benefit', sub: 'A few words more' }, { icon: 'bolt', text: 'Second benefit', sub: 'A few words more' }, { icon: 'heart', text: 'Third benefit', sub: 'A few words more' }] },
   phone: { type: 'phone', say: 'Show the product being used.', label: 'In the app', title: ['See it', 'in action'], callouts: [{ text: 'A short callout', side: 'right', y: 0.3 }] },
-  chat: { type: 'chat', say: ['Tell people how to reach you.', 'Zero nine hundred, zero zero zero, zero zero zero.'], label: 'Get in touch', title: 'Message us',
-    messages: [{ from: 'them', text: 'Hi, I am interested' }, { from: 'us', text: 'Hello! Happy to help.' }], contact: { kicker: 'Phone', button: 'Message', number: ['0900', '000', '000'], sub: 'Replies within the day' } },
+  chat: { type: 'chat', say: ['Tell people how to reach you.', 'Oh one two three, four five six, seven eight nine.'], label: 'Get in touch', title: 'Message us',
+    messages: [{ from: 'them', text: 'Hi, I am interested' }, { from: 'us', text: 'Hello! Happy to help.' }], contact: { kicker: 'Phone', button: 'Message', number: ['0123', '456', '789'], sub: 'Replies within the day' } },
   offer: { type: 'offer', say: 'Say the offer and until when it runs.', label: 'This week only', title: ['The offer', 'in two lines'], price: '-20%', terms: 'Until Sunday, in store' },
   photos: { type: 'photos', say: 'Show what people get.', label: 'Have a look', title: ['See it', 'for yourself'], photos: [{ caption: 'First picture' }, { caption: 'Second picture' }] },
   quote: { type: 'quote', say: 'Let a customer say it.', label: 'What customers say', quote: 'Replace this with the words of a real customer.', name: 'Their name', role: 'Who they are', stars: 5 },

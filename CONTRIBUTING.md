@@ -48,7 +48,8 @@ The tests never call a provider and need no key. The drawing tests need the brow
    its fields in `tools/fit.mjs` and `src/fit.mjs`, and a line in the README's table.
 4. A new look is better made as a pack (`docs/packs.md`); `packs/classic` is the model.
 5. Comments say why, in plain words. Code and documentation are in English.
-6. Examples and starters carry only invented facts (`0900 000 000`, `example.com`).
+6. Examples and starters carry only invented facts, and nothing that could reach a real person: the phone number is `0123 456 789`
+   (no Vietnamese number starts with 01, and the plan reminds people to replace it), addresses end in `example.com`.
 
 ## Reporting a problem
 

@@ -56,7 +56,7 @@
       "type": "chat",
       "say": [
         "Nhắn Zalo đặt trước, tới là có.",
-        "{Không chín trăm, không không không, không không không|0900 000 000}."
+        "{Không một hai ba, bốn năm sáu, bảy tám chín|0123 456 789}."
       ],
       "label": "Đặt trước",
       "title": "Nhắn Bếp Na",
@@ -74,9 +74,9 @@
         "kicker": "Zalo",
         "button": "Nhắn tin",
         "number": [
-          "0900",
-          "000",
-          "000"
+          "0123",
+          "456",
+          "789"
         ],
         "sub": "Đặt trước, tới là có"
       },

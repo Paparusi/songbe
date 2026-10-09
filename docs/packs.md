@@ -66,8 +66,9 @@ node bin/songbe.mjs lint examples/recruitment-vi --style=night    # and --format
 ## A starter
 
 Any Songbe project. `starter.json` gives it a name, a line of description and its place in the list; `poster.jpg` is what the picker
-shows. A starter may use a look from the same pack or from the kit. Keep facts in a starter obviously made up (`0900 000 000`,
-`example.com`): people publish what they forget to change.
+shows. A starter may use a look from the same pack or from the kit. Keep facts in a starter obviously made up, and unable to reach a real person: the phone
+number `0123 456 789` (no Vietnamese number starts with 01; Songbe reminds people to replace it) and addresses ending in
+`example.com`. People publish what they forget to change.
 
 ## What a pack cannot do
 

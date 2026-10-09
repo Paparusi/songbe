@@ -13,7 +13,7 @@ motion graphics, captions, music and sound effects, and then checks its own work
 line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
 people who would rather click than type.
 
-> Version 0.19. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.19.1. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux and Windows 11; on macOS
 > the tests pass and the app has not been built. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 
@@ -213,7 +213,7 @@ spoken highlighted. Lines keep clauses together and are balanced rather than fil
 Where the voice should say one thing and the caption show another, write both: `{spoken|shown}`.
 
 ```json
-"say": "Looking for work in {Vee Sip two|VSIP 2}? Call {zero nine hundred, zero zero zero|0900 000}."
+"say": "Looking for work in {Vee Sip two|VSIP 2}? Call {oh one two three, four five six|0123 456}."
 ```
 
 Word times are estimated from the length of each word within its sentence — no speech recognition, no extra key. In square and wide

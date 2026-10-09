@@ -26,11 +26,11 @@
     },
     {
       "type": "chat",
-      "say": ["Nhắn Zalo cho Mộc để đặt trước nhé.", "{Không chín trăm, không không không, không không không|0900 000 000}."],
+      "say": ["Nhắn Zalo cho Mộc để đặt trước nhé.", "{Không một hai ba, bốn năm sáu, bảy tám chín|0123 456 789}."],
       "label": "Đặt trước",
       "title": "Nhắn Mộc",
       "messages": [ { "from": "them", "text": "Cho mình 2 ly sữa đá mang đi" }, { "from": "us", "text": "Có ngay, 5 phút nữa bạn ghé lấy nhé!" } ],
-      "contact": { "kicker": "Zalo", "button": "Nhắn tin", "number": ["0900", "000", "000"], "sub": "Đặt trước, ghé là có" },
+      "contact": { "kicker": "Zalo", "button": "Nhắn tin", "number": ["0123", "456", "789"], "sub": "Đặt trước, ghé là có" },
       "footer": { "name": "Cà phê Mộc", "line": "Rang mộc mỗi sáng" }
     },
     {

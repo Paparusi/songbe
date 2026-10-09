@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import * as fal from './providers/fal.mjs';
 import crypto from 'node:crypto';
 import { run, sha, mkdir, exists, tools, duration, log, orientationOf, UPRIGHT } from './util.mjs';
-import { validate, FORMATS } from './spec.mjs';
+import { validate, FORMATS, NO_SUCH_NUMBER } from './spec.mjs';
 import { spokenOf, shownOf, pausesIn, timedWords, captionLines } from './captions.mjs';
 import { beatsOf, snapCuts } from './beats.mjs';
 import { packStyles } from './packs.mjs';
@@ -170,6 +170,7 @@ export async function makePlan(dir, opts = {}) {
     } else sc.media = { kind: 'image', src: url(src), fit, ratio, lean };
   }
 
+  scenes.forEach((sc, n) => { if (list(sc.contact?.number).join('').replace(/\D/g, '') === NO_SUCH_NUMBER) notes.push(`Scene ${n + 1} (${sc.type}): the phone number is still the example's, which nobody can ring. Put yours in before this goes out.`); });
   for (const sc of scenes) if (sc.screens) sc.screens = list(sc.screens).map((p) => url(path.resolve(dir, p)));
   for (const sc of scenes) if (sc.type === 'photos' && Array.isArray(sc.photos)) sc.photos = sc.photos.map((p) => (p.src ? { ...p, src: url(path.resolve(dir, p.src)) } : p));
   for (const sc of scenes) if (sc.type === 'quote' && sc.photo) sc.photo = url(path.resolve(dir, sc.photo));

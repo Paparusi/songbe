@@ -34,14 +34,14 @@
     },
     {
       "type": "chat",
-      "say": ["Muốn biết lương và ca làm? Nhắn Zalo cho chúng tôi nhé.", "{Không chín không không, không không không, không không không|0900 000 000}."],
+      "say": ["Muốn biết lương và ca làm? Nhắn Zalo cho chúng tôi nhé.", "{Không một hai ba, bốn năm sáu, bảy tám chín|0123 456 789}."],
       "label": "Nhắn Zalo để biết",
       "title": "Lương & ca làm",
       "messages": [
         { "from": "them", "text": "Em muốn ứng tuyển ạ" },
         { "from": "us", "text": "Chào bạn! Bạn cho mình xin năm sinh và nơi đang ở nhé." }
       ],
-      "contact": { "kicker": "Zalo tuyển dụng", "button": "Nhắn ngay", "number": ["0900", "000", "000"], "sub": "Tuyển công nhân sản xuất · Nhà máy ABC" },
+      "contact": { "kicker": "Zalo tuyển dụng", "button": "Nhắn ngay", "number": ["0123", "456", "789"], "sub": "Tuyển công nhân sản xuất · Nhà máy ABC" },
       "footer": { "name": "Việc Làm ABC", "line": "Không thu phí người lao động" }
     }
   ]
