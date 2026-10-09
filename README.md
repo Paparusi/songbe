@@ -13,7 +13,15 @@ motion graphics, captions, music and sound effects, and then checks its own work
 line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
 people who would rather click than type.
 
-> Version 0.19.1. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+**An idea in, a series out.** `songbe film make my-series "<idea>"` writes the story and the shot table, gives every person a
+face and a voice, draws every shot, records every line in its speaker's own voice, films the clips with the video models you
+choose, and cuts the episodes. Everything it makes sits on one canvas (`flow.json`) where each picture, line and clip is a node
+of its own: change a line, hand one shot to another model, add a prop of yours, and only what works from it is made again.
+→ [Films and series](docs/film.md)
+
+<p align="center"><img src="docs/img/film-board.jpg" width="92%" alt="The board of an episode: the cast with their reference sheets, the places, and every shot with its line"></p>
+
+> Version 0.20.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux, Windows and macOS (the tests
 > and each installer run on all three for every release). Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 

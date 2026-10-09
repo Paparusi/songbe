@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fitGuide, tooLong, tooLongNote } from './fit.mjs';
 import { packStyles } from './packs.mjs';
 import { makePlan } from './plan.mjs';
-import { ask as askModel, modelFor, writerFor } from './providers/llm.mjs';      // (writerFor is re-exported below for the app)
+import { NO_KEY, ask as askModel, modelFor, writerFor } from './providers/llm.mjs';      // (writerFor is re-exported below for the app)
 import { lintLayout } from './render.mjs';
 import { FORMATS, STYLES, jsonSchema, validate } from './spec.mjs';
 import { ROOT, exists, mkdir, run, tools } from './util.mjs';
@@ -175,7 +175,7 @@ export async function writeSpec(dir, brief, { style, format = 'tall', captions =
   const file = path.join(mkdir(dir), 'video.json');
   if (exists(file) && !force) throw new Error(`${dir} already has a video.json (use --force to write over it)`);
   let provider = ask ? 'custom' : writerFor(env), model = ask ? null : modelFor(provider, env), note = null;
-  if (!provider) throw new Error('Writing needs a key: ANTHROPIC_API_KEY, or the FAL_KEY that also makes the voice and music.');
+  if (!provider) throw new Error('Writing ' + NO_KEY);
   const say = async (q) => { const r = await (ask ? ask(q) : askModel(q, env)); if (typeof r === 'string') return r; ({ provider, model } = r); note = r.note || note; return r.text; }, system = systemPrompt({ style, footage }), first = userPrompt({ brief, style, format, captions, media: mediaOf(dir) });
 
   let spec = null, found = null, last = '', used = 0;
@@ -201,7 +201,7 @@ export async function rewriteScene(dir, index, request, { ask, env = process.env
   const old = spec.scenes?.[index];
   if (!old) throw new Error('there is no such scene');
   if (!request || request.trim().length < 3) throw new Error('Say what should change.');
-  if (!ask && !writerFor(env)) throw new Error('Rewriting needs a key: ANTHROPIC_API_KEY, or the FAL_KEY that also makes the voice and music.');
+  if (!ask && !writerFor(env)) throw new Error('Rewriting ' + NO_KEY);
   const say = async (q) => { const r = await (ask ? ask(q) : askModel(q, env)); return typeof r === 'string' ? r : r.text; };
   const system = systemPrompt({ style: spec.style || 'soft' }) + `
 

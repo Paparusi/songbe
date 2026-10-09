@@ -1,13 +1,18 @@
 // Text models for the writer: one question in, one answer out, on the person's own key.
-// Anthropic directly when ANTHROPIC_API_KEY is set; otherwise the fal.ai key that already pays for voice and music, through fal's
-// language-model endpoint. SONGBE_WRITER picks one outright, SONGBE_WRITER_MODEL another model.
-const DEFAULT = { anthropic: 'claude-opus-5-5', fal: 'anthropic/claude-sonnet-4.5' };
+// Anthropic directly when ANTHROPIC_API_KEY is set, Google directly when GEMINI_API_KEY is; otherwise the fal.ai key that already
+// pays for voice and music, through fal's language-model endpoint. SONGBE_WRITER picks one outright, SONGBE_WRITER_MODEL another model.
+import * as google from './google.mjs';
+
+const DEFAULT = { anthropic: 'claude-opus-5-5', google: 'gemini-pro-latest', fal: 'anthropic/claude-sonnet-4.5' };
+const KEY = { anthropic: ['ANTHROPIC_API_KEY'], google: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'], fal: ['FAL_KEY'] };
+const has = (provider, env) => KEY[provider].some((k) => env[k]);
+export const NO_KEY = 'needs a key: ANTHROPIC_API_KEY or GEMINI_API_KEY, or the FAL_KEY that also makes the voice and music.';
 
 // which provider would answer, given these keys (null when none can)
 export function writerFor(env = process.env) {
   const want = env.SONGBE_WRITER;
-  if (want === 'anthropic' || want === 'fal') return env[want === 'fal' ? 'FAL_KEY' : 'ANTHROPIC_API_KEY'] ? want : null;
-  return env.ANTHROPIC_API_KEY ? 'anthropic' : env.FAL_KEY ? 'fal' : null;
+  if (KEY[want]) return has(want, env) ? want : null;
+  return Object.keys(KEY).find((p) => has(p, env)) || null;
 }
 export const modelFor = (provider, env = process.env) => env.SONGBE_WRITER_MODEL || DEFAULT[provider];
 
@@ -20,10 +25,12 @@ async function post(url, headers, body, name) {
 }
 
 // { system, prompt } → { text, provider, model }. When Anthropic refuses (a wrong key, a model name it does not know) and a fal.ai
-// key is there too, the question goes to fal instead and `note` says so.
-export async function ask({ system, prompt, maxTokens = 6000 }, env = process.env) {
+// key is there too, the question goes to fal instead and `note` says so. `json` tells a provider that can promise it that the
+// answer is one JSON value.
+export async function ask({ system, prompt, maxTokens = 6000, json = false }, env = process.env) {
   const provider = writerFor(env), model = modelFor(provider, env);
-  if (!provider) throw new Error('Writing needs a key: ANTHROPIC_API_KEY, or the FAL_KEY that also makes the voice and music.');
+  if (!provider) throw new Error('Writing ' + NO_KEY);
+  if (provider === 'google') return { text: await google.text({ model, system, prompt, maxTokens: Math.max(maxTokens, 16000), json }, env), provider, model };      // its thinking counts against the same allowance
   const viaFal = async (name) => {
     const r = await post('https://fal.run/fal-ai/any-llm', { Authorization: 'Key ' + env.FAL_KEY }, { model: name, system_prompt: system, prompt, max_tokens: maxTokens }, 'fal.ai');
     if (r.error || !r.output) throw new Error('fal.ai returned no text' + (r.error ? `: ${String(r.error).slice(0, 200)}` : ''));

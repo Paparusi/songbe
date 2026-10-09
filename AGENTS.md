@@ -15,6 +15,23 @@ Songbe has no interactive steps. A build is: write `video.json`, look at stills,
 5. **Report honestly.** State the duration, whether there is sound, what was generated with AI, and anything you could not verify
    (you cannot listen to the audio; the loudness numbers and the transcript are your evidence).
 
+## Films and series
+
+`songbe film help` lists the commands and [docs/film.md](docs/film.md) the files. A series is made in steps, cheapest first:
+
+1. `songbe film new <dir> "<idea>"` writes `series.json`; `songbe film script <dir>` writes `episodes/NN.json`. Read both and
+   correct them before anything is drawn: the look, each person's `look` and `wardrobe`, each scene's `staging`, each shot.
+2. `songbe film run <dir> --upto=board`, then open `out/eN-board.jpg`. Check that everyone looks like their reference sheet, that
+   each first frame shows what its shot says, and that nobody's clothes change between shots. Fix the script, or the node in
+   `flow.json`, and run again: only what you changed is made again.
+3. `songbe film run <dir>` makes the lines, the clips, the music and the cut. `songbe flow <dir>` says what stands for every node.
+4. For one bad clip: `songbe flow retake <dir> e1-s5`, or change that node (`prompt`, `model`, `seconds`) and `songbe flow run
+   <dir> e1`. Choose between takes with `songbe flow takes` and `pick`.
+5. Report what you could not judge: you cannot watch motion or hear a voice. Transcribe `out/eN.mp4` when a key for that is set,
+   compare with the lines, and say which shots you looked at as stills only.
+
+Clips are the dear part (seconds of video); pictures and lines are cheap. Never `retake` a whole episode to fix one shot.
+
 Rules
 
 - Scenes that show generated people or places must set `notice`.

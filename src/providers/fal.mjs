@@ -25,6 +25,11 @@ const urlOf = (x) => (typeof x === 'string' ? x : x?.url);
 const dataUri = (file) => { const b = fs.readFileSync(file), kind = b[0] === 0x89 && b[1] === 0x50 ? 'png' : b.toString('latin1', 0, 4) === 'RIFF' ? 'webp' : 'jpeg'; return `data:image/${kind};base64,${b.toString('base64')}`; };
 
 export const available = () => !!process.env.FAL_KEY;
+// Any file as a data: address: a picture by what its bytes are, a sound or a clip by its name.
+const SOUNDS = { wav: 'audio/wav', mp3: 'audio/mpeg', m4a: 'audio/mp4', ogg: 'audio/ogg', mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+export const fileUri = (file) => { const kind = SOUNDS[String(file).split('.').pop().toLowerCase()]; return kind ? `data:${kind};base64,${fs.readFileSync(file).toString('base64')}` : dataUri(file); };
+// One call to any model on fal.ai, with the request already in that model's own words: the first file of its answer is saved.
+export async function run(model, args, file, timeoutSec = 900) { return save(fileIn(await queued(model, args, timeoutSec)), file); }
 
 // text → speech. The default is MiniMax speech (v.voice is one of its voice ids, with speed, emotion and a language hint); with
 // v.model set to another text-to-speech endpoint the text, the voice and the speed go in under the names that model uses.
@@ -50,6 +55,7 @@ export function speechFor(inputs, text, v, model = 'that model') {
   a[said] = text;
   for (const n of ['voice', 'voice_id', 'speaker']) if (has(n) && v.voice) { a[n] = v.voice; break; }
   if (has('speed') && v.speed) a.speed = v.speed;
+  if (has('style_instructions') && v.style) a.style_instructions = v.style;      // how to say it, for the models that take direction
   const code = CODES[String(v.language || '').toLowerCase()];
   if (has('language_code') && code) a.language_code = code; else if (has('language') && v.language && v.language !== 'auto') a.language = inputs.language.options?.find((o) => String(o).toLowerCase() === String(v.language).toLowerCase() || o === code) ?? v.language;
   return a;

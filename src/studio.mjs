@@ -22,7 +22,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 const MEDIA = /\.(png|jpe?g|svg|webp|gif|mp4|mov|webm|wav|mp3)$/i;
 const PAGES = path.join(ROOT, 'studio');
-const KEYS = { FAL_KEY: 'fal', GROQ_API_KEY: 'groq', ANTHROPIC_API_KEY: 'anthropic' };
+const KEYS = { FAL_KEY: 'fal', GROQ_API_KEY: 'groq', ANTHROPIC_API_KEY: 'anthropic', GEMINI_API_KEY: 'gemini' };
 // the only places outside this computer the app ever sends a person to
 const LINKS = { fal: 'https://fal.ai/dashboard/keys', groq: 'https://console.groq.com/keys', anthropic: 'https://console.anthropic.com/settings/keys', ffmpeg: 'https://ffmpeg.org/download.html' };
 const NOT_COPIED = /[\\/](\.songbe|out|starter\.json|poster\.jpg)([\\/]|$)/;      // what a new project does not take from its starter

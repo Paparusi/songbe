@@ -2,6 +2,22 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.20
+- **Films and series.** `songbe film make <dir> "<idea>"` writes a series (its look, cast, places and episodes), the shot table
+  of an episode, and makes the episode: a face and a reference sheet for everyone, a plate for every place, one wide picture per
+  scene that fixes the light and where everyone is, a first frame for every shot drawn from it, every line recorded in its
+  speaker's own voice, a clip per shot, music, and the cut with subtitles (`out/e1.mp4`, `.srt`). `--upto=board` stops before a
+  clip is paid for and draws the whole episode as one picture. See [docs/film.md](docs/film.md).
+- **The canvas.** Everything a film is made of is a node of `flow.json`: a note, a person, a place, a picture, a spoken line, a
+  clip, music, a cut. `@name` in a prompt puts another node there — its words, or its file as a reference for the model. Each
+  result is a take kept under a key of everything it was made from: a second run makes nothing, a changed line remakes exactly
+  what works from it, and earlier takes can be chosen again or held (`songbe flow`, `run`, `retake`, `takes`, `pick`, `lock`).
+- **Any model for any node.** Models are known by name (`songbe flow models`) or named by their door (`fal:<endpoint>`,
+  `google:<model id>`); a series names one per kind of work and any node may name its own. A clip model that takes a recording
+  acts to the line; one that speaks is told it; otherwise the voice is laid over.
+- **Google's own API** (`GEMINI_API_KEY`): Nano Banana for pictures, Veo for clips, Gemini's voices, Lyria for music, and Gemini as
+  the writer, asked directly. The writer (`songbe write` too) now uses Anthropic, Google or fal.ai, whichever key is set.
+
 ## 0.19.1
 - The first public version, and the first with installers to download: Windows, macOS (Apple silicon) and Linux. The macOS
   app is new: built by the release workflow, opened from its disk image and checked there.

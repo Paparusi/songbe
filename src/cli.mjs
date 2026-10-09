@@ -37,8 +37,12 @@ const HELP = `Songbe — short ads from a single video.json
   songbe footage <dir> --scene=N  generate the footage one scene asks for now, without building (uses FAL_KEY)
   songbe model <endpoint>         what a model on fal.ai takes: what Songbe fills in, and the settings that are yours to set (--json)
 
-Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage, and
-the writer), ANTHROPIC_API_KEY (optional: the writer then uses Claude directly), GROQ_API_KEY (optional transcript check).
+  songbe film …                   a series from an idea: script, cast with faces and voices, every shot, every episode (songbe film help)
+  songbe flow …                   the canvas a film is made on: every picture, line, clip and cut a node of its own
+
+Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage, the
+writer, and for films the models of every maker on fal.ai), GEMINI_API_KEY (films: Google's pictures, clips, voices and music asked
+directly; the writer too), ANTHROPIC_API_KEY (optional: the writer then uses Claude directly), GROQ_API_KEY (optional transcript check).
 Without keys the build still works: no voice, no music, plain backgrounds where footage would be generated.`;
 
 
@@ -61,7 +65,7 @@ export async function main(argv) {
     }
     if (target && !target.startsWith('--')) loadDotEnv(path.resolve(target));
     loadDotEnv(dataDir());
-    for (const k of ['FAL_KEY', 'GROQ_API_KEY']) log(`${process.env[k] ? 'set  ' : 'unset'} ${k}`);
+    for (const k of ['FAL_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY']) log(`${process.env[k] ? 'set  ' : 'unset'} ${k}`);
     log(`projects: ${projectsHome()}\ndata:     ${dataDir()}`);
     return log(`node ${process.version} on ${process.platform}`);
   }
@@ -127,6 +131,7 @@ export async function main(argv) {
     if (!packs.length) log('no packs found');
     return log(`starters to begin from (songbe init <dir> --from=ID): ${starterList().map((x) => x.id).join(', ')}`);
   }
+  if (cmd === 'film' || cmd === 'flow') return (await import('./film/cli.mjs')).main(cmd, argv.slice(1));
   if (!target) throw new Error('which project directory?\n\n' + HELP);
   const dir = path.resolve(target);
   if (cmd === 'write') {
