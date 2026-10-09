@@ -249,6 +249,15 @@ test('a maker that answers that the money has run out is not asked again in that
     const x = await runFlow(fresh('no-' + said.length), { format: 'tall', nodes: { a: flow.nodes.a } }, { use: u, pause: 0 }); assert.equal(n, 1, said); assert.equal(x.failed[0].error, said); }
 });
 
+test('how long a shot is kept is what its clip says now: within what was filmed it is made longer or shorter without being filmed again', async () => {
+  const dir = fresh('length'), flow = small(), use = standIns(); flow.nodes.film.shots = ['@s1', '@s2']; flow.nodes.s2.seconds = 2.4;      // the stand-in films whole seconds: 3 of them
+  const parts = (r) => JSON.parse(fs.readFileSync(r.out.get('film').file.replace(/\.mp4$/, '.json'), 'utf8')).parts, filmed = () => use.asked.filter((x) => x.kind === 'clip').length;
+  const first = await runFlow(dir, flow, { use }), clips = filmed(); assert.deepEqual(first.failed, []); assert.equal(parts(first)[1].length, 2.4); assert.equal(use.asked.filter((x) => x.kind === 'clip').at(-1).seconds, 3);
+  flow.nodes.s2.seconds = 2.8; const longer = await runFlow(dir, flow, { use }); assert.equal(madeOf(longer), 'film'); assert.equal(filmed(), clips, 'not filmed again'); assert.equal(parts(longer)[1].length, 2.8);
+  flow.nodes.s2.seconds = 2.2; const shorter = await runFlow(dir, flow, { use }); assert.equal(madeOf(shorter), 'film'); assert.equal(filmed(), clips); assert.equal(parts(shorter)[1].length, 2.2);
+  flow.nodes.s2.seconds = 4; assert.equal(madeOf(await runFlow(dir, flow, { use })), 'film s2', 'longer than what was filmed: filmed again'); assert.equal(filmed(), clips + 1);
+});
+
 test('a sound is made once and set at a second of a clip: the cut puts it there, and no clip is filmed again for it', async () => {
   const dir = fresh('sound'), flow = small(), use = standIns();
   flow.nodes.knock = { kind: 'sound', prompt: 'One slow knock on a wall. @look', seconds: 1 };

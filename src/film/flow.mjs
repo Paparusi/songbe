@@ -291,7 +291,10 @@ function sound(c, id, n) {
 function cutting(c, id, n) {
   const parts = list(n.shots).map((s) => { const x = shotOf(s), cid = idOf(x.clip), cn = c.flow.nodes[cid], got = c.got(cid), line = cn.voice ? c.flow.nodes[idOf(cn.voice)] : null, rec = line ? c.got(idOf(cn.voice)) : null;
     const sounds = soundsOf(cn).map((s) => { const g = c.got(idOf(s.sound)); return { id: idOf(s.sound), file: g.file, take: g.take, at: s.at ?? 0, volume: s.volume ?? 1, ...(s.to ? { to: s.to } : {}) }; });
-    return { id: cid, file: got.file, take: got.take, info: got.info || {}, from: x.from, to: x.to, text: line?.text || null, who: (line?.who && c.flow.nodes[idOf(line.who)]?.name) || null, rec, ownVoice: !!cn.ownVoice, lay: rec?.info?.fit ? rec.info.lay : null, sounds }; });
+    // how long a shot is kept is what its clip says now, not what it said when it was filmed: within what was filmed, a shot is made
+    // longer or shorter without being filmed again (a clip in which the model speaks the line itself is kept by where it spoke)
+    const info = got.info?.length == null ? got.info || {} : { ...got.info, length: lengthOf(cn, rec?.file ? secondsOf(rec.file) : null) };
+    return { id: cid, file: got.file, take: got.take, info, from: x.from, to: x.to, text: line?.text || null, who: (line?.who && c.flow.nodes[idOf(line.who)]?.name) || null, rec, ownVoice: !!cn.ownVoice, lay: rec?.info?.fit ? rec.info.lay : null, sounds }; });
   const bed = n.music ? c.got(idOf(n.music)) : null, size = FORMATS[c.flow.format] || FORMATS.tall;
   const settings = { title: n.title || null, notice: n.notice ?? null, subtitles: n.subtitles !== false, musicVolume: n.musicVolume ?? .22, size };
   return { recipe: { kind: 'cut', parts: parts.map((p) => ({ clip: p.take, voice: take(p.rec), from: p.from, to: p.to, text: p.text, info: p.info, ownVoice: p.ownVoice, lay: p.lay, ...(p.sounds.length ? { sounds: p.sounds.map(({ take: t, at, volume, to }) => ({ take: t, at, volume, ...(to ? { to } : {}) })) } : {}) })), music: take(bed), ...settings }, by: null,

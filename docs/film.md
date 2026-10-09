@@ -79,7 +79,9 @@ first frame before the clip: a new take of the clip from the same frame makes th
 
 `size` is one of `wide`, `full`, `medium`, `two shot`, `over shoulder`, `close`, `extreme close`, `insert`. A shot has at most one
 line, said by one person. When the speaker is in `who` they are seen saying it; when only the listener is, the voice is heard from
-off screen. `seconds` sets the length of a shot nobody speaks in (a shot with a line lasts as long as the line). `continues: true`
+off screen. `seconds` sets the length of a shot nobody speaks in (a shot with a line lasts as long as the line, or as long as
+`seconds` when that is longer: a face held after a word). A shot already filmed is made longer or shorter by the cut alone, as
+long as it stays within the seconds the model made. `continues: true`
 starts a shot on the last frame of the one before. `model` hands this one shot to another clip model.
 
 ## The canvas

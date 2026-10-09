@@ -13,6 +13,13 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
     now tells the clip model in words how its people look and what they wear, after everything else it is told. Filmed
     again, he kept his shirt and she her hair, and she still did what the shot directs her to do.
   Clips and pictures already on a canvas keep their words; `songbe film expand --rewrite=<node>` asks for the new ones.
+- **A filmed shot is made longer or shorter without being filmed again.** How long a shot is kept was fixed when its clip
+  was filmed, so a new `seconds` did nothing until the clip was made again — and the last shot of an episode, a face held
+  after a one-word line, was cut after a second. The cut now keeps what the clip says now: within the seconds the model made
+  (five, for a three-second shot by a model that makes five), a shot is lengthened or shortened by the cut alone.
+- Tried against the models: the second episode of that film — fifteen clips by MiniMax H3, six lines, five sounds set at
+  their seconds. Thirteen clips stood as filmed; one was filmed again for its people (above), one for a line that could not
+  be understood as first recorded.
 
 ## 0.35
 - **Acting.** An episode came out stiff: its picture moved half as much as that of the film before it, on the same clip
