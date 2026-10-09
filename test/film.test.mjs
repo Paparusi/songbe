@@ -15,7 +15,7 @@ import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '.
 import { grave, heardShare, inWords, reviewClip, reviewFit, reviewHeard, reviewPicture, reviewVoice } from '../src/film/review.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, episodeFile, lengthOf, readEpisode, readSeries, seriesFile, speechSeconds, writeJson, written } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
-import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
+import { bibleSystem, castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
 import { serve } from '../src/studio.mjs';
 import { run, sha, tools } from '../src/util.mjs';
 
@@ -574,7 +574,9 @@ test('the writer drafts a series and a script, and is handed back what the check
   const writer = scripted(stranger, EPISODE), e = await writeEpisode(dir, saved, 1, { ask: writer.ask, env });
   assert.equal(e.rounds, 2); assert.match(writer.asked[1].prompt, /"tam" is not in the cast/); assert.deepEqual(readEpisode(dir, 1).scenes, EPISODE.scenes); assert.ok(e.seconds > 7 && e.seconds < 17);
   const next = scripted(EPISODE); await writeEpisode(dir, saved, 2, { ask: next.ask, env });
-  assert.match(next.asked[0].prompt, /THE STORY SO FAR\nEpisode 1: Hai giờ sáng\.[\s\S]*It ended on: [\s\S]*WRITE EPISODE 2 OF 2: Cánh cửa[\s\S]*\(This is the last episode\.\)/);
+  assert.match(next.asked[0].prompt, /THE STORY SO FAR\nEpisode 1: Hai giờ sáng\.[\s\S]*It ended on: [\s\S]*WRITE EPISODE 2 OF 2: Cánh cửa[\s\S]*\(This is the last episode: it must end the story, on screen\.\)/);
+  // a series was written to end every episode on an open question, the last one too — and ended on a look: the last episode is told to end the story
+  assert.match(bibleSystem({ language: 'Vietnamese', episodes: 3, seconds: 60 }), /The last episode is different: it ends the story\./); assert.match(next.asked[0].system, /Not in the last episode of the series: that one ends the story/);
   await assert.rejects(writeEpisode(dir, saved, 3, { ask: next.ask, env }), /the series has no episode 3/); await assert.rejects(writeEpisode(dir, saved, 1, { ask: next.ask, env }), /already has a script/);
   const long = structuredClone(EPISODE); for (let i = 5; i < 30; i++) long.scenes[0].shots.push({ id: String(i), size: 'close', who: ['lan'], action: 'Lan waits.', seconds: 5 });
   await assert.rejects(writeEpisode(fresh('long'), saved, 1, { ask: scripted(long).ask, env, rounds: 1 }), /the episode runs about \d+ seconds; bring it to about 12/);

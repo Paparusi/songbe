@@ -21,6 +21,9 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
   run itself, a doubtful one is pointed at with what was heard, and what was heard is kept with the take. Tried on that
   line: the take that could not be understood was heard as three other words and refused, the one recorded after it was heard
   right. `"listen": false` in `series.json` turns it off.
+- **The last episode ends the story.** The writer was told to end every episode on an open question, the last one too — and
+  a three-episode film ended on a look, with nothing paid off. It is now told that the last episode is different: what the
+  series set up is paid off on screen, we see what became of the person we followed, and it closes on an image that is final.
 - **A filmed shot is made longer or shorter without being filmed again.** How long a shot is kept was fixed when its clip
   was filmed, so a new `seconds` did nothing until the clip was made again — and the last shot of an episode, a face held
   after a one-word line, was cut after a second. The cut now keeps what the clip says now: within the seconds the model made

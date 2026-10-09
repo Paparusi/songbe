@@ -48,7 +48,7 @@ FIELDS
   ${voiceList(voices)}` : ''}
 - places: 2 to 4. look: a set designer's note — size, furniture, materials, colours, where the light comes from, what is seen through the windows. No people in it.
 - sounds: leave this out unless the story turns on a sound that must be the same every time it is heard — a knock on a wall, a phone ringing, a gunshot. At most three. prompt: exactly what is heard, one sound, in a few words, with nothing before or after it; seconds: how long it lasts. Shots then say at which second it is heard. Ordinary background (rain, room tone, footsteps) does not belong here.
-- episodes: exactly ${episodes}. Each summary is two or three sentences: what happens, the image or line it opens on, and the question it ends on. Every episode runs about ${seconds} seconds on screen — one or two scenes, one turn of the story — opens on something that stops a thumb, and ends before its question is answered.
+- episodes: exactly ${episodes}. Each summary is two or three sentences: what happens, the image or line it opens on, and the question it ends on. Every episode runs about ${seconds} seconds on screen — one or two scenes, one turn of the story — opens on something that stops a thumb, and ends before its question is answered. The last episode is different: it ends the story. What the series set up is paid off on screen — we see what became of the person we followed — and its summary says how it ends, not what question it leaves.
 
 ${CANNOT}`;
 }
@@ -69,7 +69,7 @@ LANGUAGES
 THE EPISODE
 - About ${seconds} seconds: ${low} to ${high} shots in one or two scenes (three at most).
 - The first shot must stop a thumb: a face in the middle of something, a line that raises a question. No slow establishing opening.
-- The last shot leaves a question open: a reveal, a look, a line that changes what we thought.
+- The last shot leaves a question open: a reveal, a look, a line that changes what we thought. Not in the last episode of the series: that one ends the story — its last shots show what became of the person we followed, the things the series kept returning to come back one last time, and it closes on an image that is final, never on a look or an open line.
 
 SCENES
 - where: one of the place ids you are given. time: the hour and the light, for example "late night, one desk lamp, rain outside".
@@ -157,7 +157,7 @@ export async function writeEpisode(dir, series, n, { rounds = 3, force = false, 
   const bible = { title: series.title, logline: series.logline, tone: series.tone, cast: Object.fromEntries(Object.entries(series.cast).map(([id, c]) => [id, { name: c.name, role: c.role, look: c.look, manner: c.manner }])),
     places: Object.fromEntries(Object.entries(series.places).map(([id, p]) => [id, { name: p.name, look: p.look }])),
     ...(series.sounds && Object.keys(series.sounds).length ? { sounds: Object.fromEntries(Object.entries(series.sounds).map(([id, x]) => [id, { name: x.name, heard: x.prompt, seconds: x.seconds }])) } : {}) };
-  const first = `THE SERIES\n${JSON.stringify(bible)}\n\n${before.length ? `THE STORY SO FAR\n${before.join('\n')}\n\n` : ''}WRITE EPISODE ${n} OF ${series.episodes.length}: ${outline.title}\n${outline.summary}${n < series.episodes.length ? `\n\n(The next episode will be: ${series.episodes[n].summary})` : '\n\n(This is the last episode.)'}`;
+  const first = `THE SERIES\n${JSON.stringify(bible)}\n\n${before.length ? `THE STORY SO FAR\n${before.join('\n')}\n\n` : ''}WRITE EPISODE ${n} OF ${series.episodes.length}: ${outline.title}\n${outline.summary}${n < series.episodes.length ? `\n\n(The next episode will be: ${series.episodes[n].summary})` : '\n\n(This is the last episode: it must end the story, on screen.)'}`;
   const r = await drafted({ system: scriptSystem({ language: series.language || 'English', seconds }), first, rounds, ask, env, onStep, what: 'script',
     check: (d) => { const bad = checkEpisode(series, d); if (bad.length) return bad; const runs = scriptSeconds(series, d);
       return runs > seconds * 1.45 ? [`the episode runs about ${Math.round(runs)} seconds; bring it to about ${seconds} by cutting shots or shortening lines`] : runs < seconds * .55 ? [`the episode runs only about ${Math.round(runs)} seconds; it should be about ${seconds}`] : []; } });
