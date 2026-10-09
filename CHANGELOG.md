@@ -27,8 +27,8 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
 - `app/smoke.mjs` starts a built app and checks it: the engine, its version, every starter, the window loading its page, nothing
   left running afterwards. The release workflow installs each package and runs this before attaching it.
 - `songbe --version`. `SONGBE_TRACE=1` prints one line per request the app's pages make.
-- The workflows use current action versions and keep the Tauri command between runs, which takes a release run from eighteen
-  minutes to about seven.
+- The workflows use current action versions and keep the Tauri command between runs, which took the Linux release run from
+  nineteen minutes to ten.
 
 ## 0.17
 - The editor: click words in the preview to edit the field they come from; undo and redo.
