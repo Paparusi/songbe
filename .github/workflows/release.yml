@@ -1,7 +1,7 @@
 # Installers for a tagged release: a setup program for Windows, an AppImage and a .deb for Linux, a disk image for macOS, attached
 # to the GitHub release of that tag. Each is installed and started on the runner first (app/smoke.mjs); one that does not come up
-# is never attached. Skipped while the repository is private (macOS minutes cost ten times the others); it can be started by hand
-# from the Actions tab for one system at a time. Nothing is code-signed.
+# is never attached. Skipped in a private copy of the repository (macOS minutes cost ten times the others); it can be started by
+# hand from the Actions tab for one system at a time, which builds and checks without publishing. Nothing is code-signed.
 name: release
 on:
   push: { tags: ['v*'] }

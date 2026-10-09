@@ -1,5 +1,5 @@
-# Tests on every push and pull request. While the repository is private the automatic runs are skipped (they would spend paid
-# minutes); they start by themselves the day it is made public. A run can also be started by hand for one system.
+# Tests on every push and pull request, on Linux, Windows and macOS. In a private copy of the repository the automatic runs are
+# skipped (they would spend paid minutes). A run can also be started by hand for one system.
 name: tests
 on:
   push:

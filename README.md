@@ -1,5 +1,6 @@
 <p align="center"><img src="docs/img/logo.png" width="104" alt="Songbe"></p>
 <h1 align="center">Songbe</h1>
+<p align="center"><a href="https://github.com/Paparusi/songbe/actions/workflows/ci.yml"><img src="https://github.com/Paparusi/songbe/actions/workflows/ci.yml/badge.svg" alt="tests"></a></p>
 
 <p align="center">
   <img src="docs/img/promotion.webp" width="232" alt="A promotion built by Songbe, playing">
@@ -40,7 +41,10 @@ Three examples are included: `examples/app-launch-en` (an app launch, English, w
 
 ## Quick start
 
+Songbe needs Node 22 or newer, ffmpeg, and Chrome, Chromium or Edge. It has no npm dependencies, so there is nothing to install:
+
 ```bash
+git clone https://github.com/Paparusi/songbe.git && cd songbe
 node bin/songbe.mjs doctor                        # are ffmpeg, ffprobe and a browser found? which keys are set?
 node bin/songbe.mjs app                           # the app: projects, visual editor, Build button (see below)
 node bin/songbe.mjs frames examples/recruitment-vi # a few stills in out/frames — look before you render
