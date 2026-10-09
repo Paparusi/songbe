@@ -341,9 +341,10 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 - `docs/comparison.md` — how Songbe relates to ArtCraft, plainly.
 - `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
 - `app/README.md` — the desktop shell, how installers are built and what has been checked on which system. `.github/workflows/`
-  runs the tests and builds the installers on a tagged release once the repository is public; until then they are started by hand.
+  runs the tests on every push, and builds, installs and starts the installers of a tagged release before attaching them.
 
 ## License
 
-Apache-2.0. The bundled fonts are Be Vietnam Pro, Anton and Playfair Display (all SIL OFL 1.1). The installed app ships Node.js next to the engine,
+Apache-2.0, for everything in this repository: the engine, the kit, the app, the examples and the Songbe logo. The bundled fonts
+are Be Vietnam Pro, Anton and Playfair Display (all SIL OFL 1.1). The installed app ships Node.js next to the engine,
 under Node's own licence. ffmpeg is never part of a Songbe package. See `NOTICE`.

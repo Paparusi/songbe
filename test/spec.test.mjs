@@ -79,3 +79,8 @@ test('generated footage: a description, a picture of your own, or both; and noth
   for (const k of ['from', 'imageOptions', 'videoOptions']) assert.ok(media.properties[k], k);
   assert.equal(jsonSchema().properties.voice.properties.options.type, 'object');
 });
+
+test('the bundled examples and starters fit their own places: nothing longer than what was measured', async () => {
+  const { tooLong } = await import('../src/fit.mjs'), { starterList } = await import('../src/packs.mjs');
+  for (const st of starterList()) { const spec = JSON.parse(fs.readFileSync(path.join(st.dir, 'video.json'), 'utf8')); assert.deepEqual(tooLong(spec, spec.style), [], st.id); }
+});

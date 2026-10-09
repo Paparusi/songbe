@@ -28,19 +28,20 @@
       "say": "Quyền lợi đầy đủ. Bạn không mất bất kỳ khoản phí nào.",
       "label": "Khi vào làm",
       "title": ["Quyền lợi", "đầy đủ"],
-      "media": "media/khu-cong-nghiep.jpg", "caption": "Hình minh hoạ · khu công nghiệp",
-      "stat": { "badge": "0đ", "heading": "Không mất phí", "sub": "Người lao động không đóng khoản nào" }
+      "media": "media/khu-cong-nghiep.jpg", "caption": "Khu công nghiệp",
+      "stat": { "badge": "0đ", "heading": "Không mất phí", "sub": "Người lao động không đóng khoản nào" },
+      "notice": "Hình ảnh minh hoạ có sử dụng AI"
     },
     {
       "type": "chat",
       "say": ["Muốn biết lương và ca làm? Nhắn Zalo cho chúng tôi nhé.", "{Không chín không không, không không không, không không không|0900 000 000}."],
       "label": "Nhắn Zalo để biết",
-      "title": "Lương và ca làm",
+      "title": "Lương & ca làm",
       "messages": [
         { "from": "them", "text": "Em muốn ứng tuyển ạ" },
         { "from": "us", "text": "Chào bạn! Bạn cho mình xin năm sinh và nơi đang ở nhé." }
       ],
-      "contact": { "kicker": "Zalo · Tuyển dụng", "button": "Nhắn ngay", "number": ["0900", "000", "000"], "sub": "Tuyển công nhân sản xuất · Nhà máy ABC" },
+      "contact": { "kicker": "Zalo tuyển dụng", "button": "Nhắn ngay", "number": ["0900", "000", "000"], "sub": "Tuyển công nhân sản xuất · Nhà máy ABC" },
       "footer": { "name": "Việc Làm ABC", "line": "Không thu phí người lao động" }
     }
   ]
