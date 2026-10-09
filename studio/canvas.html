@@ -118,14 +118,17 @@ function draw() {
   world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
   const todo = S.rows.filter((r) => r.state === 'make' || r.state === 'wait').length, done = S.rows.filter((r) => ['ready', 'held', 'own'].includes(r.state)).length;
   $('#count').textContent = S.bad.length ? `${S.bad.length} problem${S.bad.length > 1 ? 's' : ''}` : `${done} made · ${todo} to make`; $('#count').className = 'tag' + (S.bad.length ? ' warn' : todo ? '' : ' on');
-  $('#go').textContent = todo ? `Make what is missing (${todo})` : 'Everything is made'; $('#go').disabled = !todo || S.running || !!S.bad.length; $('#go').hidden = S.running; $('#stop').hidden = !S.running;
+  $('#go').textContent = todo ? `Make what is missing (${todo})${plan?.pieces?.length ? ` · about $${plan.usd.toFixed(2)}` : ''}` : 'Everything is made'; $('#go').disabled = !todo || S.running || !!S.bad.length; $('#go').hidden = S.running; $('#stop').hidden = !S.running;
 }
+// what the missing pieces would cost by list price; asked for again whenever the canvas changes
+let plan = null, armed = 0;
+const price = () => api('/api/plan').then((r) => r.json()).then((p) => { plan = p; if (S) draw(); }).catch(() => {});
 function fit() {
   const ids = Object.keys(S.flow.nodes); if (!ids.length) return;
   const x0 = Math.min(...ids.map((i) => place(i)[0])), y0 = Math.min(...ids.map((i) => place(i)[1])), x1 = Math.max(...ids.map((i) => place(i)[0] + sizeOf(i)[0])), y1 = Math.max(...ids.map((i) => place(i)[1] + sizeOf(i)[1]));
   const k = Math.min(1, (board.clientWidth - 60) / (x1 - x0), (board.clientHeight - 60) / (y1 - y0)); view = { k, x: 30 - x0 * k, y: 30 - y0 * k }; draw();
 }
-function take(state) { S = state; rows = new Map(S.rows.map((r) => [r.id, r])); pos = arrange(); document.title = (S.title || S.name) + ' · Songbe'; $('#proj').textContent = S.title || S.name; $('#proj').title = S.dir; if (sel && !S.flow.nodes[sel]) sel = null; }
+function take(state) { price(); S = state; rows = new Map(S.rows.map((r) => [r.id, r])); pos = arrange(); document.title = (S.title || S.name) + ' · Songbe'; $('#proj').textContent = S.title || S.name; $('#proj').title = S.dir; if (sel && !S.flow.nodes[sel]) sel = null; }
 const say = (text, bad) => { const d = el('div', { text, class: bad ? 'bad' : '' }); $('#log').append(d); setTimeout(() => d.remove(), bad ? 9000 : 4000); };
 
 // ---- the panel of one node ----
@@ -187,7 +190,7 @@ async function run(what) {
 function listen() {
   if (events) events.close(); events = new EventSource(prefix + '/api/events');
   events.onmessage = async (m) => { const e = JSON.parse(m.data);
-    if (e.type === 'start') { busy.add(e.id); failed.delete(e.id); say(`${e.id}: ${e.by}`); } else if (e.type === 'done') busy.delete(e.id); else if (e.type === 'failed') { busy.delete(e.id); failed.set(e.id, e.error); say(`${e.id}: ${e.error}`, true); } else if (e.type === 'line') say(e.text, /^songbe:/.test(e.text));
+    if (e.type === 'start') { busy.add(e.id); failed.delete(e.id); say(`${e.id}: ${e.by}${e.usd ? ` · about $${e.usd.toFixed(2)}` : ''}`); } else if (e.type === 'done') busy.delete(e.id); else if (e.type === 'failed') { busy.delete(e.id); failed.set(e.id, e.error); say(`${e.id}: ${e.error}`, true); } else if (e.type === 'line') say(e.text, /^songbe:/.test(e.text)); else if (e.type === 'wait') say(`${e.id}: ${e.why}, trying again in ${e.seconds} s`);
     if (e.type === 'end') { events.close(); events = null; busy.clear(); }
     if (['done', 'failed', 'end'].includes(e.type)) { take(await api('/api/state').then((r) => r.json())); panel(); }
     draw(); };
@@ -215,7 +218,11 @@ board.addEventListener('pointerup', () => {
 board.addEventListener('wheel', (e) => { e.preventDefault(); const r = board.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, k = Math.min(2.5, Math.max(.08, view.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
   view.x = mx - (mx - view.x) * (k / view.k); view.y = my - (my - view.y) * (k / view.k); view.k = k; world.style.transform = `translate(${view.x}px,${view.y}px) scale(${k})`; }, { passive: false });
 $('#zoom').addEventListener('click', (e) => { const z = e.target.dataset.z; if (!z) return; if (z === 'fit') return fit(); const k = Math.min(2.5, Math.max(.08, view.k * (z === 'in' ? 1.25 : .8))), cx = board.clientWidth / 2, cy = board.clientHeight / 2; view.x = cx - (cx - view.x) * (k / view.k); view.y = cy - (cy - view.y) * (k / view.k); view.k = k; draw(); });
-$('#go').addEventListener('click', () => run({})); $('#stop').addEventListener('click', () => api('/api/stop', { method: 'POST', body: '{}' }));
+// over the budget of a run, the button first says what it would spend and wants a second click
+$('#go').addEventListener('click', () => { const over = plan && plan.usd > plan.budget;
+  if (over && Date.now() - armed > 7000) { armed = Date.now(); $('#go').textContent = `About $${plan.usd.toFixed(2)}, over the $${plan.budget} a run may spend — click again to spend it`; return; }
+  armed = 0; run(over ? { budget: Math.ceil(plan.usd * 1.15) } : {}); });
+$('#stop').addEventListener('click', () => api('/api/stop', { method: 'POST', body: '{}' }));
 
 // ---- a new node ----
 const FIRST = { text: () => ({ text: 'Write here.' }), person: (name) => ({ name }), place: (name) => ({ name }), picture: () => ({ prompt: 'Describe the picture.' }), voice: () => ({ text: 'The line.' }), clip: () => ({ prompt: 'Describe what happens.' }), music: () => ({ prompt: 'Instrumental, no vocals.' }) };

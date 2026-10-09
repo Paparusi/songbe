@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { board } from './board.mjs';
 import { STAGES, stageNodes, sync } from './director.mjs';
-import { checkFlow, look, openStore, readFlow, runFlow } from './flow.mjs';
+import { checkFlow, estimate, look, openStore, readFlow, runFlow } from './flow.mjs';
 import { KNOWN, PREFER, modelFor } from './models.mjs';
 import { hasEpisode, readEpisode, readSeries, seriesFile, written } from './series.mjs';
 import { scriptSeconds, writeEpisode, writeSeries } from './writer.mjs';
@@ -25,6 +25,8 @@ Songbe flow — the canvas itself: every picture, line, clip and cut is a node t
 
   songbe flow <dir>                   what stands for every node: made, to make, waiting, yours (--json)
   songbe flow run <dir> [node…]       make what is missing or out of date (those nodes and what they work from; all when none named)
+  songbe flow plan <dir> [node…]      what a run would ask of which model and about what it costs, before anything is asked
+  songbe flow spent <dir>             what the takes made so far cost by list price, day by day
   songbe flow retake <dir> <node…>    another take of these nodes; what works from them follows on the next run
   songbe flow takes <dir> <node>      the takes a node has; songbe flow pick <dir> <node> <n> chooses one
   songbe flow lock|unlock <dir> <node>   hold a node's chosen take whatever changes around it
@@ -32,19 +34,40 @@ Songbe flow — the canvas itself: every picture, line, clip and cut is a node t
   songbe flow board <dir>             one page and one picture of the whole canvas (out/board.html, out/board.jpg)
   songbe flow models                  the models known by name; any other is named fal:<endpoint> or google:<model id>
 
+A run may spend $5 by list price unless --budget=N (or "budget" in series.json) says otherwise; one that would spend more
+stops before it starts and says what it would ask for.
+
 flow.json is yours to edit: a node says what it is made from, and "@name" in a prompt puts another node there — a note's words,
 a person's description, or a picture handed to the model as a reference. Keys: GEMINI_API_KEY (Google's own API: pictures, clips,
 voices, music, the writer) and FAL_KEY (models of other makers, through fal.ai).`;
 
 const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+const BUDGET = 5;      // what one run may ask models for, in dollars by list price, unless the series or the command says otherwise
+const money = (usd) => '$' + (+usd).toFixed(2);
+// what a run would ask for, model by model
+function planLines(plan) {
+  const by = new Map(), unit = { picture: ['picture'], voice: ['line'], clip: ['clip'], music: ['track'] };
+  for (const p of plan.pieces) { const k = `${p.model || '?'} ${p.kind}`, g = by.get(k) || { model: p.model || 'a model that cannot be reached', kind: p.kind, n: 0, seconds: 0, usd: 0, priced: true }; g.n++; if (p.kind === 'clip') g.seconds += p.units || 0; if (p.usd === null) g.priced = false; else g.usd += p.usd; by.set(k, g); }
+  return [...by.values()].map((g) => `  ${g.model.padEnd(18)} ${`${plural(g.n, ...unit[g.kind])}${g.kind === 'clip' ? `, ${Math.round(g.seconds)} s` : ''}`.padEnd(20)} ${g.priced ? 'about ' + money(g.usd) : 'no list price known'}`);
+}
+const planTotal = (plan) => `about ${money(plan.usd)} by list prices${plan.unpriced ? ` (${plural(plan.unpriced, 'piece')} not counted)` : ''}`;
+// Before a run: say what it will ask for, and refuse one that goes over the budget unless the command names a budget itself.
+async function allowed(dir, flow, { want, again, budget }, quiet = false) {
+  const plan = await estimate(dir, flow, { want, again }), cap = budget ?? flow.budget ?? BUDGET;
+  if (!plan.pieces.length) return cap;
+  if (!quiet) log(`this run asks models for ${plural(plan.pieces.length, 'piece')}, ${planTotal(plan)}`);
+  if (plan.usd > cap && budget === undefined) throw new Error(`that is more than a run may spend (${money(cap)}):\n${planLines(plan).join('\n')}\nSay --budget=${Math.ceil(plan.usd * 1.15)} to allow it, or make less at once (--upto=board, or name the nodes).`);
+  return cap;
+}
 // `--events`: one line of JSON per thing that happens, for a program that is watching (the canvas window)
-const forMachines = (e) => console.log('@@' + JSON.stringify({ type: e.type, id: e.id, kind: e.kind, by: e.by, took: e.took, n: e.n, error: e.error }));
+const forMachines = (e) => console.log('@@' + JSON.stringify({ type: e.type, id: e.id, kind: e.kind, by: e.by, took: e.took, n: e.n, error: e.error, seconds: e.seconds, why: e.why }));
 function progress(machine = false) {
   if (machine) return forMachines;
   return (e) => {
     if (e.type === 'start') log(`  … ${e.id.padEnd(22)} ${e.kind.padEnd(8)} ${e.by}`);
     else if (e.type === 'done') log(`  ✓ ${e.id.padEnd(22)} ${e.took} s`);
     else if (e.type === 'failed') log(`  ! ${e.id.padEnd(22)} ${e.error.split('\n')[0].slice(0, 220)}`);
+    else if (e.type === 'wait') log(`  · ${e.id.padEnd(22)} ${e.why}: trying again in ${e.seconds} s`);
   };
 }
 // the finished cuts copied to where people look for them: out/<node>.mp4 with its subtitles
@@ -94,7 +117,8 @@ export async function main(cmd, args) {
       if (!hasEpisode(dir, n)) await script(series, n);
       const flow = expand(series), stage = opt('upto') || 'cut';
       log(`episode ${n}, up to "${stage}":`);
-      const result = await runFlow(dir, flow, { want: stageNodes(flow, n, stage), limit: +(opt('limit') || 4), on: progress() }); summary(result);
+      const want = stageNodes(flow, n, stage), budget = await allowed(dir, flow, { want, again: [], budget: opt('budget') === undefined ? undefined : +opt('budget') });
+      const result = await runFlow(dir, flow, { want, limit: +(opt('limit') || 4), budget, on: progress() }); summary(result);
       const b = await board(dir, flow, await look(dir, flow), { name: `e${n}-board`, title: `${series.title} — episode ${n}`, cuts: [`e${n}`] });
       log(`board: ${b.jpg}`); for (const f of publish(dir, flow, result)) if (path.basename(f) === `e${n}.mp4`) log(`film:  ${f}`);
       if (result.failed.length) process.exitCode = 2;
@@ -114,7 +138,7 @@ export async function main(cmd, args) {
   }
 
   // ---- songbe flow ----
-  const known = ['run', 'retake', 'takes', 'pick', 'lock', 'unlock', 'board', 'open', 'models', 'status', 'help'], sub = known.includes(words[0]) ? words[0] : 'status', rest = known.includes(words[0]) ? words.slice(1) : words;
+  const known = ['run', 'retake', 'plan', 'spent', 'takes', 'pick', 'lock', 'unlock', 'board', 'open', 'models', 'status', 'help'], sub = known.includes(words[0]) ? words[0] : 'status', rest = known.includes(words[0]) ? words.slice(1) : words;
   if (sub === 'help') return log(HELP);
   if (sub === 'models') {
     keys(null);
@@ -142,9 +166,23 @@ export async function main(cmd, args) {
     const count = (s) => rows.filter((r) => r.state === s).length;
     return log(`\n${count('ready') + count('held')} made · ${count('make')} to make · ${count('wait')} waiting on those${count('stuck') ? ` · ${count('stuck')} stuck` : ''}`);
   }
+  if (sub === 'plan') {      // what a run would ask of which model, and about what it costs, before anything is asked
+    const plan = await estimate(dir, flow, { want: names.length ? names : null, again: (opt('again') || '').split(',').filter(Boolean) });
+    if (has('json')) return log(JSON.stringify(plan, null, 1));
+    if (!plan.pieces.length) return log('nothing would be asked of any model: everything named is made');
+    return log(`a run would ask for\n${planLines(plan).join('\n')}\n${planTotal(plan)} — a run may spend ${money(opt('budget') ?? flow.budget ?? BUDGET)} unless --budget says otherwise\n(list prices as read in October 2026; the maker's invoice decides)`);
+  }
+  if (sub === 'spent') {      // what the takes made so far cost by list price, day by day
+    const store = JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')), days = new Map(); let unknown = 0;
+    for (const t of Object.values(store.takes || {}).flat()) { if (t.by === 'here') continue; if (t.usd === undefined) { unknown++; continue; } const d = String(t.at).slice(0, 10), g = days.get(d) || new Map(); g.set(t.by, (g.get(t.by) || 0) + t.usd); days.set(d, g); }
+    for (const [d, g] of [...days].sort()) log(`${d}  ${money([...g.values()].reduce((a, b) => a + b, 0))}   ${[...g].map(([by, usd]) => `${by.split(' (')[0]} ${money(usd)}`).join(' · ')}`);
+    return log(`${days.size ? '' : 'no take with a known price yet; '}${unknown ? `${plural(unknown, 'take')} made before prices were kept, or by a model without a list price, ${unknown === 1 ? 'is' : 'are'} not counted` : 'every take is counted'}`);
+  }
   if (sub === 'run' || sub === 'retake') {
     if (sub === 'retake' && !names.length) throw new Error('another take of which node?');
-    const result = await runFlow(dir, flow, { want: names.length ? names : null, again: sub === 'retake' ? names : (opt('again') || '').split(',').filter(Boolean), limit: +(opt('limit') || 4), on: progress(has('events')) });
+    const want = names.length ? names : null, again = sub === 'retake' ? names : (opt('again') || '').split(',').filter(Boolean);
+    const budget = await allowed(dir, flow, { want, again, budget: opt('budget') === undefined ? undefined : +opt('budget') }, has('events'));
+    const result = await runFlow(dir, flow, { want, again, limit: +(opt('limit') || 4), budget, on: progress(has('events')) });
     if (has('events')) { publish(dir, flow, result); if (result.failed.length) process.exitCode = 2; return; }
     summary(result); for (const f of publish(dir, flow, result)) log(`film:  ${f}`);
     if (sub === 'retake') for (const id of names) if (result.out.has(id)) log(`${id}: ${result.out.get(id).file}`);

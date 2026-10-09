@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
-import { nameOf, secondsOf } from './models.mjs';
+import { costOf, nameOf, secondsOf } from './models.mjs';
 import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
 import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
@@ -89,6 +89,7 @@ export function ordered(flow, ids = Object.keys(flow.nodes)) {
 export function checkFlow(flow, dir = null) {
   const bad = [], nodes = flow.nodes || {}, is = (ref, ...kinds) => kinds.includes(nodes[idOf(ref)]?.kind);
   if (flow.format !== undefined && !FORMATS[flow.format]) bad.push(`format: "${flow.format}" is not one of ${Object.keys(FORMATS).join(', ')}`);
+  if (flow.budget !== undefined && !(typeof flow.budget === 'number' && flow.budget >= 0)) bad.push('budget: what a run may spend, a number of dollars');
   for (const [id, n] of Object.entries(nodes)) {
     if (!ID.test(id) || id.length > 48) bad.push(`${id}: a node's name is lower-case letters, digits and dashes (like "lan-sheet" or "e1-s3")`);
     const shape = KINDS[n?.kind];
@@ -165,7 +166,7 @@ function picture(c, id, n) {
   }
   const r = c.use.modelFor('picture', n.model || c.flow.models?.picture, c.env, c.strict), w = wordsOf(c.flow, n.prompt, c.got), files = [...w.files, ...more(c, n, w)];
   const aspect = n.aspect || ASPECT[c.flow.format] || ASPECT.tall;
-  return { recipe: { kind: 'picture', model: r.name, prompt: w.words, refs: files.map(take), aspect, options: n.options }, by: r,
+  return { recipe: { kind: 'picture', model: r.name, prompt: w.words, refs: files.map(take), aspect, options: n.options }, by: r, units: 1,
     make: (file, { seed }) => c.use.makePicture(r, { prompt: w.words, refs: files.map((f) => f.file), aspect, seed, options: n.options }, file, c.env) };
 }
 function voice(c, id, n) {
@@ -175,12 +176,13 @@ function voice(c, id, n) {
   const style = r.known?.directed ? [`Language: ${language || 'the language the line is written in'}${c.flow.accent ? ', ' + c.flow.accent : ''}.`, person ? `Speaker: ${person.name}${person.manner ? ', ' + person.manner : ''}.` : null, set.style ? `Voice: ${set.style}.` : null,
     `Delivery: ${n.how || 'natural'}. A line of dialogue in a film, said to someone in the same room: conversational pace, not a narrator, not an announcer.`].filter(Boolean).join('\n') : set.style || null;
   const say = (how, file) => c.use.makeVoice(r, { text: n.text, voice: name, style: how, language: language || 'auto', speed: set.speed, options: n.options }, file, c.env);
-  if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, make: (file) => say(style, file) };
+  const spoken = String(n.text).length / 1000;      // thousands of characters, which is what voices are priced by
+  if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, units: spoken, make: (file) => say(style, file) };
   // Recorded to picture, the way a line is dubbed: the clip was filmed first with the actor speaking in a voice of the model's
   // choosing; the line is now recorded in the person's own voice to last as long as the lips moved (asked for again when it
   // comes out too long or too short to be stretched), and set exactly where they moved. The result is as long as the clip.
   const clip = c.got(idOf(n.fit)), spoke = spokenPart(clip.info?.spoke || [], speechSeconds(n.text, language)), target = +spoke.reduce((t, [a, b]) => t + b - a, 0).toFixed(2);
-  return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options, fit: { clip: clip.take, spoke } }, by: r,
+  return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options, fit: { clip: clip.take, spoke } }, by: r, units: spoken * 2,
     make: async (file) => {
       if (!spoke.length) { await say(style, file); return { fit: false }; }      // nobody was heard speaking in the clip: the line is recorded as it is and laid over
       let best = null, ask = target;
@@ -220,7 +222,7 @@ async function clip(c, id, n) {
     : how === 'native' ? ` ${who} says in ${c.flow.language || 'the language of the line'}${manner}: "${line.text}" Nobody else speaks.` : ' Nobody in the frame speaks; lips stay closed.';
   const prompt = `${w.words.trim()}${speech} No subtitles, no captions, no text on screen. No music.`, aspect = ASPECT[c.flow.format] || ASPECT.tall, resolution = n.resolution || c.flow.resolution || '720p';
   return { recipe: { kind: 'clip', model: r.name, how, prompt, frame: take(frame), end: take(end), voice: how === 'voice' ? rec.take : undefined, refs: refs.map(take), seconds, aspect, resolution, sound: n.sound !== false, options: n.options }, by: r,
-    info: { how, length: how === 'native' ? null : length, keeps: how === 'voice' && can.acts === 'keeps' },
+    info: { how, length: how === 'native' ? null : length, keeps: how === 'voice' && can.acts === 'keeps' }, units: seconds,
     make: async (file, { seed }) => {
       const track = how === 'voice' ? file + '.talk.wav' : null;      // the recording as the actor hears it: a breath of silence, the line, then silence to the end of the clip
       if (track) ff('-f', 'lavfi', '-t', String(LEAD), '-i', 'anullsrc=r=48000:cl=mono', '-i', rec.file, '-filter_complex', `[0][1]concat=n=2:v=0:a=1,apad=whole_dur=${Math.max(2, seconds)}`, '-ar', '48000', '-ac', '1', track);
@@ -231,7 +233,7 @@ async function clip(c, id, n) {
 }
 function music(c, id, n) {
   const r = c.use.modelFor('music', n.model || c.flow.models?.music, c.env, c.strict), w = wordsOf(c.flow, n.prompt, () => ({}));
-  return { recipe: { kind: 'music', model: r.name, prompt: w.words, options: n.options }, by: r, make: (file, { seed }) => c.use.makeMusic(r, { prompt: w.words, seed, options: n.options }, file, c.env) };
+  return { recipe: { kind: 'music', model: r.name, prompt: w.words, options: n.options }, by: r, units: 1, make: (file, { seed }) => c.use.makeMusic(r, { prompt: w.words, seed, options: n.options }, file, c.env) };
 }
 function cutting(c, id, n) {
   const parts = list(n.shots).map((s) => { const x = shotOf(s), cid = idOf(x.clip), cn = c.flow.nodes[cid], got = c.got(cid), line = cn.voice ? c.flow.nodes[idOf(cn.voice)] : null, rec = line ? c.got(idOf(cn.voice)) : null;
@@ -262,7 +264,7 @@ export async function look(dir, flow, { env = process.env, use = MODELS } = {}) 
       const p = await PLAN[n.kind]({ flow, env, use, strict: false, got: (x) => out.get(x) }, id, n), key = sha(p.recipe), t = store.current(id, key);
       const asked = p.recipe.prompt ? { recipe: { model: p.recipe.model, prompt: p.recipe.prompt, refs: p.recipe.refs, how: p.recipe.how, seconds: p.recipe.seconds } } : {};      // what the model is told, for whoever wants to read it
       if (t) { out.set(id, { file: t.file, take: `${key}-${t.n}`, info: t.info }); rows.push({ id, kind: n.kind, state: 'ready', file: t.file, take: `${key}-${t.n}`, by: t.by, n: t.n, takes: store.all(key).length, ...asked }); }
-      else rows.push({ id, kind: n.kind, state: 'make', by: p.by ? nameOf(p.by) : null, first: !store.picked(id), ...asked });
+      else rows.push({ id, kind: n.kind, state: 'make', by: p.by ? nameOf(p.by) : null, first: !store.picked(id), ...asked, ...(p.by ? { model: p.by.name, units: p.units, usd: costOf(p.by, p.units) } : {}) });
     } catch (e) { rows.push({ id, kind: n.kind, state: 'stuck', why: e.message }); }
   }
   return rows;
@@ -272,7 +274,11 @@ export async function look(dir, flow, { env = process.env, use = MODELS } = {}) 
 // `again` names nodes to make another take of even though one stands. Up to `limit` models are asked at once; a node that fails
 // is reported and everything that does not need it still gets made. `on` hears { type: 'start' | 'done' | 'failed' | 'ready' | 'own', id, … }.
 // (`use` stands in for the models in tests.)
-export async function runFlow(dir, flow, { want = null, again = [], limit = 4, env = process.env, use = MODELS, on = () => {} } = {}) {
+// `budget` (US dollars by list price) is the most this run may ask models for: once the next piece would go over it, that piece
+// and whatever needs it are held back and said to be.
+export async function runFlow(dir, flow, { want = null, again = [], limit = 4, env = process.env, use = MODELS, on = () => {}, pause = 1, budget = null } = {}) {
+  const c0 = { pause };      // (tests shorten the waits)
+  let spent = 0;
   const bad = checkFlow(flow, dir); if (bad.length) throw new Error(`flow.json has ${bad.length} problem${bad.length > 1 ? 's' : ''}:\n  - ` + bad.join('\n  - '));
   const store = openStore(dir), order = ordered(flow, want || Object.keys(flow.nodes)).filter((id) => made(flow.nodes[id])), redo = new Set(again);
   const out = new Map(), failed = new Map(), busy = new Map(), result = { made: [], ready: [], failed: [] };
@@ -286,18 +292,26 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
     const stands = await PLAN[n.kind]({ flow, env, use, strict: false, got: (x) => out.get(x) }, id, n), had = redo.has(id) ? null : store.current(id, sha(stands.recipe));
     if (had) { out.set(id, { file: had.file, take: `${sha(stands.recipe)}-${had.n}`, info: had.info }); result.ready.push(id); on({ type: 'ready', id }); return; }
     const p = await PLAN[n.kind]({ flow, env, use, strict: true, got: (x) => out.get(x) }, id, n), key = sha(p.recipe);
+    const usd = p.by ? costOf(p.by, p.units) : 0;
+    if (budget !== null && budget !== undefined && usd && spent + usd > budget + 1e-9) throw new Error(`held back: it would take this run to about $${(spent + usd).toFixed(2)}, over its budget of $${(+budget).toFixed(2)} (--budget=N raises it)`);
+    spent += usd || 0;
     const slot = store.next(key, KINDS[n.kind].ext), t0 = Date.now(), by = p.by ? nameOf(p.by) : 'here';
-    on({ type: 'start', id, kind: n.kind, by });
+    on({ type: 'start', id, kind: n.kind, by, usd });
     busy.set(id, (async () => {
       let found = null;      // what making it found out about the result, kept with the take
       try {
         for (let tries = 1; ; tries++) {      // a busy or unreachable provider gets a second and a third chance; a refusal does not
           try { found = await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n }); break; }
-          catch (e) { fs.rmSync(slot.file, { force: true }); if (tries >= 3 || !/could not be reached|answered (429|5\d\d)|fal (429|5\d\d)|timed out|fetch failed|ECONNRESET/i.test(e.message)) throw e; await new Promise((r) => setTimeout(r, 4000 * tries)); }
+          catch (e) { fs.rmSync(slot.file, { force: true });
+            // a provider that says "too many at once" is given a good while (its limits are counted by the minute), up to five times
+            const full = /(answered|fal) 429/.test(e.message) && !/locked|TOP_UP|spending cap|spend cap|billing|not enabled/i.test(e.message), again = full || /could not be reached|answered 5\d\d|fal 5\d\d|timed out|fetch failed|ECONNRESET/i.test(e.message);
+            if (!again || tries >= (full ? 5 : 3)) throw e;
+            if (full) on({ type: 'wait', id, seconds: 45 * tries, why: 'the provider asks for a pause' });
+            await new Promise((r) => setTimeout(r, (full ? 45000 : 4000) * tries * (c0.pause ?? 1))); }
         }
         if (!exists(slot.file) || !fs.statSync(slot.file).size) throw new Error('nothing was written');
         const info = p.info || found ? { ...(p.info || {}), ...(found || {}) } : null;
-        const kept = store.add(id, key, { n: slot.n, file: slot.name, at: new Date().toISOString(), by, took: +((Date.now() - t0) / 1000).toFixed(1), ...(info ? { info } : {}) });
+        const kept = store.add(id, key, { n: slot.n, file: slot.name, at: new Date().toISOString(), by, took: +((Date.now() - t0) / 1000).toFixed(1), ...(usd ? { usd } : {}), ...(info ? { info } : {}) });
         out.set(id, { file: kept.file, take: `${key}-${slot.n}`, info }); result.made.push(id); on({ type: 'done', id, kind: n.kind, by, took: kept.took, file: kept.file, n: slot.n });
       } catch (e) { failed.set(id, e.message); result.failed.push({ id, error: e.message }); on({ type: 'failed', id, error: e.message }); }
       finally { busy.delete(id); }
@@ -315,5 +329,25 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
     }
     if (busy.size) await Promise.race(busy.values()); else if (!moved) break;
   }
-  return { ...result, out };
+  return { ...result, out, spent: +spent.toFixed(2) };
+}
+
+// What a run would ask of which model, and about what that costs by list price, before anything is asked:
+// { pieces: [{ id, kind, model, units, usd }], usd (the sum of what has a price), unpriced (how many pieces have none) }.
+// A piece whose inputs are not made yet is counted from what its node says (a clip from the length of its line).
+export async function estimate(dir, flow, { want = null, again = [], env = process.env, use = MODELS } = {}) {
+  const rows = new Map((await look(dir, flow, { env, use })).map((r) => [r.id, r])), wanted = new Set(ordered(flow, want || Object.keys(flow.nodes))), redo = new Set(again), pieces = [];
+  for (const id of wanted) {
+    const n = flow.nodes[id], r = rows.get(id);
+    if (!made(n) || n.file || n.kind === 'cut' || n.grab || !(redo.has(id) || ['make', 'wait'].includes(r?.state))) continue;
+    try {
+      if (r?.state === 'make' && r.model) { pieces.push({ id, kind: n.kind, model: r.model, units: r.units, usd: r.usd }); continue; }
+      const line = n.kind === 'clip' && n.voice ? flow.nodes[idOf(n.voice)] : null, role = n.kind === 'clip' ? (line && !n.heard ? 'talk' : 'clip') : n.kind;
+      const by = use.modelFor(role, n.model || (n.kind === 'voice' && flow.nodes[idOf(n.who)]?.voice?.model) || flow.models?.[role], env, false);
+      let units = n.kind === 'voice' ? String(n.text).length / 1000 * (n.fit ? 2 : 1) : 1;
+      if (n.kind === 'clip') { const guess = n.seconds || (line ? LEAD + speechSeconds(line.text, flow.language) * 1.15 + TAIL + .4 : 4); try { units = MODELS.fitSeconds(await use.clipAbilities(by, { frame: !!n.frame }), guess); } catch { units = Math.ceil(guess); } }
+      pieces.push({ id, kind: n.kind, model: by.name, units: +(+units).toFixed(3), usd: costOf(by, units) });
+    } catch (e) { pieces.push({ id, kind: n.kind, model: null, units: null, usd: null, why: e.message }); }
+  }
+  return { pieces, usd: +pieces.reduce((t, p) => t + (p.usd || 0), 0).toFixed(2), unpriced: pieces.filter((p) => p.usd === null).length };
 }

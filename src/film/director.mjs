@@ -74,7 +74,7 @@ export function expand(series, scripts = {}) {
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });
     put(`e${n}`, 'cut', { n, shots: all.map(({ shot }) => shot.id), title: ep.title, notice: series.notice ?? NOTICE[String(series.language || '').toLowerCase()] ?? NOTICE.english });
   }
-  return { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), nodes };
+  return { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), ...(typeof series.budget === 'number' ? { budget: series.budget } : {}), nodes };
 }
 
 const bare = ({ by, as, of, xy, ...rest }) => rest;      // a node without the director's bookkeeping and its place on the canvas
@@ -97,7 +97,7 @@ export function sync(dir, series, scripts = {}, { rewrite = false } = {}) {
   }
   for (const [id, have] of Object.entries(flow.nodes)) if (have.by === 'director' && !wanted.nodes[id]) { if (untouched(have)) { delete flow.nodes[id]; removed.push(id); } else kept.push(id); }
   const { nodes, ...settings } = wanted;
-  for (const k of ['format', 'language', 'accent', 'resolution', 'models']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
+  for (const k of ['format', 'language', 'accent', 'resolution', 'models', 'budget']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
   writeFlow(dir, { ...Object.fromEntries(Object.entries(flow).filter(([k]) => k !== 'nodes')), nodes: flow.nodes });
   return { flow, added, updated, removed, kept };
 }

@@ -10,24 +10,26 @@ import { run, tools } from '../util.mjs';
 
 // acts: performs to a recording handed to it ('keeps': the clip comes back with that recording as its sound)
 // speaks: says a line written in its prompt, in a voice of its own choosing
+// usd: a list price as read in October 2026 — per picture, per second of clip at about 720p, per thousand characters spoken —
+//      for an estimate before a run. Makers change their prices and bill by their own count: the invoice decides, not this.
 export const KNOWN = {
   // pictures
-  'nano-banana-2.1': { kind: 'picture', by: 'Google', google: 'gemini-nano-banana-2.1', fal: { words: 'google/nano-banana-2.1', refs: 'google/nano-banana-2.1/edit' } },
+  'nano-banana-2.1': { kind: 'picture', by: 'Google', usd: .05, google: 'gemini-nano-banana-2.1', fal: { words: 'google/nano-banana-2.1', refs: 'google/nano-banana-2.1/edit' } },
   'nano-banana-pro': { kind: 'picture', by: 'Google', google: 'gemini-3-pro-image', fal: { words: 'fal-ai/nano-banana-pro', refs: 'fal-ai/nano-banana-pro/edit' } },
   'seedream-4': { kind: 'picture', by: 'ByteDance', fal: { words: 'fal-ai/bytedance/seedream/v4/text-to-image', refs: 'fal-ai/bytedance/seedream/v4/edit' } },
   // clips
-  'hailuo-h3': { kind: 'clip', by: 'MiniMax', fal: { frame: 'minimax/h3/image-to-video', refs: 'minimax/h3/reference-to-video' }, acts: 'keeps', sound: true },
-  'hailuo-h3-max': { kind: 'clip', by: 'MiniMax', fal: { frame: 'minimax/h3-max/image-to-video' }, acts: 'keeps', sound: true },
-  'veo-3.1': { kind: 'clip', by: 'Google', google: 'veo-3.1-generate-preview', fal: { frame: 'fal-ai/veo3.1/image-to-video', refs: 'fal-ai/veo3.1/reference-to-video' }, speaks: true, sound: true },
-  'veo-3.1-fast': { kind: 'clip', by: 'Google', google: 'veo-3.1-fast-generate-preview', fal: { frame: 'fal-ai/veo3.1/fast/image-to-video' }, speaks: true, sound: true },
-  'veo-3.1-lite': { kind: 'clip', by: 'Google', google: 'veo-3.1-lite-generate-preview', fal: { frame: 'fal-ai/veo3.1/lite/image-to-video' }, speaks: true, sound: true },
-  'seedance-2.5': { kind: 'clip', by: 'ByteDance', fal: { frame: 'bytedance/seedance-2.5/image-to-video', refs: 'bytedance/seedance-2.5/reference-to-video' }, speaks: true, sound: true },
-  'wan-3.0': { kind: 'clip', by: 'Alibaba', fal: { frame: 'alibaba/wan-3.0/image-to-video', refs: 'alibaba/wan-3.0/reference-to-video' }, speaks: true, sound: true },
-  'kling-3': { kind: 'clip', by: 'Kuaishou', fal: { frame: 'fal-ai/kling-video/v3/pro/image-to-video' }, sound: true },
-  'gemini-omni-flash': { kind: 'clip', by: 'Google', fal: { frame: 'google/gemini-omni-flash/v1.1/image-to-video', refs: 'google/gemini-omni-flash/v1.1/reference-to-video' }, speaks: true, sound: true },
+  'hailuo-h3': { kind: 'clip', by: 'MiniMax', usd: .06, fal: { frame: 'minimax/h3/image-to-video', refs: 'minimax/h3/reference-to-video' }, acts: 'keeps', sound: true },
+  'hailuo-h3-max': { kind: 'clip', by: 'MiniMax', usd: .08, fal: { frame: 'minimax/h3-max/image-to-video' }, acts: 'keeps', sound: true },
+  'veo-3.1': { kind: 'clip', by: 'Google', usd: .4, google: 'veo-3.1-generate-preview', fal: { frame: 'fal-ai/veo3.1/image-to-video', refs: 'fal-ai/veo3.1/reference-to-video' }, speaks: true, sound: true },
+  'veo-3.1-fast': { kind: 'clip', by: 'Google', usd: .15, google: 'veo-3.1-fast-generate-preview', fal: { frame: 'fal-ai/veo3.1/fast/image-to-video' }, speaks: true, sound: true },
+  'veo-3.1-lite': { kind: 'clip', by: 'Google', usd: .05, google: 'veo-3.1-lite-generate-preview', fal: { frame: 'fal-ai/veo3.1/lite/image-to-video' }, speaks: true, sound: true },
+  'seedance-2.5': { kind: 'clip', by: 'ByteDance', usd: .47, fal: { frame: 'bytedance/seedance-2.5/image-to-video', refs: 'bytedance/seedance-2.5/reference-to-video' }, speaks: true, sound: true },
+  'wan-3.0': { kind: 'clip', by: 'Alibaba', usd: .1, fal: { frame: 'alibaba/wan-3.0/image-to-video', refs: 'alibaba/wan-3.0/reference-to-video' }, speaks: true, sound: true },
+  'kling-3': { kind: 'clip', by: 'Kuaishou', usd: .17, fal: { frame: 'fal-ai/kling-video/v3/pro/image-to-video' }, sound: true },
+  'gemini-omni-flash': { kind: 'clip', by: 'Google', usd: .1, fal: { frame: 'google/gemini-omni-flash/v1.1/image-to-video', refs: 'google/gemini-omni-flash/v1.1/reference-to-video' }, speaks: true, sound: true },
   // voices
-  'gemini-tts': { kind: 'voice', by: 'Google', google: 'gemini-3.8-flash-tts', fal: 'google/gemini-3.8-flash-tts', directed: true, voices: google.VOICES },
-  'minimax-speech': { kind: 'voice', by: 'MiniMax', fal: 'fal-ai/minimax/speech-2.8-hd',
+  'gemini-tts': { kind: 'voice', by: 'Google', usd: .045, google: 'gemini-3.8-flash-tts', fal: 'google/gemini-3.8-flash-tts', directed: true, voices: google.VOICES },
+  'minimax-speech': { kind: 'voice', by: 'MiniMax', usd: .1, fal: 'fal-ai/minimax/speech-2.8-hd',
     voices: { female: { Calm_Woman: 'calm', Wise_Woman: 'wise, older', Lively_Girl: 'lively, young', Sweet_Girl_2: 'sweet, young', Lovely_Girl: 'lovely, young', Exuberant_Girl: 'exuberant', Inspirational_girl: 'inspiring', Abbess: 'stern, older' },
       male: { Casual_Guy: 'casual', Patient_Man: 'patient', Deep_Voice_Man: 'deep', Determined_Man: 'determined', Elegant_Man: 'elegant', Decent_Boy: 'decent, young', Young_Knight: 'young, bold', Imposing_Manner: 'imposing' } } },
   // music
@@ -149,4 +151,6 @@ export async function makeClip(r, w, file, env = process.env) {
 // seconds of a sound or a clip, and whether a clip has sound
 export const secondsOf = (file) => parseFloat(run(tools.ffprobe, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]));
 export const hasSound = (file) => run(tools.ffprobe, ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', file]).trim().length > 0;
+// what one piece of work costs by list price, or null when no price is known for its model (units: pictures, seconds, thousands of characters)
+export const costOf = (r, units) => (r?.known?.usd === undefined || units === undefined ? null : +(r.known.usd * units).toFixed(4));
 export const nameOf = (r) => `${r.name}${r.known ? ` (${r.door === 'fal' ? 'through fal.ai' : 'at ' + r.known.by})` : ''}`;

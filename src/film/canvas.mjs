@@ -5,7 +5,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ID, KINDS, checkFlow, look, needs, openStore, readFlow, writeFlow } from './flow.mjs';
+import { ID, KINDS, checkFlow, estimate, look, needs, openStore, readFlow, writeFlow } from './flow.mjs';
 import { KNOWN, PREFER } from './models.mjs';
 import { ROOT, WIN, exists, killTree } from '../util.mjs';
 
@@ -39,6 +39,10 @@ export function canvasRoutes(h) {
     if (what === 'GET /') return h.serveFile(req, res, path.join(PAGES, 'canvas.html'), [PAGES]);
     if (what === 'GET /file') return h.serveFile(req, res, u.searchParams.get('p') || '', [dir]);
     if (what === 'GET /api/state') return h.send(res, 200, await state());
+    if (what === 'GET /api/plan') {      // what making these nodes (everything, when none is named) would ask for, and about what it costs
+      const flow = readFlow(dir), names = (v) => String(u.searchParams.get(v) || '').split(',').filter((x) => flow.nodes[x]), want = names('want'), again = names('again');
+      try { return h.send(res, 200, { ...(await estimate(dir, flow, { want: want.length || again.length ? [...want, ...again] : null, again, env: process.env })), budget: flow.budget ?? 5 }); } catch (e) { return h.send(res, 200, { pieces: [], usd: 0, unpriced: 0, budget: flow.budget ?? 5, error: e.message }); }
+    }
     if (what === 'GET /api/takes') {      // every take a node has for what it is asked for now
       const node = u.searchParams.get('id'), row = (await look(dir, readFlow(dir), { env: process.env })).find((r) => r.id === node);
       if (!row?.take || row.state === 'own') return h.send(res, 200, { takes: [] });
@@ -83,7 +87,7 @@ export function canvasRoutes(h) {
       const j = { done: false, stopped: false, events: [], watchers: new Set(), code: null }; runs.set(id, j);
       const say = (e) => { j.events.push(e); for (const w of j.watchers) w.write(`data: ${JSON.stringify(e)}\n\n`); };
       const feed = (d) => { for (const line of String(d).split(/\r?\n/)) { if (line.startsWith('@@')) { try { say(JSON.parse(line.slice(2))); } catch {} } else if (line.trim() && !/^\s*[…✓!]/.test(line)) say({ type: 'line', text: line.trim().slice(0, 400) }); } };
-      j.proc = spawn(process.execPath, [path.join(ROOT, 'bin', 'songbe.mjs'), 'flow', 'run', dir, ...[...new Set([...want, ...again])], ...(again.length ? ['--again=' + again.join(',')] : []), '--events'], { env: process.env, windowsHide: true, detached: !WIN });
+      j.proc = spawn(process.execPath, [path.join(ROOT, 'bin', 'songbe.mjs'), 'flow', 'run', dir, ...[...new Set([...want, ...again])], ...(again.length ? ['--again=' + again.join(',')] : []), ...(Number.isFinite(+q.budget) && q.budget !== undefined && q.budget !== null ? ['--budget=' + +q.budget] : []), '--events'], { env: process.env, windowsHide: true, detached: !WIN });
       j.proc.stdout.on('data', feed); j.proc.stderr.on('data', feed);
       j.proc.on('error', (e) => say({ type: 'line', text: 'could not start: ' + e.message }));
       j.proc.on('close', (code) => { j.done = true; j.code = code; say({ type: 'end', code, stopped: j.stopped }); for (const w of j.watchers) w.end(); });

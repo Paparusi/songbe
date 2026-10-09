@@ -2,6 +2,14 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.24
+- **What a run costs, before it runs.** `songbe flow plan` says what a run would ask of which model and about what that costs by
+  list price; `songbe flow spent` what the takes made so far cost. A run may spend $5 unless `--budget=N` or `budget` in
+  `series.json` says otherwise: over that it stops before anything is asked, and a run that reaches its budget holds back what
+  is left. The canvas shows the figure on its Make button and wants a second click to go over.
+- A provider that answers "too many at once" is given a proper pause (its limits count by the minute) and said to be; one that
+  answers that the money has run out is not asked again.
+
 ## 0.23
 - **Recorded to picture.** A clip model that speaks a line itself (Veo, Seedance, Wan…) films first, in a voice of its own; the
   line is then recorded in the person's own voice to last as long as the lips moved — as it comes naturally, and asked for again

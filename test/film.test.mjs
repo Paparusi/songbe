@@ -9,8 +9,8 @@ import path from 'node:path';
 import { boardHtml } from '../src/film/board.mjs';
 import { timeline } from '../src/film/cut.mjs';
 import { expand, stageNodes, sync } from '../src/film/director.mjs';
-import { checkFlow, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
-import { KNOWN, chosen, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
+import { checkFlow, estimate, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
+import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, lengthOf, readEpisode, readSeries, speechSeconds } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
@@ -28,7 +28,8 @@ const ff = (...a) => run(tools.ffmpeg, ['-v', 'error', '-y', ...a]);
 function standIns({ refuse = null } = {}) {
   const asked = [];
   return { asked,
-    modelFor: (role, named) => ({ name: named || `stand-in-${role === 'talk' ? 'clip' : role}`, door: 'none', id: 'x', known: { kind: role === 'talk' ? 'clip' : role, by: 'nobody', directed: true, voices: { female: { Ann: 'plain' }, male: { Bob: 'plain' } } } }),
+    // list prices of the stand-ins: a picture 5 cents, a second of clip 10 cents, a thousand characters spoken 4.5 cents; music has none
+    modelFor: (role, named) => ({ name: named || `stand-in-${role === 'talk' ? 'clip' : role}`, door: 'none', id: 'x', known: { kind: role === 'talk' ? 'clip' : role, by: 'nobody', directed: true, voices: { female: { Ann: 'plain' }, male: { Bob: 'plain' } }, ...({ picture: { usd: .05 }, clip: { usd: .1 }, talk: { usd: .1 }, voice: { usd: .045 } }[role] || {}) } }),
     clipAbilities: async (r) => ({ seconds: { min: 1, max: 12, whole: true }, end: true, acts: r.name === 'speaker' ? false : 'keeps', speaks: r.name === 'speaker', sound: true }),
     makePicture: async (r, w, file) => { asked.push({ kind: 'picture', ...w }); if (refuse?.test(w.prompt)) throw new Error('the model refused'); ff('-f', 'lavfi', '-i', 'color=c=gray:s=180x320', '-frames:v', '1', '-q:v', '6', file); },
     // a voice that is told how long a line should last takes half as long again (so that being asked a second time is tested)
@@ -199,6 +200,27 @@ test('a line recorded to picture: the clip is filmed first with the model speaki
   // what cannot be: a line recorded to a clip whose model acts to a recording, or to a clip that is not its own
   flow.nodes.s1.model = 'actor'; assert.match((await runFlow(dir, flow, { use })).failed[0].error, /actor does not speak a line by itself, so the line cannot be recorded to its lips: take "fit" off @s1-line/);
   flow.nodes['s1-line'].fit = '@s2'; assert.match(checkFlow(flow).join('\n'), /s1-line\.fit: @s2 does not have this line as its "voice"/);
+});
+
+test('what a run would cost is said before anything is asked, and a run stops at its budget', async () => {
+  const dir = fresh('budget'), flow = small(), use = standIns();
+  // before anything exists: three pictures, a line, two clips (one as long as its line is guessed to take, one of two seconds), music without a price
+  const before = await estimate(dir, flow, { use });
+  assert.deepEqual(before.pieces.map((p) => `${p.id} ${p.kind} ${p.usd}`), ['lan-face picture 0.05', 'lan-sheet picture 0.05', 's1-frame picture 0.05', 's1-line voice 0.0006', 's1 clip 0.3', 's2 clip 0.2', 'music music null']);
+  assert.deepEqual([before.usd, before.unpriced], [.65, 1]); assert.equal(costOf({ known: { usd: .15 } }, 6), .9); assert.equal(costOf({ known: {} }, 6), null);
+  assert.equal((await estimate(dir, flow, { use, want: ['lan-sheet'] })).usd, .1, 'only what was named and what it works from');
+  // a budget of 20 cents: the pictures and the line are made, the first clip would go over it and is held back with what needs it
+  const tight = await runFlow(dir, flow, { use, budget: .2 });
+  assert.equal(madeOf(tight), 'lan-face lan-sheet music s1-frame s1-line'); assert.equal(tight.spent, .15);
+  assert.deepEqual(tight.failed.map((f) => f.id), ['s1', 's2', 'film']); assert.match(tight.failed[0].error, /held back: it would take this run to about \$0\.35, over its budget of \$0\.20 \(--budget=N raises it\)/);
+  assert.equal(use.asked.filter((a) => a.kind === 'clip').length, 0, 'no clip model was asked');
+  // what is left costs what the clips cost — now that the line is recorded its clip is known to the second (two, not the three
+  // guessed) — and with room for it the run finishes; every take remembers its price
+  const left = await estimate(dir, flow, { use }); assert.deepEqual(left.pieces.map((p) => `${p.id} ${p.units} ${p.usd}`), ['s1 2 0.2', 's2 2 0.2']); assert.equal(left.usd, .4);
+  const rest = await runFlow(dir, flow, { use, budget: 1 }); assert.equal(madeOf(rest), 'film s1 s2'); assert.equal(rest.spent, .4);
+  const kept = Object.values(JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat(); assert.equal(+kept.reduce((t, k) => t + (k.usd || 0), 0).toFixed(2), .55);
+  assert.deepEqual((await estimate(dir, flow, { use })).pieces, []); assert.equal((await estimate(dir, flow, { use, again: ['s2'] })).usd, .2, 'another take of something made is counted too');
+  assert.match(checkFlow({ ...flow, budget: 'a lot' }).join(), /budget: what a run may spend, a number of dollars/); assert.equal(expand({ ...SERIES, budget: 12 }, {}).budget, 12);
 });
 
 // ---- the director and the writer ----

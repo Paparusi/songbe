@@ -87,6 +87,8 @@ Any node may carry `label`, `group` and `note`. Nothing else is special: "an epi
 songbe flow open my-series                 # the canvas in a window: cards and lines, a panel to change a node, Make
 songbe flow my-series                      # what stands for every node: made, to make, waiting
 songbe flow run my-series e1               # make what e1 works from and is missing or out of date
+songbe flow plan my-series e2              # what making e2 would ask of which model, and about what it costs
+songbe flow spent my-series                # what the takes made so far cost by list price, day by day
 songbe flow retake my-series e1-s5         # another take of one clip; songbe flow takes / pick choose between takes
 songbe flow lock my-series lan-sheet       # hold a take whatever changes around it
 songbe flow board my-series                # one picture of the whole canvas
@@ -99,6 +101,12 @@ opens its panel: its words, the nodes it starts from, its model, the prompt exac
 Changes are saved as you type, and only when the canvas is still sound with them. *Make it* makes one node, *Another take* asks
 again, *Make what is missing* runs everything that is out of date, and a node that failed says why. *+ Add* puts a new node of
 any kind on the canvas.
+
+**Money.** Clips are paid by the second, so a run says before it starts what it will ask of which model and about what that
+costs by list price, and it may spend $5 unless `--budget=N` or `"budget"` in `series.json` says otherwise: a run that would
+spend more stops before anything is asked, and one that reaches its budget on the way holds back what is left and says so. The
+canvas shows the same figure on its Make button and wants a second click to go over. The prices are list prices read in
+October 2026, there for the estimate; the maker's invoice decides.
 
 Every result is a **take**, kept under a key made from everything it was made from — the words, the model, and the takes of the
 nodes it works from. So running again costs nothing, and changing one thing leaves exactly the nodes that work from it to be made
