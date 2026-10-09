@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ROOT, tools } from '../src/util.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { ROOT, tools, run, orientationOf } from '../src/util.mjs';
 import { makePlan } from '../src/plan.mjs';
 import { FORMATS } from '../src/spec.mjs';
 
@@ -87,6 +89,54 @@ test('a request is shaped to what each model takes', async () => {
   assert.equal(requestFor({ prompt: any, image_url: any, resolution: o('512P', '768P') }, { kind: 'video', prompt: 'p', image: 'd', resolution: '1080p' }).resolution, '768P', 'the best below what was asked');
   assert.deepEqual(requestFor({ prompt: any, duration: any }, { kind: 'music', prompt: 'guitar', avoid: 'vocals', seconds: 30 }), { prompt: 'guitar', duration: 30 });
   assert.deepEqual(requestFor({ prompt: any, negative_prompt: any, seed: any }, { kind: 'music', prompt: 'guitar', avoid: 'vocals', seed: 808 }), { prompt: 'guitar', seed: 808, negative_prompt: 'vocals' });
+});
+
+test('pictures of your own and the settings of one model go into the request', async () => {
+  const { requestFor, settingsOf, takesPicture } = await import('../src/providers/fal.mjs');
+  const o = (...options) => ({ options, object: false }), any = { options: null, object: false };
+  const edit = { prompt: any, image_urls: any, aspect_ratio: o('auto', '1:1', '9:16'), output_format: o('jpeg', 'png'), num_images: any, safety_tolerance: o('1', '2') };
+  assert.deepEqual(requestFor(edit, { kind: 'image', prompt: 'on a counter', images: ['data:a', 'data:b'], aspect: '9:16', options: { safety_tolerance: '2' } }),
+    { prompt: 'on a counter', image_urls: ['data:a', 'data:b'], aspect_ratio: '9:16', num_images: 1, output_format: 'jpeg', safety_tolerance: '2' }, 'every picture, the shape of the frame rather than of the picture, a jpeg, the setting as given');
+  assert.equal(requestFor({ prompt: any, image_url: any }, { kind: 'image', prompt: 'p', images: ['data:a'] }).image_url, 'data:a', 'a model that takes one picture gets it under its own name');
+  assert.deepEqual(requestFor({ prompt: any, raw: any }, { kind: 'image', prompt: 'p', options: { raw: false } }), { prompt: 'p', raw: false }, 'what the spec sets has the last word');
+  assert.throws(() => requestFor({ prompt: any }, { kind: 'image', model: 'fal-ai/some/model', prompt: 'p', options: { guidance: 3 } }), /fal-ai\/some\/model has no setting called "guidance" \(it takes: prompt\)/);
+  assert.equal(takesPicture({ prompt: any }), null); assert.equal(takesPicture({ prompt: any, start_image_url: any }), 'start_image_url');
+  // a picture model that sells 1K, 2K and 4K is not quietly asked for the dearest
+  const priced = { prompt: any, image_urls: any, resolution: o('1K', '2K', '4K') };
+  assert.equal('resolution' in requestFor(priced, { kind: 'image', prompt: 'p', images: ['data:a'] }), false);
+  assert.equal(requestFor(priced, { kind: 'image', prompt: 'p', images: ['data:a'], options: { resolution: '2K' } }).resolution, '2K', 'unless the spec asks');
+  assert.deepEqual(settingsOf({ model: 'x/pro', category: 'image-to-image', inputs: priced }).settings.map((x) => x.name), ['resolution'], 'and it is listed as theirs to set');
+  // the same description, sorted for a person: what Songbe fills in, and what is theirs to set
+  const m = settingsOf({ model: 'x/y', category: 'image-to-video', inputs: { prompt: any, image_url: any, seed: any, camera_fixed: { options: null, object: false, type: 'boolean', default: false, about: 'Hold the camera still.' }, tail: { options: null, object: true, type: null, about: '' } } });
+  assert.deepEqual(m.filled, ['prompt', 'image_url', 'seed']);
+  assert.deepEqual(m.settings, [{ name: 'camera_fixed', type: 'boolean', options: null, default: false, about: 'Hold the camera still.', preset: false }, { name: 'tail', type: 'object', options: null, about: '' }]);
+});
+
+// A photo the way a phone held upright stores it: the sensor's rows, and a note saying how to turn them.
+const exif = (turn) => { const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), Buffer.from([0x49, 0x49, 0x2A, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0, 1, 0, 0, 0, turn, 0, 0, 0, 0, 0, 0, 0])]), head = Buffer.alloc(4);
+  head.writeUInt16BE(0xFFE1, 0); head.writeUInt16BE(body.length + 2, 2); return Buffer.concat([head, body]); };
+test('a picture of your own starts the footage: turned upright, cut to the frame, known by what is in it', { skip: !ffmpeg && 'ffmpeg not found' }, async () => {
+  const dir = path.join(copies, 'own'), media = path.join(dir, 'media'), stored = path.join(media, 'stored.jpg'), photo = path.join(media, 'photo.jpg'); fs.mkdirSync(media, { recursive: true });
+  const shoot = (left, right, turn) => { run(tools.ffmpeg, ['-v', 'error', '-y', '-f', 'lavfi', '-i', `color=${left}:s=60x80`, '-f', 'lavfi', '-i', `color=${right}:s=60x80`, '-filter_complex', 'hstack', '-frames:v', '1', stored]);
+    const jpg = fs.readFileSync(stored); fs.writeFileSync(photo, Buffer.concat([jpg.subarray(0, 2), exif(turn), jpg.subarray(2)])); };
+  shoot('red', 'blue', 6);      // stored lying on its side; shown upright it is red above blue
+  assert.equal(orientationOf(stored), 1); assert.equal(orientationOf(photo), 6);
+  fs.writeFileSync(path.join(dir, 'video.json'), JSON.stringify({ brand: { name: 'T' }, voice: false, music: false, scenes: [
+    { type: 'footage', title: 'A', duration: 2, media: { generate: { from: 'media/photo.jpg', motion: 'slow push in' } } }, { type: 'footage', title: 'B', duration: 2, media: 'media/photo.jpg' }] }));
+  const plan = await makePlan(dir, { offline: true }), still = fileURLToPath(plan.scenes[0].media.src);
+  assert.equal(run(tools.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', still]).trim(), '1080,1920', 'cut to the frame');
+  // one pixel from the middle of each quarter of a picture: [top-left, top-right, bottom-left, bottom-right]
+  const quarters = (file) => { const q = spawnSync(tools.ffmpeg, ['-v', 'error', '-i', file, '-vf', 'format=rgb24,scale=2:2:flags=neighbor', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']).stdout;      // in RGB before shrinking: a 2 by 2 picture in a video's colour format has one colour for all four
+    return [0, 1, 2, 3].map((i) => (q[i * 3] > 150 && q[i * 3 + 2] < 90 ? 'red' : q[i * 3 + 2] > 150 && q[i * 3] < 90 ? 'blue' : `other (${[...q.subarray(i * 3, i * 3 + 3)]})`)); };
+  assert.deepEqual(quarters(still), ['red', 'red', 'blue', 'blue'], 'turned upright');
+  assert.ok(Math.abs(plan.scenes[1].media.ratio - 80 / 120) < .01, 'the photo itself is measured the way it is shown');
+  assert.ok(plan.notes.includes('Scene 1 (footage): its clip is not generated yet, showing the still picture.'), plan.notes.join(' | '));
+  shoot('green', 'yellow', 6);      // another photo under the same name
+  assert.notEqual((await makePlan(dir, { offline: true })).scenes[0].media.src, plan.scenes[0].media.src, 'a replaced photo is not mistaken for the old one');
+  // the other ways a photo is stored: as it is, upside down, lying on its other side
+  for (const [turn, shown] of [[1, ['red', 'blue', 'red', 'blue']], [3, ['blue', 'red', 'blue', 'red']], [8, ['blue', 'blue', 'red', 'red']]]) {
+    shoot('red', 'blue', turn); assert.deepEqual(quarters(fileURLToPath((await makePlan(dir, { offline: true })).scenes[0].media.src)), shown, 'turn ' + turn);
+  }
 });
 
 test('another voice model gets the text, the voice and the language under its own names', async () => {

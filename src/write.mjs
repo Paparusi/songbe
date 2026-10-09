@@ -65,7 +65,7 @@ Shorter is better than exactly at the limit; never go over.
 
 MEDIA
 Use only the files listed under "Available media" in the request, with their paths exactly as given. "footage" and "card" also work without media.${footage
-    ? '\nYou may ask for generated footage on at most two footage or card scenes: "media": { "generate": { "image": "a detailed description of the still picture", "motion": "what moves, in a few words" } }. Every scene that does so must also set "notice" to a short AI disclosure in the brief\'s language, for example "Illustration generated with AI".'
+    ? '\nYou may ask for generated footage on at most two footage or card scenes: "media": { "generate": { "image": "a detailed description of the still picture", "motion": "what moves, in a few words" } }. To show a picture from "Available media" somewhere new, start from it instead: "media": { "generate": { "from": "<its path>", "image": "what to make of it, saying that the thing itself stays as it is" } } (a png, jpg or webp only). Every scene that does either must also set "notice" to a short AI disclosure in the brief\'s language, for example "Illustration generated with AI".'
     : '\nDo not ask for generated footage.'}
 Never put another company's logo or name in the video unless the brief says it may be used.
 

@@ -12,7 +12,7 @@ motion graphics, captions, music and sound effects, and then checks its own work
 line with no interactive step, so an AI coding agent can drive it from start to finish; the same engine sits behind an app for
 people who would rather click than type.
 
-> Version 0.18.1. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.19. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux and Windows 11; on macOS
 > the tests pass and the app has not been built. Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 
@@ -90,23 +90,43 @@ In text fields `[[words]]` puts them on a highlight plate and `**words**` colour
 Every scene also accepts `say`, `duration` (when it has nothing to say) and `notice`.
 The table above is a summary; `songbe schema` prints the exact shape and `songbe validate` checks a project against it.
 
-`media` is a path to a video or image, or `{ "generate": { "image": "prompt", "motion": "prompt" } }` to create footage with the configured provider.
-Set `notice` (for example "Illustration generated with AI") on scenes that use generated people or places.
+`media` is a path to a video or image, or `{ "generate": { … } }` to have the footage made with your fal.ai key:
+
+| Inside `generate` | What is made |
+| --- | --- |
+| `"image": "a description"` | a picture from the description |
+| `"image"` and `"motion": "what moves"` | that picture, then a clip of about five seconds of it |
+| `"from": "media/bottle.jpg"` and `"image": "what to make of it"` | a new picture made from yours: the same thing in another place, another light, at another angle |
+| `"from": "media/bottle.jpg"` and `"motion"` | your picture as it is, cut to the frame and set in motion |
+
+`from` is a png, jpg or webp of your own (a phone photo is turned upright first), or a list of them for models that take several.
+Set `notice` (for example "Illustration generated with AI") on scenes that show generated people or places, or your product
+somewhere it was not photographed.
+
+<p align="center"><img src="docs/img/from-your-picture.jpg" width="78%" alt="A picture of a bottle; the same bottle on a sunny counter; the picture itself set in motion, first and last frame"><br>
+<sub>The picture named in <code>from</code> (a stand-in made for this example) · with <code>"image": "the same bottle on a marble counter by a sunny window…"</code> · with only <code>"motion": "the camera pushes in slowly…"</code>, first and last frame</sub></p>
 
 **Any model on fal.ai.** The picture, the clip, the music and the voice each have a default model, and none is fixed:
 `"imageModel"` and `"videoModel"` inside `generate`, and `"model"` inside `music` and `voice`, take any endpoint in fal.ai's
-catalogue (with another voice model, `voice.voice` is one of that model's voices).
-
-```json
-"media": { "generate": { "image": "A steaming bowl of pho at dawn…", "motion": "Steam rises, the camera pushes in",
-                         "imageModel": "fal-ai/bytedance/seedream/v4/text-to-image",
-                         "videoModel": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" } }
-```
+catalogue (with another voice model, `voice.voice` is one of that model's voices; with `from`, the picture model is one that takes
+pictures, `fal-ai/nano-banana/edit` unless you name another).
 
 Songbe reads what each model takes from fal's own description of it and says what it has to say — the prompt, the picture to
-animate, the frame's shape, the length, the resolution, a seed — under that model's names and within its choices (a model without
-a 9:16 option gets the nearest shape; one that only does six seconds gets six). The editor offers a short list of models that
-were tried (`CATALOGUE` in `src/providers/fal.mjs`) and accepts any other id.
+start from, the frame's shape, the length, a clip's resolution, a seed — under that model's names and within its choices (a model
+without a 9:16 option gets the nearest shape; one that only does six seconds gets six). The editor offers a short list of models
+that were tried (`CATALOGUE` in `src/providers/fal.mjs`) and accepts any other id.
+
+**A model's own settings.** Everything else a model takes is yours to set, by the model's own names: `imageOptions` and
+`videoOptions` inside `generate`, `options` inside `music` and `voice`. `songbe model <endpoint>` lists them with their choices
+and defaults (`--json` for an agent), and the editor shows them as a form under *Settings of this model*. A name the model does
+not have stops the build before anything is paid for, with the list of those it has.
+
+```json
+"media": { "generate": { "from": "media/bottle.jpg", "image": "The same bottle on a marble counter by a sunny window",
+                         "imageModel": "fal-ai/nano-banana-pro/edit", "imageOptions": { "resolution": "2K" },
+                         "motion": "The camera pushes in slowly",
+                         "videoModel": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" } }
+```
 
 ## Writing it for you
 
@@ -251,6 +271,8 @@ whether its video is up to date; *New video* writes one from your description, o
 any words in the video and the cursor lands in the field they come from, and every change can be undone and redone. The preview
 is free — it reuses voice clips that already exist and estimates the timing of new sentences — and **Build video** runs the full
 build and shows the result with its self-check. Images and clips are added to the project's `media/` folder from the form.
+Footage can be a file, or made with AI: from a description, or starting from a picture of your own, with each model's own
+settings a click away.
 With a key, every scene also has **Rewrite this scene** (say what should change; the new scene is checked against the rest of the
 video and can be undone) and, where footage is described rather than supplied, **Generate now**, which makes that picture or clip
 at once instead of at the next build (`songbe footage <dir> --scene=N` does the same from the command line). On the home screen a

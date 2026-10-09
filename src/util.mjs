@@ -25,6 +25,30 @@ export function run(cmd, args, opts = {}) {
   return opts.stderr ? String(r.stderr) : r.stdout;
 }
 
+// How a JPEG says it should be turned (EXIF orientation, 1 to 8; 1 is "as stored"). Phones write the sensor's rows and leave the
+// turning to whoever shows the picture. A browser does it; ffmpeg does or does not, depending on its version.
+export function orientationOf(file) {
+  try {
+    const fd = fs.openSync(file, 'r'), b = Buffer.alloc(131072), n = fs.readSync(fd, b, 0, b.length, 0); fs.closeSync(fd);
+    if (n < 4 || b.readUInt16BE(0) !== 0xFFD8) return 1;
+    for (let p = 2; p + 4 <= n;) {
+      if (b[p] !== 0xFF) return 1;
+      const marker = b[p + 1], size = b.readUInt16BE(p + 2);
+      if (marker === 0xE1 && b.toString('latin1', p + 4, p + 10) === 'Exif\0\0') {
+        const t = p + 10, le = b.toString('latin1', t, t + 2) === 'II', u16 = (o) => (le ? b.readUInt16LE(o) : b.readUInt16BE(o)), u32 = (o) => (le ? b.readUInt32LE(o) : b.readUInt32BE(o));
+        const ifd = t + u32(t + 4), count = u16(ifd);
+        for (let i = 0; i < count; i++) { const e = ifd + 2 + i * 12; if (e + 12 > n) break; if (u16(e) === 0x0112) { const v = u16(e + 8); return v >= 1 && v <= 8 ? v : 1; } }
+        return 1;
+      }
+      if (marker === 0xDA) return 1;      // the picture itself begins: no more headers
+      p += 2 + size;
+    }
+  } catch {}
+  return 1;
+}
+// the ffmpeg filters that turn a picture the way its orientation asks (to be used with -noautorotate, so it is done exactly once)
+export const UPRIGHT = { 1: [], 2: ['hflip'], 3: ['hflip', 'vflip'], 4: ['vflip'], 5: ['transpose=0'], 6: ['transpose=1'], 7: ['transpose=3'], 8: ['transpose=2'] };
+
 export const sha = (x) => crypto.createHash('sha1').update(typeof x === 'string' ? x : JSON.stringify(x)).digest('hex').slice(0, 16);
 export const mkdir = (d) => (fs.mkdirSync(d, { recursive: true }), d);
 export const exists = (f) => fs.existsSync(f);

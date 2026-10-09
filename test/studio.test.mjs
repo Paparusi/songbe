@@ -14,7 +14,12 @@ const { ROOT, tools } = await import('../src/util.mjs');
 
 let s, u; const mine = { 'X-Songbe': '1' }, J = (r) => r.json();
 const post = (where, data) => fetch(u + where, { method: 'POST', headers: mine, body: JSON.stringify(data) });
-test.before(async () => { s = await serve({ port: 0 }); u = s.url.slice(0, -1); });
+// fal.ai's catalogue, played by three made-up models: one described, one unknown, one that cannot be asked about right now
+const any = { options: null, object: false, type: 'string', required: false, about: '' };
+const describeModel = async (id) => { if (id === 'fal-ai/none') throw new Error('fal.ai has no model called "fal-ai/none"'); if (id === 'fal-ai/offline') return null;
+  return { model: id, category: 'image-to-image', inputs: { prompt: any, image_urls: { ...any, type: 'array' }, guidance_scale: { ...any, type: 'number', default: 3.5, min: 1, max: 20, about: 'How closely to follow the words.' },
+    style: { ...any, options: ['photo', 'drawing'], default: 'photo', about: 'The kind of picture.' }, raw: { ...any, type: 'boolean', default: false }, mask: { options: null, object: true, type: null, required: false, about: '' } } }; };
+test.before(async () => { s = await serve({ port: 0, describeModel }); u = s.url.slice(0, -1); });
 test.after(() => { s.close(); fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
 test('a typed name becomes a folder name every system accepts', () => {
@@ -134,6 +139,16 @@ test('the command says which version it is', async () => {
   assert.equal(r.stdout.trim(), (await (await fetch(u + '/api/home')).json()).version, 'the app and the command agree');
   const cargo = fs.readFileSync(path.join(ROOT, 'app', 'src-tauri', 'Cargo.toml'), 'utf8');
   assert.equal(/^version = "([^"]+)"/m.exec(cargo)[1], r.stdout.trim(), 'the desktop shell carries the same number');
+});
+
+test('a model says what it takes: what Songbe fills in, and the settings that are yours', async () => {
+  const m = await fetch(u + '/api/model?id=' + encodeURIComponent('fal-ai/made-up/edit')).then(J);
+  assert.deepEqual(m.filled, ['prompt', 'image_urls']);
+  assert.deepEqual(m.settings.map((x) => x.name), ['guidance_scale', 'style', 'raw', 'mask']);
+  assert.deepEqual(m.settings[0], { name: 'guidance_scale', type: 'number', options: null, default: 3.5, min: 1, max: 20, about: 'How closely to follow the words.' });
+  assert.equal(m.settings[2].preset, true, 'what Songbe sends unless told otherwise is said'); assert.equal(m.settings[3].type, 'object');
+  const none = await fetch(u + '/api/model?id=fal-ai/none'); assert.equal(none.status, 404); assert.match((await none.json()).error, /no model called/);
+  const off = await fetch(u + '/api/model?id=fal-ai/offline'); assert.equal(off.status, 502); assert.match((await off.json()).error, /JSON tab/);
 });
 
 test('keys are saved on this computer and never sent back', async () => {
@@ -268,5 +283,39 @@ test('clicking words in the preview puts the cursor in their field; undo and red
     await page.evaluate(`document.querySelector('#undo').click()`); for (let i = 0; i < 60 && saved() !== '25k'; i++) await wait(100); assert.equal(saved(), '25k', 'undo restores the file');
     await page.evaluate(`document.querySelector('#redo').click()`); for (let i = 0; i < 60 && saved() !== '19k'; i++) await wait(100); assert.equal(saved(), '19k', 'redo brings the change back');
     assert.equal(await page.evaluate(`document.querySelector('#redo').disabled`), true);
+  } finally { await page.close(); }
+});
+
+test('footage can start from a picture of your own, and each model shows its own settings', { skip: !ready && 'Chrome or ffmpeg not found' }, async () => {
+  const { openPage } = await import('../src/render.mjs');
+  const { id } = await post('/api/projects', { name: 'Ảnh của mình', starter: 'blank' }).then(J), dir = path.join(process.env.SONGBE_HOME, 'Ảnh của mình');
+  fs.mkdirSync(path.join(dir, 'media'), { recursive: true }); fs.copyFileSync(path.join(ROOT, 'docs', 'img', 'logo.png'), path.join(dir, 'media', 'product.png'));
+  const read = () => JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')), first = read(); first.scenes[0].media = { generate: { image: 'a bowl of pho at dawn' } };
+  assert.equal((await fetch(`${u}/p/${id}/api/spec`, { method: 'PUT', headers: mine, body: JSON.stringify(first) }).then(J)).saved, true);
+  const page = await openPage(`${u}/p/${id}/`, [1440, 900]), wait = (ms) => new Promise((r) => setTimeout(r, ms)), gen = () => read().scenes[0].media.generate;
+  const until = async (what, test) => { for (let i = 0; i < 80; i++) { if (await test().catch(() => false)) return; await wait(150); } assert.fail('never happened: ' + what); };
+  const type = (sel, value) => page.evaluate(`(() => { const b = document.querySelector(${JSON.stringify(sel)}); b.value = ${JSON.stringify(value)}; b.dispatchEvent(new Event(b.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); })()`);
+  const FROM = '.card.open input[placeholder^="Start from a picture"]', PICTURE = '.card.open input[list=mimg]';
+  try {
+    await until('the boxes for generated footage are there', () => page.evaluate(`!!document.querySelector(${JSON.stringify(FROM)})`));
+    assert.match(await page.evaluate(`document.querySelector(${JSON.stringify(PICTURE)}).placeholder`), /flux-pro/, 'from words: the model that draws from words');
+    await type(FROM, 'media/product.png');
+    await until('the picture is in the file', async () => gen().from === 'media/product.png');
+    assert.match(await page.evaluate(`document.querySelector(${JSON.stringify(PICTURE)}).placeholder`), /nano-banana\/edit/, 'from a picture: the model that takes one');
+    assert.equal(await page.evaluate(`document.querySelector('.card.open .sub').textContent`), 'A new picture is made from yours.');
+    // only motion: the picture itself, set in motion
+    await type('.card.open textarea[placeholder^="Describe the motion"]', 'slow push in'); await until('the motion is in the file', async () => gen().motion === 'slow push in');
+    await type('.card.open textarea[placeholder^="What to make of your picture"]', ''); await until('the description is gone from the file', async () => !('image' in gen()));
+    assert.match(await page.evaluate(`document.querySelector('.card.open .sub').textContent`), /used as it is, cut to the frame, and set in motion/);
+    // the settings of the picture model, as that model describes them
+    await page.evaluate(`document.querySelector('.card.open .msets .btn').click()`);
+    await until('its settings are listed', () => page.evaluate(`document.querySelectorAll('.card.open .msets')[0].querySelectorAll('.mset').length === 3`));
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.card.open .msets')[0].querySelectorAll('.mset > label')].map((l) => l.textContent)`), ['guidance_scale', 'style', 'raw']);
+    assert.match(await page.evaluate(`document.querySelectorAll('.card.open .msets')[0].textContent`), /1 more \(lists and objects\)/);
+    await type('.card.open .msets .mset input[type=number]', '5'); await type('.card.open .msets .mset select', '1');
+    await until('the settings are in the file', async () => JSON.stringify(gen().imageOptions) === JSON.stringify({ guidance_scale: 5, style: 'drawing' }));
+    // another model: the settings of the last one go with it
+    await type(PICTURE, 'fal-ai/another/edit');
+    await until('the old settings are gone', async () => gen().imageModel === 'fal-ai/another/edit' && !('imageOptions' in gen()));
   } finally { await page.close(); }
 });

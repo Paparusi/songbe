@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as fal from './providers/fal.mjs';
-import { run, sha, mkdir, exists, tools, duration, log } from './util.mjs';
+import crypto from 'node:crypto';
+import { run, sha, mkdir, exists, tools, duration, log, orientationOf, UPRIGHT } from './util.mjs';
 import { validate, FORMATS } from './spec.mjs';
 import { spokenOf, shownOf, pausesIn, timedWords, captionLines } from './captions.mjs';
 import { beatsOf, snapCuts } from './beats.mjs';
@@ -18,7 +19,8 @@ const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 function sizeOf(file) {
   try {
     const st = JSON.parse(run(tools.ffprobe, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:stream_side_data=rotation', '-of', 'json', file])).streams[0];
-    const turned = Math.abs((st.side_data_list || [])[0]?.rotation || 0) % 180 === 90;
+    // a photo says how to turn it in its EXIF, which ffprobe reports or not depending on its version: read that ourselves
+    const turned = /\.jpe?g$/i.test(file) ? orientationOf(file) >= 5 : Math.abs((st.side_data_list || [])[0]?.rotation || 0) % 180 === 90;
     return turned ? [st.height, st.width] : [st.width, st.height];
   } catch { return null; }
 }
@@ -28,17 +30,42 @@ const frameOf = (spec, format) => { const size = (format && FORMATS[format]) || 
 // where the generated picture and clip of a scene are kept: by what was asked for, so asking again costs nothing
 const generated = (cache, g) => { const id = sha(['gen', g]); return { still: path.join(cache, `gen-${id}.jpg`), clip: path.join(cache, `gen-${id}.mp4`) }; };
 
+// Pictures of your own that generated footage starts from ("from"). Each is made upright, brought to a JPEG of at most 2048 px —
+// what the models take, and small enough to send — and kept by its content, so a photo replaced under the same name is noticed.
+function references(dir, cache, g) {
+  return list(g.from).map((f) => {
+    const src = path.resolve(dir, f);
+    if (!exists(src)) throw new Error(`picture not found: ${f}`);
+    const out = path.join(cache, `ref-${crypto.createHash('sha1').update(fs.readFileSync(src)).digest('hex').slice(0, 16)}.jpg`);
+    if (!exists(out)) run(tools.ffmpeg, ['-v', 'error', '-y', '-noautorotate', '-i', src, '-vf', [...UPRIGHT[orientationOf(src)], "scale='min(2048,iw)':'min(2048,ih)':force_original_aspect_ratio=decrease:flags=lanczos"].join(','), '-frames:v', '1', '-q:v', '2', out]);
+    return out;
+  });
+}
+const FRAME = { '9:16': [1080, 1920], '16:9': [1920, 1080], '1:1': [1440, 1440] };
+// The footage one scene asks for: a picture — described, made from pictures of your own, or one of your own as it is — and then a
+// clip of it when motion is described. With `make` off no provider is asked for anything: what is there already is used.
+// Returns what exists now, and in `made` what this call newly generated.
+async function footage(dir, cache, g, { make = true, force = false } = {}) {
+  const refs = references(dir, cache, g), words = String(g.image || '').trim(), made = [];
+  if (!words && !refs.length) return { still: null, clip: null, made, empty: true };
+  const { still, clip } = generated(cache, refs.length ? { ...g, from: refs.map((r) => path.basename(r)) } : g);
+  if (!words) {      // your own picture as it is, cut to the frame: only its motion is generated
+    const [w, h] = FRAME[g.aspect] || FRAME['9:16'];
+    if (!exists(still) || force) run(tools.ffmpeg, ['-v', 'error', '-y', '-i', refs[0], '-vf', `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`, '-frames:v', '1', '-q:v', '2', still]);
+  } else if (make && (!exists(still) || force)) { log('  image:', words.slice(0, 70) + '…'); await fal.image(words, { ...g, from: refs }, still); made.push('picture'); }
+  if (g.motion && make && exists(still) && (!exists(clip) || force)) { log('  clip:', g.motion.slice(0, 70) + '…'); await fal.animate(still, g.motion, g, clip); made.push('clip'); }
+  return { still: exists(still) ? still : null, clip: g.motion && exists(clip) ? clip : null, made };
+}
+
 // Makes the generated footage of one scene now (a picture, then a clip when motion is described) without planning or drawing
 // anything else. Returns { still, clip, made }: `made` lists what was newly generated — nothing, when it was already there.
 export async function generateFootage(dir, index, opts = {}) {
   let spec; try { spec = JSON.parse(fs.readFileSync(path.join(dir, 'video.json'), 'utf8')); } catch (e) { throw new Error('video.json is not valid JSON: ' + e.message); }
   const g0 = spec.scenes?.[index]?.media?.generate;
-  if (!g0 || typeof g0.image !== 'string' || !g0.image.trim()) throw new Error(`scene ${index + 1} does not describe footage to generate`);
+  if (!g0 || (!String(g0.image || '').trim() && !list(g0.from).length)) throw new Error(`scene ${index + 1} does not describe footage to generate`);
   if (!fal.available()) throw new Error('FAL_KEY is not set: generating footage needs your fal.ai key');
-  const cache = mkdir(path.join(dir, '.songbe', 'cache')), g = { aspect: frameOf(spec, opts.format).aspect, ...g0 }, { still, clip } = generated(cache, g), made = [];
-  if (!exists(still) || opts.force) { log('  image:', g.image.slice(0, 70) + '…'); await fal.image(g.image, g, still); made.push('picture'); }
-  if (g.motion && (!exists(clip) || opts.force)) { log('  clip:', g.motion.slice(0, 70) + '…'); await fal.animate(still, g.motion, g, clip); made.push('clip'); }
-  return { still, clip: g.motion ? clip : null, made };
+  const cache = mkdir(path.join(dir, '.songbe', 'cache')), { still, clip, made } = await footage(dir, cache, { aspect: frameOf(spec, opts.format).aspect, ...g0 }, { force: opts.force });
+  return { still, clip, made };
 }
 
 export async function makePlan(dir, opts = {}) {
@@ -112,17 +139,16 @@ export async function makePlan(dir, opts = {}) {
   scenes.forEach((sc, i) => { sc.end = i < scenes.length - 1 ? scenes[i + 1].start : total; });
 
   // ---- footage: local file, still image, or generated (image → animated clip) ----
-  for (const sc of scenes) {
-    let src = sc.media;
+  for (const [n, sc] of scenes.entries()) {
+    let src = sc.media; const here = `Scene ${n + 1} (${sc.type})`;
     if (src && typeof src === 'object' && src.generate) {
-      const g = { aspect, ...src.generate }, { still, clip } = generated(cache, g);      // generated footage is made in the frame's shape
-      if (canGen) {
-        if (!exists(still)) { log('  image:', g.image.slice(0, 70) + '…'); await fal.image(g.image, g, still); }
-        if (g.motion && !exists(clip)) { log('  clip:', g.motion.slice(0, 70) + '…'); await fal.animate(still, g.motion, g, clip); }
-      }
-      src = g.motion && exists(clip) ? clip : exists(still) ? still : null;
-      if (!src) notes.push(opts.offline ? `Scene "${sc.type}": footage not generated yet, showing the plain background.`
-        : `Scene "${sc.type}" asks for generated footage but FAL_KEY is not set: using the plain background.`);
+      const g = { aspect, ...src.generate }, made = await footage(dir, cache, g, { make: canGen });      // generated footage is made in the frame's shape
+      src = made.clip || made.still;
+      if (made.empty) notes.push(`${here}: nothing is described to generate yet, showing the plain background.`);
+      else if (!src) notes.push(opts.offline ? `${here}: footage not generated yet, showing the plain background.`
+        : `${here} asks for generated footage but FAL_KEY is not set: using the plain background.`);
+      else if (g.motion && !made.clip) notes.push(opts.offline ? `${here}: its clip is not generated yet, showing the still picture.`
+        : `${here} asks for a clip but FAL_KEY is not set: showing the still picture.`);
     } else if (typeof src === 'string') src = path.resolve(dir, src);
     if (!src) { sc.media = null; continue; }
     if (!exists(src)) throw new Error(`media not found: ${src}`);

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { makePlan } from './plan.mjs';
-import { CATALOGUE, DEFAULTS } from './providers/fal.mjs';
+import { CATALOGUE, DEFAULTS, describe, settingsOf } from './providers/fal.mjs';
 import { pageHtml } from './render.mjs';
 import { FFMPEG_WINDOWS, ffmpegAdvice, installFfmpeg } from './setup.mjs';
 import { installedPacksDir, listPacks, starterDir, starterList } from './packs.mjs';
@@ -51,7 +51,7 @@ export function trusted(req) {
 // The plan carries file:// addresses for the renderer; a page served over http gets the same files through `link`.
 export const forBrowser = (plan, link) => JSON.parse(JSON.stringify(plan), (k, v) => (typeof v === 'string' && v.startsWith('file://') ? link(fileURLToPath(v)) : v));
 
-export async function serve({ port: wantPort = 4173, project = null, home = projectsHome(), ask = null } = {}) {      // `ask` stands in for the language model in tests
+export async function serve({ port: wantPort = 4173, project = null, home = projectsHome(), ask = null, describeModel = describe } = {}) {      // `ask` stands in for the language model in tests, `describeModel` for fal.ai's catalogue
   const pinned = project ? path.resolve(project) : null;      // `songbe studio <dir>`: this project is the front door
   const registry = path.join(dataDir(), 'projects.json');
   const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map();
@@ -314,6 +314,10 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
         return send(res, 200, { packs: listPacks().map((p) => ({ id: p.id, name: p.name, version: p.version, about: p.about, licence: p.licence, where: p.where, styles: p.styles.map((x) => x.name), starters: p.starters.length })), packsDir: installedPacksDir(), version: VERSION, home, data: dataDir(), shell: process.env.SONGBE_SHELL || null, pinned: pinned ? idOf(pinned) : null,
           projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
           setup: { ...setup, canFetch: WIN, advice: ffmpegAdvice(), pick: { version: FFMPEG_WINDOWS.version, megabytes: Math.round(FFMPEG_WINDOWS.bytes / 1e6), from: FFMPEG_WINDOWS.from, licence: FFMPEG_WINDOWS.licence } } });
+      }
+      if (route === 'GET /api/model') {      // what one model takes: the editor's "settings of this model"
+        try { const d = await describeModel(u.searchParams.get('id') || ''); return d ? send(res, 200, settingsOf(d)) : send(res, 502, { error: 'fal.ai did not say what this model takes (no connection?). Its settings can still be written in the JSON tab.' }); }
+        catch (e) { return send(res, 404, { error: e.message }); }
       }
       if (route === 'POST /api/projects') { try { const q = await json(req), id = create(q); return send(res, 200, { id, writing: q.starter === 'write' }); } catch (e) { return send(res, 400, { error: e.message }); } }
       const wr = /^\/api\/writing\/([0-9a-f]{16})$/.exec(u.pathname);

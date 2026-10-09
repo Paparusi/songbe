@@ -35,6 +35,7 @@ const HELP = `Songbe — short ads from a single video.json
   songbe preview <dir>            write the scene page and print its address (open it in a browser to scrub and play)
   songbe poster <dir>             one small still of the opening scene (.songbe/poster.jpg; --out=FILE --width=480)
   songbe footage <dir> --scene=N  generate the footage one scene asks for now, without building (uses FAL_KEY)
+  songbe model <endpoint>         what a model on fal.ai takes: what Songbe fills in, and the settings that are yours to set (--json)
 
 Keys are read from the environment, <dir>/.env, or the keys saved in the app: FAL_KEY (voice, music, generated footage, and
 the writer), ANTHROPIC_API_KEY (optional: the writer then uses Claude directly), GROQ_API_KEY (optional transcript check).
@@ -63,6 +64,23 @@ export async function main(argv) {
     for (const k of ['FAL_KEY', 'GROQ_API_KEY']) log(`${process.env[k] ? 'set  ' : 'unset'} ${k}`);
     log(`projects: ${projectsHome()}\ndata:     ${dataDir()}`);
     return log(`node ${process.version} on ${process.platform}`);
+  }
+  if (cmd === 'model') {
+    if (!target || target.startsWith('--')) return log('Which model? For example: songbe model fal-ai/nano-banana/edit');
+    const { describe, settingsOf } = await import('./providers/fal.mjs'), d = await describe(target);
+    if (!d) { process.exitCode = 1; return log(`fal.ai's description of ${target} could not be had (no connection?). Its page: https://fal.ai/models/${target}`); }
+    const m = settingsOf(d);
+    if (flags.has('--json') || rest.includes('--json')) return log(JSON.stringify(m, null, 2));
+    const slot = /speech/.test(m.category || '') ? ['"voice"', 'model', 'options'] : /video/.test(m.category || '') ? ['"generate"', 'videoModel', 'videoOptions'] : /audio|music/.test(m.category || '') ? ['"music"', 'model', 'options'] : ['"generate"', 'imageModel', 'imageOptions'];
+    const kind = (x) => (x.options ? x.options.join(' | ') : { boolean: 'true or false', integer: 'a whole number', number: 'a number', string: 'text', array: 'a list', object: 'an object' }[x.type] || x.type || 'a value')
+      + (x.min !== undefined || x.max !== undefined ? ` (${x.min ?? '…'} to ${x.max ?? '…'})` : '') + (x.default !== undefined ? ` · default ${JSON.stringify(x.default)}` : '') + (x.preset !== undefined ? ` · Songbe sends ${JSON.stringify(x.preset)}` : '');
+    const wide = Math.max(8, ...m.settings.map((x) => x.name.length)) + 2;
+    log(`${m.model}${m.category ? ' — ' + m.category : ''}\n\nSongbe fills in: ${m.filled.join(', ') || 'nothing it knows by name'}`);
+    if (!m.settings.length) return log('It has no settings beyond those.');
+    log('Yours to set:');
+    for (const x of m.settings) log(`  ${x.name.padEnd(wide)}${kind(x)}${x.about ? '\n  ' + ' '.repeat(wide) + x.about : ''}`);
+    const first = m.settings.find((x) => x.type !== 'object' && x.type !== 'array') || m.settings[0], sample = first.options ? first.options[0] : first.type === 'boolean' ? true : first.type === 'string' ? '…' : first.default ?? 1;
+    return log(`\nIn video.json, inside ${slot[0]}:  "${slot[1]}": "${m.model}", "${slot[2]}": { ${JSON.stringify(first.name)}: ${JSON.stringify(sample)} }`);
   }
   if (cmd === 'app') {
     const args = argv.slice(1), shell = args.includes('--shell'), p = args.find((x) => x.startsWith('--port='));

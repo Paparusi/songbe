@@ -2,6 +2,17 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.19
+- **Start from a picture of your own.** `generate.from` names a photo of yours: with a description, a model that takes pictures
+  makes a new one from it — the same product in another place — and with only `motion` your photo itself is set in motion.
+  Phone photos are turned upright; a photo replaced under the same name is noticed. In the editor it is a box with *Upload*.
+- **A model's own settings.** `imageOptions`, `videoOptions`, and `options` for the music and the voice, by the model's own names.
+  `songbe model <endpoint>` lists what a model takes, and the editor shows the same as a form. A wrong name stops the build
+  before anything is paid for.
+- A picture model that offers 1K, 2K and 4K is no longer asked for the largest without being told to.
+- `generate` no longer accepts fields it does not know (a mistyped `imagemodel` used to be ignored in silence).
+- Notes about footage say which scene they mean. A photo with a turn in its EXIF is measured the way it is shown.
+
 ## 0.18.1
 - **The logo.** Songbe has its mark: in the app's header and opening page, as the icon of the window and the installers, in the
   Windows setup wizard, in the Linux menu entry, and at the top of the README. The placeholder is gone.

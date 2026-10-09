@@ -12,7 +12,7 @@ A picture or clip made in ArtCraft is a fine thing to put into a Songbe scene.
 | --- | --- | --- |
 | What you get at the end | Generated images and clips | A finished short ad: voice, graphics, captions, music, effects |
 | How you work | A visual canvas: 2D layers, 3D staging, posing, camera | A description, a form with live preview, or a JSON file; scenes from a kit |
-| AI models | A catalogue of about sixty (image, video, sound, 3D, worlds), through its own services and other providers, each with its own controls | Any picture, picture-to-clip, music or voice model in fal.ai's catalogue, filled in from fal's description of it (four defaults); a writer for the script. No 3D, no per-model controls |
+| AI models | A catalogue of about sixty (image, video, sound, 3D, worlds), through its own services and other providers, each with its own controls | Any picture, picture-to-clip, music or voice model in fal.ai's catalogue, filled in from fal's description of it; your own picture as the start (the same product somewhere new, or set in motion); each model's own settings as a form; a writer for the script. No 3D, no canvas |
 | Runs without an account or key | The app, yes; generating needs a provider | Yes, and still builds: motion graphics and sound effects, no voice or music |
 | Driven by a script or an AI agent | Not its purpose | Its first purpose: every step is a command, the input is one file |
 | Checks its own output | — | Layout before drawing; black frames, flashes, sound, length and a transcript after |
@@ -22,6 +22,6 @@ A picture or clip made in ArtCraft is a fine thing to put into a Songbe scene.
 | Written in | Rust and TypeScript (Tauri) | JavaScript without dependencies; a small Rust shell for the window (Tauri) |
 | Maturity | An established project with a large community | Young: started in October 2026 |
 
-Where ArtCraft is clearly ahead: control over generation (3D staging, posing, per-model tools), kinds of generation Songbe
+Where ArtCraft is clearly ahead: control over generation (a canvas, 3D staging, posing), kinds of generation Songbe
 does not do at all (3D meshes, worlds), its community, and a macOS build. Where Songbe is ahead: a licence with no conditions on use, running from one file with no interactive step, producing the
 whole ad rather than its footage, and refusing to hand over work its own checks object to.

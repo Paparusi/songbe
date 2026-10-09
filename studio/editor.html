@@ -23,6 +23,8 @@ textarea { resize: vertical; min-height: 38px; } input[type=color] { width: 38px
 .group > .gh { display: flex; align-items: center; justify-content: space-between; padding-top: 8px; font-size: 12px; font-weight: 700; color: var(--soft); text-transform: uppercase; letter-spacing: .6px; }
 .item { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 2px; position: relative; } .item > .x { position: absolute; right: 0; top: 8px; }
 .adds { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; } .hint { color: var(--soft); font-size: 12px; margin-top: 10px; }
+.msets { margin-top: 6px; } .msets > .btn.on { border-color: var(--accent); color: var(--accent); } .msets .mset { margin-top: 8px; } .msets .mset > label { font-family: ui-monospace, Menlo, monospace; font-weight: 500; }
+.msets .mset > .hint { margin-top: 3px; } .msets > div > .hint:first-child { margin-top: 8px; } .sub { color: var(--soft); font-size: 12px; margin: 4px 0 0; }
 #stagewrap { min-height: 0; position: relative; background: #05070A; } #pv { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 #strip { display: flex; gap: 3px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--line); }
 #strip div { height: 30px; border-radius: 7px; background: var(--raise); border: 1px solid var(--line); font-size: 11px; font-weight: 700; color: var(--soft); display: grid; place-items: center; cursor: pointer; overflow: hidden; white-space: nowrap; min-width: 0; }
@@ -69,9 +71,9 @@ const LABEL = { captions: 'Captions that follow the voice', format: 'Frame <b>·
   motionBlur: 'Motion blur', brand: 'Brand', voice: 'Voice', music: 'Music', ink: 'Ink (dark)', primary: 'Primary', accent: 'Accent (bright)', paper: 'Paper (light background)', muted: 'Muted text', logo: 'Logo',
   price: 'The figure <b>· "-30%", "99k", "$29"</b>', was: 'Old price <b>· struck out</b>', terms: 'Terms <b>· until when, where</b>', code: 'Code', photos: 'Pictures <b>· one to four</b>', src: 'Picture',
   quote: 'Their words', role: 'Who they are', stars: 'Stars (1–5)', photo: 'Their picture',
-  mark: 'Logo mark', word: 'Wordmark (for dark backgrounds)', model: 'Model', language: 'Language', speed: 'Speed', emotion: 'Emotion', prompt: 'Describe the music', file: 'Or use a file', volume: 'Volume (0–1)', sync: 'Move cuts onto the beat (on unless unticked)', avoid: 'Avoid', seed: 'Seed' };
+  mark: 'Logo mark', word: 'Wordmark (for dark backgrounds)', model: 'Model', language: 'Language', speed: 'Speed', emotion: 'Emotion', options: 'More', prompt: 'Describe the music', file: 'Or use a file', volume: 'Volume (0–1)', sync: 'Move cuts onto the beat (on unless unticked)', avoid: 'Avoid', seed: 'Seed' };
 const COLOURS = new Set(['ink', 'primary', 'accent', 'paper', 'muted']), FILES = new Set(['mark', 'word', 'file', 'src', 'photo']), ICONS = ['check', 'star', 'bolt', 'heart', 'shield', 'drop', 'clock', 'bell', 'sun', 'pin', 'number'];
-const BASIC = ['str', 'num', 'bool', 'text', 'media'];
+const BASIC = ['str', 'num', 'bool', 'text', 'media', 'settings'];
 const isEnum = (s) => Array.isArray(s) && (s.length > 1 || (typeof s[0] === 'string' && !BASIC.includes(s[0])));
 const clean = (k) => k.replace(/!$/, '');
 
@@ -129,6 +131,43 @@ function pickField(i, text) {
   f.animate([{ background: 'color-mix(in srgb, var(--accent) 22%, transparent)' }, { background: 'transparent' }], { duration: 900 });
 }
 
+// ---- a model's own settings: fal.ai says what every model takes; what Songbe does not fill in by itself is offered here ----
+const described = new Map();
+function modelSettings(model, get, set) {
+  const box = el('div', { className: 'msets' }), tog = el('button', { className: 'btn small', textContent: 'Settings of this model' }), body = el('div'); let shown = false, last = null;
+  const paint = async () => {
+    body.replaceChildren(); tog.classList.toggle('on', shown); if (!shown) return;
+    const id = last = model(); let m = described.get(id);
+    if (!m) {
+      body.append(el('div', { className: 'hint', textContent: 'Asking fal.ai what ' + id + ' takes…' }));
+      try { const r = await api('/api/model?id=' + encodeURIComponent(id)); m = await r.json(); if (r.ok) described.set(id, m); } catch { m = { error: 'No answer. Its settings can still be written in the JSON tab.' }; }
+      if (model() !== id || !shown) return; body.replaceChildren();
+    }
+    if (m.error) { body.append(el('div', { className: 'hint', textContent: m.error })); return; }
+    const cur = () => get() || {}, put = (name, v) => { const o = { ...cur() }; if (v === undefined) delete o[name]; else o[name] = v; set(Object.keys(o).length ? o : undefined); changed(); };
+    const rows = m.settings.filter((x) => x.type !== 'object' && x.type !== 'array');
+    for (const x of rows) {
+      const v = cur()[x.name], usual = x.preset !== undefined ? x.preset : x.default; let c;
+      if (x.options || x.type === 'boolean') { const list = x.options || [true, false]; c = el('select'); c.append(el('option', { value: '', textContent: usual !== undefined ? `(as usual: ${usual})` : '(as usual)' }));
+        list.forEach((o, n) => c.append(el('option', { value: String(n), textContent: String(o), selected: v === o }))); c.onchange = () => put(x.name, c.value === '' ? undefined : list[+c.value]); }
+      else if (x.type === 'integer' || x.type === 'number') { c = el('input', { type: 'number', step: x.type === 'integer' ? '1' : 'any', value: v ?? '', placeholder: usual !== undefined ? String(usual) : '' });
+        if (x.min !== undefined) c.min = x.min; if (x.max !== undefined) c.max = x.max; c.oninput = () => put(x.name, c.value === '' ? undefined : +c.value); }
+      else { c = el('input', { type: 'text', value: v ?? '', placeholder: usual !== undefined ? String(usual) : '', spellcheck: false }); c.oninput = () => put(x.name, c.value === '' ? undefined : c.value); }
+      body.append(el('div', { className: 'f mset' }, el('label', { textContent: x.name }), c, ...(x.about ? [el('div', { className: 'hint', textContent: x.about })] : [])));
+    }
+    const more = m.settings.length - rows.length, strange = Object.keys(cur()).filter((k) => !m.settings.some((x) => x.name === k));
+    if (!rows.length) body.append(el('div', { className: 'hint', textContent: 'This model has no settings beyond what Songbe fills in.' }));
+    if (more) body.append(el('div', { className: 'hint', textContent: `${more} more (lists and objects) can be written in the JSON tab.` }));
+    if (strange.length) { const drop = el('button', { className: 'btn small', textContent: 'Remove' }); drop.onclick = () => { const o = { ...cur() }; for (const k of strange) delete o[k]; set(Object.keys(o).length ? o : undefined); changed(); paint(); };
+      body.append(el('div', { className: 'rowf', style: 'margin-top:8px' }, el('span', { className: 'hint', style: 'margin:0', textContent: `This model has no setting called ${strange.join(', ')}; a build would stop on it.` }), drop)); }
+  };
+  tog.onclick = () => { shown = !shown; paint(); };
+  if (get() && Object.keys(get()).length) { shown = true; paint(); }      // settings that are set are shown
+  box.append(tog, body); box.reload = () => { if (shown) paint(); };
+  for (const ev of ['pointerenter', 'focusin']) box.addEventListener(ev, () => { if (shown && model() !== last) paint(); });      // the model named beside it was changed meanwhile
+  return box;
+}
+
 // ---- form builder driven by the same table the validator uses ----
 function field(key, shape, get, set) {
   const k = clean(key), wrap = el('div', { className: 'f' }), lab = el('label'); lab.innerHTML = LABEL[k] || k; let v = get();
@@ -138,6 +177,7 @@ function field(key, shape, get, set) {
     const sel = el('select'); for (const o of ['', ...(k === 'icon' ? ICONS : shape)]) sel.append(el('option', { value: o, textContent: o || '(default)', selected: (v ?? '') === o }));
     sel.onchange = () => { set(sel.value || undefined); changed(); }; wrap.append(sel); return wrap;
   }
+  if (shape === 'settings') { const kind = here[here.length - 2]; wrap.replaceChildren(modelSettings(() => (spec[kind] && spec[kind].model) || S.models.defaults[kind], get, set)); return wrap; }
   if (shape === 'num') { const i = el('input', { type: 'number', step: 'any', value: v ?? '' }); i.oninput = () => { set(i.value === '' ? undefined : +i.value); changed(); }; wrap.append(i); return wrap; }
   if (shape === 'str' && COLOURS.has(k)) {
     const c = el('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(v || '') ? v : '#000000' }), t = el('input', { type: 'text', value: v ?? '' });
@@ -161,13 +201,31 @@ function field(key, shape, get, set) {
     const box = el('div', { style: 'margin-top:6px' }), paint = () => {
       box.replaceChildren(); const cur = get();
       if (mode.value === 'file') { const t = el('input', { type: 'text', value: typeof cur === 'string' ? cur : '', placeholder: 'media/clip.mp4' }); t.oninput = () => { set(t.value || undefined); changed(); }; box.append(el('div', { className: 'rowf' }, t, upload((p) => { t.value = p; set(p); changed(); }))); }
-      if (mode.value === 'gen') { const g = (cur && cur.generate) || { image: '', motion: '' };
-        const a = el('textarea', { rows: 3, value: g.image || '', placeholder: 'Describe the still image' }), b = el('textarea', { rows: 2, value: g.motion || '', placeholder: 'Describe the motion (leave empty for a still)' });
+      if (mode.value === 'gen') {
+        if (!cur || typeof cur !== 'object' || !cur.generate) { set({ generate: { image: '' } }); }
+        const g = get().generate, D = S.models.defaults, keep = (k, v) => { if (v === '' || v === undefined) delete g[k]; else g[k] = v; };
+        const many = (v) => [].concat(v || []), paths = (t) => { const l = t.split(',').map((x) => x.trim()).filter(Boolean); return l.length > 1 ? l : l[0]; };
+        // a picture of your own to start from: the same thing somewhere new (with a description), or your picture itself set in motion
+        const fr = el('input', { type: 'text', value: many(g.from).join(', '), placeholder: 'Start from a picture of yours (optional): media/product.jpg', spellcheck: false });
+        const a = el('textarea', { rows: 3, value: g.image || '' }), b = el('textarea', { rows: 2, value: g.motion || '', placeholder: 'Describe the motion (leave empty for a still)' }), note = el('div', { className: 'sub' });
         // which models make it: the defaults when left empty, a few known ones offered, any fal.ai endpoint accepted
-        const pick = (id, list, value, hint) => { const dl = el('datalist', { id }); for (const m of list) dl.append(el('option', { value: m })); const i = el('input', { type: 'text', value: value || '', placeholder: hint, spellcheck: false }); i.setAttribute('list', id); return [i, dl]; };
-        const [im, il] = pick('mimg', S.models.image, g.imageModel || g.model, 'Picture model: ' + S.models.defaults.image), [vm, vl] = pick('mvid', S.models.video, g.videoModel, 'Clip model: ' + S.models.defaults.video);
-        const put = () => { set({ generate: { ...Object.fromEntries(Object.entries(g).filter(([k]) => !['image', 'motion', 'imageModel', 'videoModel', 'model'].includes(k))), image: a.value, ...(b.value ? { motion: b.value } : {}), ...(im.value.trim() ? { imageModel: im.value.trim() } : {}), ...(vm.value.trim() ? { videoModel: vm.value.trim() } : {}) } }); changed(); };
-        for (const x of [a, b, im, vm]) x.oninput = put; box.append(a, el('div', { style: 'height:6px' }), b, el('div', { style: 'height:6px' }), im, il, el('div', { style: 'height:6px' }), vm, vl); }
+        const pick = (id, value) => { const dl = el('datalist', { id }), i = el('input', { type: 'text', value: value || '', spellcheck: false }); i.setAttribute('list', id); return [i, dl]; };
+        const [im, il] = pick('mimg', g.imageModel || g.model), [vm, vl] = pick('mvid', g.videoModel);
+        for (const m of S.models.video) vl.append(el('option', { value: m })); vm.placeholder = 'Clip model: ' + D.video;
+        const is = modelSettings(() => g.imageModel || g.model || (g.from ? D.edit : D.image), () => g.imageOptions, (o) => keep('imageOptions', o));
+        const vs = modelSettings(() => g.videoModel || D.video, () => g.videoOptions, (o) => keep('videoOptions', o));
+        const dress = () => {      // the words around the boxes follow whether a picture of yours is the start
+          a.placeholder = g.from ? 'What to make of your picture: "the same bottle on a marble counter by a sunny window". Leave empty to keep it as it is and only set it in motion.' : 'Describe the still image';
+          note.textContent = !g.from ? '' : (g.image || '').trim() ? 'A new picture is made from yours.' : 'Your picture is used as it is, cut to the frame' + ((g.motion || '').trim() ? ', and set in motion.' : '. Describe the motion, or what to make of it.');
+          im.placeholder = 'Picture model: ' + (g.from ? D.edit : D.image); il.replaceChildren(...(g.from ? S.models.edit : S.models.image).map((m) => el('option', { value: m })));
+        };
+        const words = () => { if (a.value || !g.from) g.image = a.value; else delete g.image; };
+        fr.oninput = () => { keep('from', paths(fr.value)); words(); dress(); is.reload(); changed(); };
+        a.oninput = () => { words(); dress(); changed(); }; b.oninput = () => { keep('motion', b.value); dress(); changed(); };
+        im.oninput = () => { keep('imageModel', im.value.trim()); delete g.model; keep('imageOptions'); is.reload(); changed(); };      // another model: the settings of the last one go
+        vm.oninput = () => { keep('videoModel', vm.value.trim()); keep('videoOptions'); vs.reload(); changed(); };
+        dress(); const gap = () => el('div', { style: 'height:6px' });
+        box.append(el('div', { className: 'rowf' }, fr, upload((p) => { fr.value = p; fr.oninput(); })), note, gap(), a, gap(), b, gap(), im, il, is, gap(), vm, vl, vs); }
     };
     mode.onchange = () => { set(mode.value === 'gen' ? { generate: { image: '' } } : undefined); paint(); changed(); }; paint(); wrap.append(mode, box); return wrap;
   }
@@ -201,7 +259,7 @@ function draw() {
   for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
   const pane = $('#pane'); pane.replaceChildren();
   if (tab === 'json') { const t = el('textarea', { id: 'json', spellcheck: false, value: JSON.stringify(spec, null, 2) }); t.oninput = () => { try { spec = JSON.parse(t.value); changed(); } catch { $('#saved').textContent = 'JSON not valid yet'; } }; pane.append(t); return; }
-  if (tab === 'brand') { const { scenes, ...top } = spec; pane.append(...order(Object.keys(S.table.TOP)).map((key) => field(key, S.table.TOP[key], () => spec[clean(key)], (v) => { if (v === undefined) delete spec[clean(key)]; else spec[clean(key)] = v; })));
+  if (tab === 'brand') { const { scenes, ...top } = spec; pane.append(...order(Object.keys(S.table.TOP)).map((key) => { here = [clean(key)]; const f = field(key, S.table.TOP[key], () => spec[clean(key)], (v) => { if (v === undefined) delete spec[clean(key)]; else spec[clean(key)] = v; }); here = []; return f; }));
     pane.append(el('div', { className: 'hint', textContent: 'Voice, music and generated footage are created when you press Build, with your own key (set on the Videos page).' })); return; }
   spec.scenes.forEach((sc, i) => {
     const card = el('div', { className: 'card' + (i === open ? ' open sel' : '') }), head = el('div', { className: 'head' });

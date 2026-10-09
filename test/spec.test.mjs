@@ -57,3 +57,25 @@ test('a brand colour must be a colour', () => {
   for (const ok of ['#0A1B31', '#fff', '#0a1b31cc', 'navy', 'rgb(10, 27, 49)', 'hsl(215 66% 12%)', 'oklch(0.3 0.1 250 / 80%)']) assert.deepEqual(validate(spec(ok)), [], ok);
   for (const bad of ['0A1B31', '#12', 'red; background: url(https://example.com/x)', 'url(https://example.com/x)', 'var(--x)', '#0A1B31"}</style>']) assert.equal(validate(spec(bad)).length, 1, bad);
 });
+
+test('generated footage: a description, a picture of your own, or both; and nothing the table does not know', () => {
+  const ok = (generate, more = {}) => validate({ brand: {}, ...more, scenes: [{ type: 'footage', title: 't', duration: 2, media: { generate } }] }, root);
+  assert.deepEqual(ok({ image: 'a bowl of pho at dawn', motion: 'steam rises' }), []);
+  assert.deepEqual(ok({ image: '' }), [], 'still being typed: the plan says nothing is described yet');
+  assert.deepEqual(ok({ from: 'docs/img/logo.png', image: 'the same mark on a shop window' }), []);
+  assert.deepEqual(ok({ from: ['docs/img/logo.png', 'app/icon.png'], motion: 'slow push in' }), []);
+  assert.deepEqual(ok({ image: 'x', imageModel: 'fal-ai/flux/schnell', imageOptions: { num_inference_steps: 4 }, videoOptions: { camera_fixed: true }, seed: 3 }), []);
+  assert.match(ok({})[0], /describe the picture \("image"\), or name a picture of your own/);
+  assert.match(ok({ from: 'docs/img/logo.png' })[0], /"from" alone generates nothing/);
+  assert.match(ok({ from: 'docs/img/nope.png', image: 'x' })[0], /generate\.from: file not found: docs\/img\/nope\.png/);
+  assert.match(ok({ from: 'README.md', image: 'x' })[0], /README\.md is not a picture/);
+  assert.match(ok({ image: 'x', imagemodel: 'y' })[0], /generate\.imagemodel: unknown field \(did you mean "imageModel"\?\)/);
+  assert.match(ok({ image: 'x', imageOptions: 'fast' })[0], /imageOptions: expected an object of that model's own settings/);
+  assert.match(ok({ image: 3 })[0], /generate\.image: expected a description/);
+  assert.deepEqual(ok({ image: 'x' }, { voice: { model: 'fal-ai/elevenlabs/tts/eleven-v3', options: { stability: 0.4 } }, music: { options: { guidance: 3 } } }), [], 'the voice and the music take settings too');
+  assert.match(ok({ image: 'x' }, { voice: { options: 'calm' } })[0], /video\.voice\.options: expected an object/);
+  const media = jsonSchema().properties.scenes.items.oneOf[0].properties.media.anyOf[1].properties.generate;
+  assert.deepEqual(media.anyOf, [{ required: ['image'] }, { required: ['from'] }]);
+  for (const k of ['from', 'imageOptions', 'videoOptions']) assert.ok(media.properties[k], k);
+  assert.equal(jsonSchema().properties.voice.properties.options.type, 'object');
+});

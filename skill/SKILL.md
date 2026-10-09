@@ -31,7 +31,7 @@ Four to five scenes, one idea each, 15–25 seconds in total. A scene lasts as l
 
 | Use | Scene | Notes |
 | --- | --- | --- |
-| Hook over real or generated footage | `footage` | `title` of 2 short lines; `[[word]]` highlights it. Set `notice` when the footage is AI-generated. |
+| Hook over real or generated footage | `footage` | `title` of 2 short lines; `[[word]]` highlights it. Set `notice` when the footage is AI-generated. To show the user's own product somewhere new, or to set their photo in motion, start from it: `"media": { "generate": { "from": "media/photo.jpg", "image": "…", "motion": "…" } }`. |
 | A claim backed by a picture and one number | `card` | `media` is the proof shot; `stat.badge` is 2–4 characters ("0đ", "24h", "4.8"). |
 | Three benefits | `list` | 3 rows is best, 5 at most. `icon`: check, star, bolt, heart, shield, drop, clock, bell, sun, pin, or `number`. |
 | An app or website in use | `phone` | `screens` are portrait screenshots (about 9:19.5), required. 1–2 `callouts`, each up to 22 characters. |
