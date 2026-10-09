@@ -193,6 +193,6 @@ Claude.ai sign-in or to run on a person's Pro or Max plan, and xAI publishes no 
   (no lip-sync model is run). The line is recorded again, up to four times, until every phrase is within about a tenth of its
   place; a voice cannot always be brought that close — it pauses where the words pause, not where the actor's lips did — and a
   line that still had to be stretched as far as sounds right is pointed at ("listen to it"). In the test film that was three
-  of the six lines a speaking model filmed.
+  of the eight lines a speaking model filmed.
 - The review measures; it does not understand. It finds a colour that was not there, a cut, a freeze, a silence — not a face
   that is no longer the person's, a hand with six fingers, or the wrong person speaking. Those are still for your eyes.
