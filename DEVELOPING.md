@@ -1,6 +1,7 @@
-# Contributing to Songbe
+# Working on Songbe
 
-Thank you for looking. This file says how the project is put together and what a change needs before it is merged.
+How the code is put together, and what a change needs before it goes in. Songbe is proprietary (see `LICENSE`); this file is for
+the people who work on it.
 
 ## Running it
 
@@ -21,7 +22,8 @@ The tests never call a provider and need no key. The drawing tests need the brow
 | --- | --- |
 | `src/` | the engine: `spec` (the shape of video.json), `plan` (voice, timeline, footage), `render` (the browser draws frames), `audio`, `check`, `write` (the writer), `studio` (the app's server), `packs`, `fit`, `setup` |
 | `kit/` | what is drawn: `runtime.js` (time, looks, the layout check), `scenes.js` (the scene types), `base.css` and `styles/` (the looks), `fit.json` (measured) |
-| `studio/` | the app's two pages: `home.html`, `editor.html` |
+| `src/film/` | films and series: `series` and `writer` (the bible and the scripts), `director` (fills the canvas), `flow` (the canvas, takes, the run), `models` (which model, through which door), `cut`, `board`, `canvas` (the window's server) |
+| `studio/` | the app's pages: `home.html`, `editor.html`, `canvas.html` |
 | `packs/` | bundled packs; `docs/packs.md` describes the format |
 | `app/` | the desktop shell (Tauri): it starts the engine and shows its pages, nothing more |
 | `examples/` | projects that double as starters and as test material |
@@ -50,10 +52,3 @@ The tests never call a provider and need no key. The drawing tests need the brow
 5. Comments say why, in plain words. Code and documentation are in English.
 6. Examples and starters carry only invented facts, and nothing that could reach a real person: the phone number is `0123 456 789`
    (no Vietnamese number starts with 01, and the plan reminds people to replace it), addresses end in `example.com`.
-
-## Reporting a problem
-
-Open an issue with the `video.json` (remove anything private), the command you ran, and `out/check.json` if a build finished.
-For anything that touches safety, read `SECURITY.md` first.
-
-By contributing you agree that your contribution is licensed under the Apache License 2.0, like the rest of the project.

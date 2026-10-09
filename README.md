@@ -21,9 +21,9 @@ of its own: change a line, hand one shot to another model, add a prop of yours, 
 
 <p align="center"><img src="docs/img/film-canvas.jpg" width="92%" alt="The canvas: every first frame, clip and line of an episode as a card; the chosen clip's panel shows its prompt as the model reads it"></p>
 
-> Version 0.21.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.22.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux, Windows and macOS (the tests
-> and each installer run on all three for every release). Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
+> and each installer run on all three for every release). Named after the Sông Bé, a river in southern Vietnam.
 
 ```
 songbe build examples/app-launch-en       →  examples/app-launch-en/out/video.mp4  (+ sheet.jpg, check.json)
@@ -255,9 +255,8 @@ node bin/songbe.mjs init my-ad --from=classic/quan-ca-phe
 ```
 
 A pack runs no code, carries its own licence, and can be measured and checked with the same tools as the kit
-(`node tools/fit.mjs --pack=<id>`). `docs/packs.md` describes the format; `packs/classic` is the worked example. The core is
-Apache-2.0 and stays so whatever is plugged in: packs are how more looks and industry-specific starters can be shared — or sold —
-without forking it.
+(`node tools/fit.mjs --pack=<id>`). `docs/packs.md` describes the format; `packs/classic` is the worked example. Packs are how
+more looks and industry-specific starters are added, or sold, without touching the core.
 
 ## How a build runs
 
@@ -356,13 +355,17 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 ## More to read
 
 - `docs/packs.md` — making a pack: looks and starters outside the core.
-- `docs/comparison.md` — how Songbe relates to ArtCraft, plainly.
-- `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
+- `docs/film.md` — films and series: the files, the canvas, the models.
+- `DEVELOPING.md` (how the code is laid out and what a change needs), `SECURITY.md`, `CHANGELOG.md`.
 - `app/README.md` — the desktop shell, how installers are built and what has been checked on which system. `.github/workflows/`
   runs the tests on every push, and builds, installs and starts the installers of a tagged release before attaching them.
 
-## License
+## Licence
 
-Apache-2.0, for everything in this repository: the engine, the kit, the app, the examples and the Songbe logo. The bundled fonts
-are Be Vietnam Pro, Anton and Playfair Display (all SIL OFL 1.1). The installed app ships Node.js next to the engine,
-under Node's own licence. ffmpeg is never part of a Songbe package. See `NOTICE`.
+Songbe is proprietary software. Copyright © 2026 Le Hieu, all rights reserved: using it needs a licence from its owner, and it may
+not be copied, passed on or changed without one (`LICENSE`). What you make with it is yours. Versions 0.19.1 and earlier were
+published under Apache-2.0, which still applies to those versions only.
+
+It is distributed with the work of others under their own licences: the fonts Be Vietnam Pro, Anton and Playfair Display (all SIL
+OFL 1.1), and in the installed app Node.js next to the engine and the Rust crates of the window. ffmpeg is never part of a Songbe
+package. See `NOTICE`.

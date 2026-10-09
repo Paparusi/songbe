@@ -48,7 +48,7 @@ if (!text) {
 }
 if (!/Node\.js is licensed for use as follows/.test(text)) throw new Error('that does not look like the Node.js licence');
 fs.writeFileSync(path.join(lic, 'NODE-LICENSE.txt'), text);
-fs.writeFileSync(path.join(lic, 'README.txt'), `Songbe is licensed under the Apache License 2.0 (see core/LICENSE and core/NOTICE).\n\nThis folder holds the licences of programs shipped next to it:\n  NODE-LICENSE.txt   Node.js ${process.version}, the runtime of the Songbe engine: songbe-engine${process.platform === 'win32' ? '.exe' : ''} is an unmodified copy of it\n\nffmpeg is not part of this package. When you ask Songbe to fetch it, it is downloaded from its publisher under its own licence (GPL).\n`);
+fs.writeFileSync(path.join(lic, 'README.txt'), `Songbe is proprietary software: its licence is core/LICENSE, and core/NOTICE says what else it is distributed with.\n\nThis folder holds the licences of programs shipped next to it:\n  NODE-LICENSE.txt   Node.js ${process.version}, the runtime of the Songbe engine: songbe-engine${process.platform === 'win32' ? '.exe' : ''} is an unmodified copy of it\n\nffmpeg is not part of this package. When you ask Songbe to fetch it, it is downloaded from its publisher under its own licence (GPL).\n`);
 
 // ---- and of the Rust crates compiled into the window's program: who wrote each, under which licence ----
 try {

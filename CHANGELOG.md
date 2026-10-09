@@ -2,6 +2,11 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.22
+- **Songbe is proprietary from version 0.20 on.** `LICENSE` is now the Songbe Software Licence: all rights reserved, use needs a
+  licence from the owner, what you make with it is yours. Versions 0.19.1 and earlier remain under Apache-2.0. `NOTICE` lists what
+  it is distributed with; the documents of the open project are gone (`CONTRIBUTING.md` became `DEVELOPING.md`).
+
 ## 0.21
 - **The canvas in a window.** `songbe flow open <dir>` shows `flow.json` as cards and lines: every picture, every clip that
   plays, every line of dialogue, and what each works from. A panel changes the chosen node — its words, where it starts, its

@@ -1,9 +1,9 @@
 [package]
 name = "songbe-app"
-version = "0.21.0"
+version = "0.22.0"
 description = "Songbe desktop app: a native window around the Songbe studio"
 edition = "2021"
-license = "Apache-2.0"
+license-file = "../../LICENSE"
 publish = false
 
 [[bin]]

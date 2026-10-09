@@ -77,5 +77,5 @@ pack from a stranger like a document from a stranger all the same — a style sh
 
 ## Licence
 
-Songbe is Apache-2.0 and stays so whatever is plugged into it. A pack is a separate work with its own licence, stated in `pack.json`;
-it may be free or sold. Nothing in Songbe checks or enforces that.
+A pack is a separate work with its own licence, stated in `pack.json`; it may be free or sold, whatever Songbe's own licence
+says. Nothing in Songbe checks or enforces that.

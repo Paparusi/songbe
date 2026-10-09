@@ -17,9 +17,9 @@
     "externalBin": ["binaries/songbe-engine"],
     "publisher": "Songbe",
     "category": "Video",
-    "shortDescription": "Short ads from a single video.json",
-    "longDescription": "Songbe turns one description file into a finished short ad: voice, footage, motion graphics, music and a self-check.",
-    "copyright": "Apache-2.0",
+    "shortDescription": "Films, series and short ads made with AI",
+    "longDescription": "Songbe makes a series from an idea — the script, the cast with their faces and voices, every shot, every episode — on a canvas where each piece can be changed, and turns one description file into a finished short ad.",
+    "copyright": "Copyright © 2026 Le Hieu. All rights reserved.",
     "windows": {
       "nsis": { "installMode": "currentUser", "installerIcon": "icons/icon.ico", "sidebarImage": "installer/sidebar.bmp", "headerImage": "installer/header.bmp" },
       "webviewInstallMode": { "type": "downloadBootstrapper" }

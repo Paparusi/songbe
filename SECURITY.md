@@ -19,5 +19,4 @@ stranger is like opening a document from a stranger — it cannot run code, but 
 
 ## Reporting a vulnerability
 
-Please do not open a public issue. Use the repository's private vulnerability reporting ("Security" → "Report a vulnerability")
-and include what you did and what happened. You will get an answer, and credit if you want it, once it is fixed.
+Tell the people you have Songbe from, privately, with what you did and what happened. Please do not publish it before it is fixed.

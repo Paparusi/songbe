@@ -3,7 +3,7 @@
 //   styles/<name>.css  a look, with <name>.json beside it for what a style sheet cannot say (headline scale, how lines arrive…)
 //   fit.json           how much text fits where in its looks (made by `node tools/fit.mjs --pack=<pack>`)
 // Packs are found in three places: packs/ in Songbe itself (bundled), <data folder>/packs (installed on this computer), and the
-// folders named in SONGBE_PACKS (for someone building one). A pack carries its own licence: the core stays Apache-2.0 whatever
+// folders named in SONGBE_PACKS (for someone building one). A pack carries its own licence, apart from Songbe's, whatever
 // is plugged into it. A look is a style sheet and a few numbers — no pack runs code.
 import fs from 'node:fs';
 import path from 'node:path';
