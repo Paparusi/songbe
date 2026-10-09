@@ -64,12 +64,14 @@ if (pkg !== crate) say(`note: package.json says ${pkg} but app/src-tauri/Cargo.t
 // The target is named outright: left to itself the bundler assumes the system its own program was compiled for, which need not be
 // the toolchain in use (a GNU-built cargo-tauri next to an MSVC build), and then looks for the runtime under the wrong name.
 // One kind of installer per system unless asked otherwise: a setup program on Windows, an AppImage and a .deb on Linux, a disk image on macOS.
-const KINDS = { win32: 'nsis', linux: 'appimage,deb', darwin: 'dmg' }, rest = process.argv.slice(2), plain = rest.includes('--no-bundle') || rest.includes('--bundles');
+// (On macOS the bundler makes only the app; the disk image is made from it afterwards by app/mac.mjs, signed when there is an identity.)
+const KINDS = { win32: 'nsis', linux: 'appimage,deb', darwin: 'app' }, rest = process.argv.slice(2), plain = rest.includes('--no-bundle') || rest.includes('--bundles');
 const args = ['tauri', 'build', ...(rest.includes('--target') ? [] : ['--target', host]), ...(plain || !KINDS[process.platform] ? [] : ['--bundles', KINDS[process.platform]]), ...rest];
 const made = path.join(TAURI, 'target', rest.includes('--target') ? rest[rest.indexOf('--target') + 1] : host, 'release'), bundles = path.join(made, 'bundle');
 fs.rmSync(bundles, { recursive: true, force: true });      // installers of earlier versions must not be mistaken for this one
 say('cargo ' + args.join(' '));
 const r = spawnSync('cargo', args, { cwd: APP, stdio: 'inherit' });
 if (r.status !== 0) process.exit(r.status ?? 1);
+if (process.platform === 'darwin' && !plain) (await import('./mac.mjs')).packageMac();
 say('program: ' + path.join(made, 'songbe' + (process.platform === 'win32' ? '.exe' : '')));
 if (fs.existsSync(bundles)) for (const kind of fs.readdirSync(bundles)) for (const f of fs.readdirSync(path.join(bundles, kind))) if (/\.(exe|msi|dmg|AppImage|deb|rpm)$/.test(f)) say('installer: ' + path.join(bundles, kind, f));
