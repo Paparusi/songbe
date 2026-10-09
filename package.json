@@ -1,6 +1,6 @@
 {
   "name": "songbe",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Short ads from a single video.json, and series from an idea: script, cast, voices, shots and cuts on a canvas of nodes — driven from the command line or by an AI agent.",
   "type": "module",
   "bin": { "songbe": "bin/songbe.mjs" },

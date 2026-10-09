@@ -230,8 +230,9 @@ export async function look(dir, flow, { env = process.env, use = MODELS } = {}) 
       const missing = needs(flow, id).filter((d) => !out.has(d));
       if (missing.length) { rows.push({ id, kind: n.kind, state: 'wait', why: 'needs ' + missing.join(', ') }); continue; }
       const p = await PLAN[n.kind]({ flow, env, use, strict: false, got: (x) => out.get(x) }, id, n), key = sha(p.recipe), t = store.current(id, key);
-      if (t) { out.set(id, { file: t.file, take: `${key}-${t.n}`, info: t.info }); rows.push({ id, kind: n.kind, state: 'ready', file: t.file, take: `${key}-${t.n}`, by: t.by, n: t.n, takes: store.all(key).length }); }
-      else rows.push({ id, kind: n.kind, state: 'make', by: p.by ? nameOf(p.by) : null, first: !store.picked(id) });
+      const asked = p.recipe.prompt ? { recipe: { model: p.recipe.model, prompt: p.recipe.prompt, refs: p.recipe.refs, how: p.recipe.how, seconds: p.recipe.seconds } } : {};      // what the model is told, for whoever wants to read it
+      if (t) { out.set(id, { file: t.file, take: `${key}-${t.n}`, info: t.info }); rows.push({ id, kind: n.kind, state: 'ready', file: t.file, take: `${key}-${t.n}`, by: t.by, n: t.n, takes: store.all(key).length, ...asked }); }
+      else rows.push({ id, kind: n.kind, state: 'make', by: p.by ? nameOf(p.by) : null, first: !store.picked(id), ...asked });
     } catch (e) { rows.push({ id, kind: n.kind, state: 'stuck', why: e.message }); }
   }
   return rows;

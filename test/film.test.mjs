@@ -13,6 +13,7 @@ import { checkFlow, look, needs, openStore, ordered, readFlow, runFlow, wordsOf,
 import { KNOWN, chosen, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, lengthOf, readEpisode, readSeries, speechSeconds } from '../src/film/series.mjs';
 import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
+import { serve } from '../src/studio.mjs';
 import { run, sha, tools } from '../src/util.mjs';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'songbe-film-'));
@@ -240,4 +241,29 @@ test('the timeline of a cut: every part where it falls, each line a breath into 
   const rows = timeline([{ id: 'a', file: clip, info: { how: 'voice', length: 2.3 }, voice: line, text: 'Một' }, { id: 'b', file: clip, info: { how: 'plain', length: 6 } }, { id: 'c', file: clip, from: 1, to: 2.5, info: { how: 'native', length: null }, text: 'Hai' }, { id: 'd', file: clip }]);
   assert.deepEqual(rows.map((r) => [r.start, r.end, r.pad]), [[0, 2.3, 0], [2.3, 8.3, 1], [8.3, 9.8, 0], [9.8, 14.8, 0]]);
   assert.deepEqual(rows[0].line, [LEAD, 1.95]); assert.equal(rows[1].line, null); assert.deepEqual(rows[2].line, [8.5, 9.65], 'a line the model spoke itself is shown for the whole of its shot');
+});
+
+test('the canvas window is handed the nodes, what stands for each and the lines between them, and keeps only changes that leave the canvas sound', async () => {
+  const dir = fresh('canvas'), home = fresh('canvas-home');
+  fs.mkdirSync(path.join(dir, 'media')); ff('-f', 'lavfi', '-i', 'color=c=blue:s=90x160', '-frames:v', '1', path.join(dir, 'media', 'me.jpg'));
+  writeFlow(dir, { format: 'tall', nodes: { look: { kind: 'text', text: 'Soft light.' }, lan: { kind: 'person', name: 'Lan' }, 'lan-face': { kind: 'picture', file: 'media/me.jpg' }, 'lan-sheet': { kind: 'picture', prompt: 'A sheet of the person in @lan-face. @look', by: 'director', as: 'a', of: 'b' } } });
+  const s = await serve({ port: 0, film: dir, home }), origin = s.url.replace(/\/$/, '');
+  try {
+    const front = await fetch(s.url, { redirect: 'manual' }), where = front.headers.get('location'); assert.equal(front.status, 302); assert.match(where, /^\/c\/[0-9a-f]{16}\/$/);
+    const at = origin + where.replace(/\/$/, ''), get = (p) => fetch(at + p).then((r) => r.json()), send = (p, method, body) => fetch(at + p, { method, headers: { 'X-Songbe': '1' }, body: JSON.stringify(body) }).then((r) => r.json());
+    assert.match(await fetch(at + '/').then((r) => r.text()), /id="board"/);
+    const st = await get('/api/state');
+    assert.deepEqual(st.rows.map((r) => `${r.id} ${r.state}`), ['look words', 'lan words', 'lan-face own', 'lan-sheet make']); assert.deepEqual(st.edges, [['lan-face', 'lan-sheet']]);
+    assert.equal(st.rows[3].recipe.prompt, 'A sheet of the person in image 1. Soft light.', 'the prompt as the model will read it'); assert.equal(st.models.known['hailuo-h3'].acts, true);
+    assert.equal((await fetch(origin + st.rows[2].url)).status, 200); assert.equal((await fetch(at + '/file?p=' + encodeURIComponent('/etc/passwd'))).status, 404, 'only files of the film are served');
+    assert.equal((await fetch(at + '/api/node?id=x', { method: 'PUT', body: '{}' })).status, 403, 'a change needs the header a foreign page cannot send');
+    const unsound = await send('/api/node?id=rain', 'PUT', { kind: 'picture', prompt: 'Like @nobody.' }); assert.equal(unsound.saved, false); assert.match(unsound.bad[0], /it mentions @nobody/); assert.ok(!readFlow(dir).nodes.rain);
+    const kept = await send('/api/node?id=rain', 'PUT', { kind: 'picture', prompt: 'Rain on glass. @look', by: 'director', as: 'x' }); assert.equal(kept.saved, true); assert.deepEqual(readFlow(dir).nodes.rain, { kind: 'picture', prompt: 'Rain on glass. @look' }, 'the director\'s marks are not the page\'s to set');
+    await send('/api/node?id=lan-sheet', 'PUT', { kind: 'picture', prompt: 'A sheet of @lan as in @lan-face.' }); assert.deepEqual([readFlow(dir).nodes['lan-sheet'].by, readFlow(dir).nodes['lan-sheet'].of], ['director', 'b'], 'and those it has stay');
+    assert.match((await send('/api/node?id=Bad Name', 'PUT', { kind: 'text', text: 'x' })).error, /lower-case letters/);
+    assert.match((await send('/api/delete', 'POST', { id: 'lan-face' })).error, /lan-sheet works from it/); assert.match((await send('/api/delete', 'POST', { id: 'lan' })).error, /lan-sheet works from it/, 'a person is in use where a prompt mentions them');
+    assert.equal((await send('/api/delete', 'POST', { id: 'rain' })).saved, true); assert.ok(!readFlow(dir).nodes.rain);
+    await send('/api/place', 'POST', { lan: [120.4, 40], nobody: [1, 2] }); assert.deepEqual(readFlow(dir).nodes.lan.xy, [120, 40]);
+    assert.match((await send('/api/pick', 'POST', { id: 'lan-sheet', n: 1 })).error, /no take yet/); assert.deepEqual((await get('/api/takes?id=lan-sheet')).takes, []);
+  } finally { s.close(); }
 });

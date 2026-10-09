@@ -79,6 +79,7 @@ the order of mention. Write `@@` for a plain @.
 Any node may carry `label`, `group` and `note`. Nothing else is special: "an episode" is a cut and the nodes it works from.
 
 ```sh
+songbe flow open my-series                 # the canvas in a window: cards and lines, a panel to change a node, Make
 songbe flow my-series                      # what stands for every node: made, to make, waiting
 songbe flow run my-series e1               # make what e1 works from and is missing or out of date
 songbe flow retake my-series e1-s5         # another take of one clip; songbe flow takes / pick choose between takes
@@ -86,6 +87,13 @@ songbe flow lock my-series lan-sheet       # hold a take whatever changes around
 songbe flow board my-series                # one picture of the whole canvas
 songbe flow models                         # the models known by name
 ```
+
+**The window** (`songbe flow open`) shows every node as a card — a picture, a clip that plays, a line of dialogue — with a line
+to each node it works from. Drag the background to move and scroll to zoom; drag a card by its top to place it. Choosing a card
+opens its panel: its words, the nodes it starts from, its model, the prompt exactly as the model reads it, the result, its takes.
+Changes are saved as you type, and only when the canvas is still sound with them. *Make it* makes one node, *Another take* asks
+again, *Make what is missing* runs everything that is out of date, and a node that failed says why. *+ Add* puts a new node of
+any kind on the canvas.
 
 Every result is a **take**, kept under a key made from everything it was made from — the words, the model, and the takes of the
 nodes it works from. So running again costs nothing, and changing one thing leaves exactly the nodes that work from it to be made
@@ -108,7 +116,8 @@ for any other the recording is laid over the shot. For endpoints named by their 
 
 ## What it cannot do yet
 
-- The canvas has no window of its own yet: it is edited as a file and looked at as a board.
+- In the canvas window a node is wired to another by writing `@name` or choosing it in a list; lines cannot be dragged yet.
+  Films are opened with `songbe flow open`; the app's home screen does not list them yet.
 - One line per shot, one speaker per shot. Two people talking over each other is not written.
 - Reference pictures for clips go to fal.ai endpoints only; Google's Veo is asked with a first frame (and a last one).
 - A clip is taken from its start; `from` and `to` in a cut choose the part to keep by hand.

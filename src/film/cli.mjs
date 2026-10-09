@@ -28,6 +28,7 @@ Songbe flow — the canvas itself: every picture, line, clip and cut is a node t
   songbe flow retake <dir> <node…>    another take of these nodes; what works from them follows on the next run
   songbe flow takes <dir> <node>      the takes a node has; songbe flow pick <dir> <node> <n> chooses one
   songbe flow lock|unlock <dir> <node>   hold a node's chosen take whatever changes around it
+  songbe flow open <dir>              the canvas in a window: every node a card, changed and made from there (--port=N)
   songbe flow board <dir>             one page and one picture of the whole canvas (out/board.html, out/board.jpg)
   songbe flow models                  the models known by name; any other is named fal:<endpoint> or google:<model id>
 
@@ -36,7 +37,10 @@ a person's description, or a picture handed to the model as a reference. Keys: G
 voices, music, the writer) and FAL_KEY (models of other makers, through fal.ai).`;
 
 const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
-function progress() {
+// `--events`: one line of JSON per thing that happens, for a program that is watching (the canvas window)
+const forMachines = (e) => console.log('@@' + JSON.stringify({ type: e.type, id: e.id, kind: e.kind, by: e.by, took: e.took, n: e.n, error: e.error }));
+function progress(machine = false) {
+  if (machine) return forMachines;
   return (e) => {
     if (e.type === 'start') log(`  … ${e.id.padEnd(22)} ${e.kind.padEnd(8)} ${e.by}`);
     else if (e.type === 'done') log(`  ✓ ${e.id.padEnd(22)} ${e.took} s`);
@@ -110,7 +114,7 @@ export async function main(cmd, args) {
   }
 
   // ---- songbe flow ----
-  const known = ['run', 'retake', 'takes', 'pick', 'lock', 'unlock', 'board', 'models', 'status', 'help'], sub = known.includes(words[0]) ? words[0] : 'status', rest = known.includes(words[0]) ? words.slice(1) : words;
+  const known = ['run', 'retake', 'takes', 'pick', 'lock', 'unlock', 'board', 'open', 'models', 'status', 'help'], sub = known.includes(words[0]) ? words[0] : 'status', rest = known.includes(words[0]) ? words.slice(1) : words;
   if (sub === 'help') return log(HELP);
   if (sub === 'models') {
     keys(null);
@@ -123,6 +127,12 @@ export async function main(cmd, args) {
   const dir = path.resolve(target); keys(dir);
   const flow = readFlow(dir), bad = checkFlow(flow, dir);
   if (!Object.keys(flow.nodes).length) throw new Error(`there is no flow.json in ${dir} yet (songbe film new … writes one from an idea)`);
+  if (sub === 'open') {      // the canvas in a window: every node a card, changed and made from there
+    const { serve } = await import('../studio.mjs'), s = await serve({ port: +(opt('port') || 4173), film: dir });
+    log(`the canvas of ${dir}\n  open ${s.url}\n  looking is free; "Make" uses your keys\n  Ctrl-C to stop`);
+    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { s.close(); process.exit(0); });
+    return;
+  }
   for (const id of names) if (sub !== 'pick' && !flow.nodes[id]) throw new Error(`there is no node called "${id}"`);
   if (sub === 'status') {
     if (bad.length) { process.exitCode = 2; return log(`${plural(bad.length, 'problem')}:\n  - ` + bad.join('\n  - ')); }
@@ -134,7 +144,8 @@ export async function main(cmd, args) {
   }
   if (sub === 'run' || sub === 'retake') {
     if (sub === 'retake' && !names.length) throw new Error('another take of which node?');
-    const result = await runFlow(dir, flow, { want: names.length ? names : null, again: sub === 'retake' ? names : (opt('again') || '').split(',').filter(Boolean), limit: +(opt('limit') || 4), on: progress() });
+    const result = await runFlow(dir, flow, { want: names.length ? names : null, again: sub === 'retake' ? names : (opt('again') || '').split(',').filter(Boolean), limit: +(opt('limit') || 4), on: progress(has('events')) });
+    if (has('events')) { publish(dir, flow, result); if (result.failed.length) process.exitCode = 2; return; }
     summary(result); for (const f of publish(dir, flow, result)) log(`film:  ${f}`);
     if (sub === 'retake') for (const id of names) if (result.out.has(id)) log(`${id}: ${result.out.get(id).file}`);
     if (result.failed.length) process.exitCode = 2; return;

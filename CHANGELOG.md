@@ -2,6 +2,14 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.21
+- **The canvas in a window.** `songbe flow open <dir>` shows `flow.json` as cards and lines: every picture, every clip that
+  plays, every line of dialogue, and what each works from. A panel changes the chosen node — its words, where it starts, its
+  model — and shows the prompt exactly as the model reads it, the result, and the takes to choose from. *Make it*, *Another
+  take* and *Make what is missing* run in a process of their own with the cards following live; a node that fails says why.
+  *+ Add* puts a node of any kind on the canvas; a change that would break the canvas is not saved, and the page says what is
+  wrong with it.
+
 ## 0.20
 - **Films and series.** `songbe film make <dir> "<idea>"` writes a series (its look, cast, places and episodes), the shot table
   of an episode, and makes the episode: a face and a reference sheet for everyone, a plate for every place, one wide picture per

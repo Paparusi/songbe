@@ -19,9 +19,9 @@ choose, and cuts the episodes. Everything it makes sits on one canvas (`flow.jso
 of its own: change a line, hand one shot to another model, add a prop of yours, and only what works from it is made again.
 → [Films and series](docs/film.md)
 
-<p align="center"><img src="docs/img/film-board.jpg" width="92%" alt="The board of an episode: the cast with their reference sheets, the places, and every shot with its line"></p>
+<p align="center"><img src="docs/img/film-canvas.jpg" width="92%" alt="The canvas: every first frame, clip and line of an episode as a card; the chosen clip's panel shows its prompt as the model reads it"></p>
 
-> Version 0.20.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.21.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux, Windows and macOS (the tests
 > and each installer run on all three for every release). Named after the Sông Bé, a river in southern Vietnam. Apache-2.0.
 

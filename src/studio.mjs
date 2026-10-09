@@ -15,6 +15,7 @@ import { FFMPEG_WINDOWS, ffmpegAdvice, installFfmpeg } from './setup.mjs';
 import { installedPacksDir, listPacks, starterDir, starterList } from './packs.mjs';
 import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES, refreshStyles } from './spec.mjs';
 import { rewriteScene, writeSpec, writerFor } from './write.mjs';
+import { canvasRoutes } from './film/canvas.mjs';
 import { KIT, ROOT, WIN, dataDir, exists, killTree, log, mkdir, openOutside, projectsHome, readDotEnv, sha, tools } from './util.mjs';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
@@ -51,8 +52,9 @@ export function trusted(req) {
 // The plan carries file:// addresses for the renderer; a page served over http gets the same files through `link`.
 export const forBrowser = (plan, link) => JSON.parse(JSON.stringify(plan), (k, v) => (typeof v === 'string' && v.startsWith('file://') ? link(fileURLToPath(v)) : v));
 
-export async function serve({ port: wantPort = 4173, project = null, home = projectsHome(), ask = null, describeModel = describe } = {}) {      // `ask` stands in for the language model in tests, `describeModel` for fal.ai's catalogue
+export async function serve({ port: wantPort = 4173, project = null, film = null, home = projectsHome(), ask = null, describeModel = describe } = {}) {      // `ask` stands in for the language model in tests, `describeModel` for fal.ai's catalogue
   const pinned = project ? path.resolve(project) : null;      // `songbe studio <dir>`: this project is the front door
+  const pinnedFilm = film ? path.resolve(film) : null;        // `songbe flow open <dir>`: the canvas of this film is
   const registry = path.join(dataDir(), 'projects.json');
   const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map();
   let setup = { running: false, step: null, done: 0, total: 0, error: null, version: null }, toolsSeen = null, toolsAt = 0;
@@ -109,6 +111,13 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     const dirs = new Map(), add = (d) => { if (exists(path.join(d, 'video.json'))) dirs.set(idOf(d), path.resolve(d)); };
     if (exists(home)) for (const n of fs.readdirSync(home)) add(path.join(home, n));
     recent().forEach(add); if (pinned) add(pinned);
+    return dirs;
+  }
+  // films: every folder with a flow.json, found the same way; their pages are the canvas, under /c/<id>/
+  function films() {
+    const dirs = new Map(), add = (d) => { if (exists(path.join(d, 'flow.json'))) dirs.set(idOf(d), path.resolve(d)); };
+    if (exists(home)) for (const n of fs.readdirSync(home)) add(path.join(home, n));
+    recent().forEach(add); if (pinnedFilm) add(pinnedFilm);
     return dirs;
   }
   // asked for on every request of a project (a preview loads thirty frames a second), so the answer is remembered while it holds
@@ -288,6 +297,7 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     send(res, 404, { error: 'not found' });
   }
 
+  const canvas = canvasRoutes({ send, json, serveFile, keysFor, version: VERSION });
   const server = http.createServer(async (req, res) => {
     try {
       // SONGBE_TRACE=1: one line per request (who asked for what, never the query), for finding out what a window really loaded
@@ -301,7 +311,14 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
         if (m[2] === '/' && req.method === 'GET' && !pinned) remember(dir);      // opening a project moves it to the top of the list
         return await projectRoute(req, res, u, m[1], dir, m[2]);
       }
-      if (route === 'GET /') return send(res, 302, '', 'text/plain', { Location: pinned ? `/p/${idOf(pinned)}/` : '/home' });
+      const c = /^\/c\/([0-9a-f]{16})(\/.*)?$/.exec(u.pathname);
+      if (c) {
+        const dir = films().get(c[1]);
+        if (!dir) return send(res, 404, '<body style="font:16px system-ui;color:#ddd;padding:24px;background:#111">This film is no longer where it was. <a style="color:#4FE0D6" href="/home">Back to your videos</a></body>', MIME['.html']);
+        if (!c[2]) return send(res, 302, '', 'text/plain', { Location: `/c/${c[1]}/` });
+        return await canvas(req, res, u, c[1], dir, c[2]);
+      }
+      if (route === 'GET /') return send(res, 302, '', 'text/plain', { Location: pinnedFilm ? `/c/${idOf(pinnedFilm)}/` : pinned ? `/p/${idOf(pinned)}/` : '/home' });
       if (route === 'GET /home') return serveFile(req, res, path.join(PAGES, 'home.html'), [PAGES]);
       if (req.method === 'GET' && u.pathname.startsWith('/kit/')) return serveFile(req, res, path.join(KIT, decodeURIComponent(u.pathname.slice(5))), [KIT]);
       if (req.method === 'GET' && u.pathname.startsWith('/studio/')) return serveFile(req, res, path.join(PAGES, decodeURIComponent(u.pathname.slice(8))), [PAGES]);
@@ -363,7 +380,7 @@ export async function serve({ port: wantPort = 4173, project = null, home = proj
     posters.queue.length = 0; if (posters.proc) killTree(posters.proc);
     for (const j of jobs.values()) if (!j.done) { j.stopped = true; killTree(j.proc); }
     for (const f of footage.values()) if (!f.done) killTree(f.proc);
-    server.close(); server.closeAllConnections?.();
+    canvas.close(); server.close(); server.closeAllConnections?.();
   };
   return { server, port, url: `http://127.0.0.1:${port}/`, home, close };
 }

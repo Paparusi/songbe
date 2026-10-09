@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Songbe</title>
+<link rel="icon" type="image/png" href="/studio/logo.png"><link rel="stylesheet" href="/kit/fonts/fonts.css"><link rel="stylesheet" href="/studio/ui.css">
+<style>
+.proj { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; } .sep { color: var(--line); }
+main { display: grid; grid-template-columns: 1fr 400px; height: calc(100% - 56px); }
+#board { position: relative; overflow: hidden; background: #0A0D12 radial-gradient(#1B2330 1px, transparent 1.2px) 0 0 / 24px 24px; cursor: grab; touch-action: none; user-select: none; }
+#board.panning { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#wires { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+#wires path { fill: none; stroke: #5A6B80; stroke-width: 1.4; opacity: .28; } #wires path.on { stroke: var(--accent); opacity: .95; stroke-width: 2; }
+.node { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 6px 18px #0006; }
+.node:hover { border-color: #46566A; } .node.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent), 0 8px 22px #0008; }
+.node.dim { opacity: .38; }
+.nh { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 9px; font-size: 12px; cursor: move; background: var(--raise); border-bottom: 1px solid var(--line); }
+.nh b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .nh i { font-style: normal; color: var(--soft); margin-left: auto; flex: none; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #55616F; flex: none; }
+.s-ready .dot, .s-held .dot, .s-own .dot { background: #46D39A; } .s-make .dot { background: var(--warn); } .s-stuck .dot { background: var(--bad); } .s-words .dot { background: #6E8BFF; }
+.s-busy .dot { background: var(--accent); animation: pulse 1s infinite; } @keyframes pulse { 50% { opacity: .25; } }
+.nb { position: relative; background: #0B0F15; } .nb img, .nb video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nb .none { position: absolute; inset: 0; display: grid; place-items: center; color: #5B6878; font-size: 12px; text-align: center; padding: 8px; }
+.nb .words { padding: 8px 10px; font-size: 12px; line-height: 1.4; color: #C4CEDA; height: 100%; overflow: hidden; } .nb .words b { color: #fff; }
+.nb .play { position: absolute; right: 8px; bottom: 8px; width: 28px; height: 28px; border-radius: 50%; background: #000A; display: grid; place-items: center; font-size: 12px; color: #fff; }
+.k-voice .nb .words { color: #fff; border-left: 3px solid #6EA8FF; } .k-music .nb .words { border-left: 3px solid #C9A23A; }
+#side { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 14px 14px 60px; }
+#side h2 { font-size: 16px; margin-bottom: 2px; word-break: break-all; } #side .kind { color: var(--soft); font-size: 12px; margin-bottom: 10px; }
+.f { margin-top: 10px; } .f > label { display: block; font-size: 12px; font-weight: 600; color: var(--soft); margin-bottom: 4px; }
+textarea { resize: vertical; min-height: 38px; } .rowf { display: flex; gap: 8px; align-items: center; } .rowf > * { min-width: 0; }
+.out { margin-top: 12px; border-radius: 10px; overflow: hidden; background: #000; } .out img, .out video { display: block; width: 100%; max-height: 420px; object-fit: contain; } .out audio { display: block; width: 100%; }
+.takes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; } .takes .btn.on { border-color: var(--accent); color: var(--accent); }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; } details { margin-top: 12px; } summary { cursor: pointer; color: var(--soft); font-size: 12px; font-weight: 600; }
+.read { font: 12px/1.5 ui-monospace, Menlo, monospace; color: #B8C3D0; white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; margin-top: 6px; }
+.hint { color: var(--soft); font-size: 12px; margin-top: 8px; } .mark { color: var(--soft); font-size: 12px; margin-top: 12px; }
+#add { position: relative; } #menu { position: absolute; right: 0; top: 42px; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; width: 250px; box-shadow: 0 10px 30px #000A; }
+#menu .kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; } #menu .kinds .btn.on { border-color: var(--accent); color: var(--accent); }
+#zoom { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; z-index: 5; }
+#log { position: absolute; left: 12px; top: 12px; z-index: 5; max-width: 60%; font-size: 12px; color: var(--soft); pointer-events: none; }
+#log div { background: #0D1117D9; border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; margin-bottom: 4px; width: fit-content; } #log .bad { color: var(--bad); }
+</style></head>
+<body>
+<header class="bar">
+  <a class="logo" href="/home" title="All your videos"><img src="/studio/logo.png" alt=""><b>Song<span>be</span></b></a>
+  <span class="sep">/</span><div class="proj" id="proj"></div><div class="gap"></div>
+  <span class="tag" id="count">loading…</span><span class="tag" id="saved" hidden></span>
+  <div id="add"><button class="btn" id="addb">+ Add</button><div id="menu" hidden></div></div>
+  <button class="btn stop" id="stop" hidden>Stop</button><button class="btn go" id="go">Make what is missing</button>
+</header>
+<main>
+  <section id="board"><div id="world"><svg id="wires"></svg></div><div id="log"></div>
+    <div id="zoom"><button class="btn small" data-z="out">−</button><button class="btn small" data-z="fit">Fit</button><button class="btn small" data-z="in">+</button></div></section>
+  <aside id="side"></aside>
+</main>
+<script>
+// The canvas: flow.json drawn as cards and lines. Nothing here decides what a film is; it shows the nodes there are, lets each be
+// changed, and asks the server to have the missing ones made. Text from the file is always set as text, never as markup.
+const prefix = location.pathname.replace(/\/$/, ''), api = (where, o = {}) => fetch(prefix + where, { ...o, headers: { 'X-Songbe': '1', ...(o.headers || {}) } });
+const $ = (q) => document.querySelector(q), board = $('#board'), world = $('#world'), wires = $('#wires'), side = $('#side');
+const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(props)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v !== false && v !== null && v !== undefined) e.setAttribute(k, v === true ? '' : v); } e.append(...kids.filter((x) => x !== null && x !== undefined && x !== false)); return e; };
+const list = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]), bare = (ref) => String(ref || '').replace(/^@/, '');
+const STATE = { ready: 'made', held: 'held', own: 'your file', make: 'to make', wait: 'waiting', stuck: 'stuck', words: '' };
+let S = null, rows = new Map(), sel = null, view = { x: 40, y: 30, k: .6 }, busy = new Set(), failed = new Map(), pos = {}, saving = null, events = null;
+
+// ---- where cards sit ----
+const RATIO = { '9:16': 9 / 16, '16:9': 16 / 9, '1:1': 1, '3:4': 3 / 4, '4:3': 4 / 3, '2:3': 2 / 3, '3:2': 3 / 2, '4:5': 4 / 5, '5:4': 5 / 4, '21:9': 21 / 9 };
+const frameRatio = () => ({ tall: 9 / 16, wide: 16 / 9, square: 1 }[S.flow.format || 'tall']);
+function sizeOf(id) {      // [width, height] of a card, header included
+  const n = S.flow.nodes[id], r = n.kind === 'picture' ? (n.grab ? frameRatio() : RATIO[n.aspect] || frameRatio()) : frameRatio();
+  if (n.kind === 'picture' || n.kind === 'clip' || n.kind === 'cut') { const w = r > 1.2 ? 300 : 190; return [w, 30 + Math.round(w / r)]; }
+  return n.kind === 'voice' ? [210, 30 + 78] : n.kind === 'music' ? [210, 30 + 62] : [240, 30 + 104];
+}
+function arrange() {      // a tidy first layout for nodes that were never moved: notes, cast, places, then each cut with its shots in order
+  const N = S.flow.nodes, at = {}, ids = Object.keys(N), of = (kind) => ids.filter((id) => N[id].kind === kind), put = (id, x, y) => { if (N[id] && !(id in at)) { at[id] = [x, y]; return sizeOf(id); } return [0, 0]; };
+  let y = 0; for (const id of of('text')) y += put(id, 0, y)[1] + 18;
+  let x = 280, tall = 0; y = 0;
+  const row = (head, ...rest) => { let cx = x, h = put(head, cx, y)[1]; cx += 258; for (const r of rest) { const [w, hh] = put(r, cx, y); if (w) { cx += w + 18; h = Math.max(h, hh); } } tall = Math.max(tall, cx); y += h + 24; };
+  for (const p of of('person')) row(p, `${p}-face`, `${p}-sheet`);
+  for (const p of of('place')) row(p, `${p}-plate`);
+  x = Math.max(tall, x + 258) + 90;
+  for (const c of of('cut')) {
+    const shots = list(N[c].shots).map((s) => bare(typeof s === 'string' ? s : s.clip)).filter((s) => N[s]), frames = new Set(shots.map((s) => bare(N[s].frame)));
+    let cx = x, top = 0; top = Math.max(top, put(c, cx, 0)[1]); cx += sizeOf(c)[0] + 18;
+    if (N[c].music) { const m = bare(N[c].music); top = Math.max(top, put(m, cx, 0)[1]); cx += 228; }
+    for (const id of ids) if (N[id].kind === 'picture' && N[c].group && N[id].group === N[c].group && !frames.has(id)) { const [w, h] = put(id, cx, 0); if (w) { cx += w + 18; top = Math.max(top, h); } }
+    let sx = x; const sy = top + 70;
+    for (const s of shots) { let yy = sy; const f = bare(N[s].frame), l = bare(N[s].voice); if (f && N[f]) yy += put(f, sx, yy)[1] + 16; yy += put(s, sx, yy)[1] + 16; if (l && N[l]) put(l, sx, yy); sx += 228; }
+    x = Math.max(cx, sx) + 110;
+  }
+  // a card someone placed by hand keeps its place, and a card the tidy layout would put under it steps aside
+  const taken = ids.filter((id) => N[id].xy).map((id) => [...N[id].xy, ...sizeOf(id)]), hits = (id) => { const [x, y] = at[id], [w, h] = sizeOf(id); return taken.some(([tx, ty, tw, th]) => x < tx + tw && tx < x + w && y < ty + th && ty < y + h); };
+  for (const id of ids) if (!N[id].xy && at[id]) for (let i = 0; i < 40 && hits(id); i++) at[id] = [at[id][0] + 228, at[id][1]];
+  let lx = 0, ly = Math.max(0, ...Object.entries(at).map(([id, p]) => p[1] + sizeOf(id)[1])) + 80;
+  for (const id of ids) if (!(id in at)) { const [w] = put(id, lx, ly); lx += w + 18; if (lx > 2600) { lx = 0; ly += 400; } }
+  return at;
+}
+const place = (id) => S.flow.nodes[id].xy || pos[id] || [0, 0];
+
+// ---- drawing ----
+function card(id) {
+  const n = S.flow.nodes[id], r = rows.get(id) || {}, [w, h] = sizeOf(id), [x, y] = place(id), state = busy.has(id) ? 'busy' : failed.has(id) && r.state !== 'ready' ? 'stuck' : r.state || 'wait';
+  const body = el('div', { class: 'nb', style: `height:${h - 30}px` });
+  if (n.kind === 'picture') body.append(r.url ? el('img', { src: r.url, draggable: 'false', loading: 'lazy' }) : el('div', { class: 'none', text: STATE[state] || 'to make' }));
+  else if (n.kind === 'clip' || n.kind === 'cut') { const f = n.kind === 'clip' ? rows.get(bare(n.frame)) : null; body.append(r.url ? el('video', { src: r.url + '#t=0.1', preload: 'metadata', muted: true, playsinline: true }) : f?.url ? el('img', { src: f.url, draggable: 'false', style: 'opacity:.45' }) : el('div', { class: 'none', text: STATE[state] || 'to make' })); if (r.url) body.append(el('div', { class: 'play', text: '▶' })); }
+  else { const words = el('div', { class: 'words' }); if (n.name) words.append(el('b', { text: n.name + (n.voice?.voice ? ` · ${n.voice.voice}` : '') }), el('br')); words.append(String(n.text || n.look || n.prompt || '').slice(0, 260)); body.append(words); }
+  return el('div', { class: `node k-${n.kind} s-${state}${id === sel ? ' sel' : ''}`, 'data-id': id, style: `left:${x}px;top:${y}px;width:${w}px` },
+    el('div', { class: 'nh' }, el('span', { class: 'dot' }), el('b', { text: id }), el('i', { text: n.kind })), body);
+}
+function wire([from, to]) {
+  const [ax, ay] = place(from), [aw, ah] = sizeOf(from), [bx, by] = place(to), [bw, bh] = sizeOf(to), down = Math.abs(bx - ax) < 60 && by > ay;
+  const p = down ? [ax + aw / 2, ay + ah, bx + bw / 2, by] : bx >= ax ? [ax + aw, ay + ah / 2, bx, by + bh / 2] : [ax, ay + ah / 2, bx + bw, by + bh / 2];
+  const d = down ? `M${p[0]},${p[1]} C${p[0]},${p[1] + 40} ${p[2]},${p[3] - 40} ${p[2]},${p[3]}` : `M${p[0]},${p[1]} C${p[0] + (bx >= ax ? 1 : -1) * Math.max(60, Math.abs(p[2] - p[0]) * .4)},${p[1]} ${p[2] - (bx >= ax ? 1 : -1) * Math.max(60, Math.abs(p[2] - p[0]) * .4)},${p[3]} ${p[2]},${p[3]}`;
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); if (sel && (from === sel || to === sel)) path.setAttribute('class', 'on'); return path;
+}
+function draw() {
+  for (const n of [...world.querySelectorAll('.node')]) n.remove();
+  wires.replaceChildren(...S.edges.filter(([a, b]) => S.flow.nodes[a] && S.flow.nodes[b]).map(wire));
+  world.append(...Object.keys(S.flow.nodes).map(card));
+  world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+  const todo = S.rows.filter((r) => r.state === 'make' || r.state === 'wait').length, done = S.rows.filter((r) => ['ready', 'held', 'own'].includes(r.state)).length;
+  $('#count').textContent = S.bad.length ? `${S.bad.length} problem${S.bad.length > 1 ? 's' : ''}` : `${done} made · ${todo} to make`; $('#count').className = 'tag' + (S.bad.length ? ' warn' : todo ? '' : ' on');
+  $('#go').textContent = todo ? `Make what is missing (${todo})` : 'Everything is made'; $('#go').disabled = !todo || S.running || !!S.bad.length; $('#go').hidden = S.running; $('#stop').hidden = !S.running;
+}
+function fit() {
+  const ids = Object.keys(S.flow.nodes); if (!ids.length) return;
+  const x0 = Math.min(...ids.map((i) => place(i)[0])), y0 = Math.min(...ids.map((i) => place(i)[1])), x1 = Math.max(...ids.map((i) => place(i)[0] + sizeOf(i)[0])), y1 = Math.max(...ids.map((i) => place(i)[1] + sizeOf(i)[1]));
+  const k = Math.min(1, (board.clientWidth - 60) / (x1 - x0), (board.clientHeight - 60) / (y1 - y0)); view = { k, x: 30 - x0 * k, y: 30 - y0 * k }; draw();
+}
+function take(state) { S = state; rows = new Map(S.rows.map((r) => [r.id, r])); pos = arrange(); document.title = (S.title || S.name) + ' · Songbe'; $('#proj').textContent = S.title || S.name; $('#proj').title = S.dir; if (sel && !S.flow.nodes[sel]) sel = null; }
+const say = (text, bad) => { const d = el('div', { text, class: bad ? 'bad' : '' }); $('#log').append(d); setTimeout(() => d.remove(), bad ? 9000 : 4000); };
+
+// ---- the panel of one node ----
+function panel() {
+  if (!sel) return side.replaceChildren(el('h2', { text: 'Nothing chosen' }), el('div', { class: 'hint', text: 'Click a card to see what it is made from and change it. Drag the background to move, scroll to zoom; drag a card by its top to place it.' }),
+    ...(S.bad.length ? [el('div', { class: 'f' }, el('label', { text: 'Problems in flow.json' }), ...S.bad.map((b) => el('div', { class: 'msg bad', text: b })))] : []));
+  const n = S.flow.nodes[sel], r = rows.get(sel) || {}, K = S.kinds[n.kind], kids = [el('h2', { text: sel }), el('div', { class: 'kind', text: `${n.kind}${n.label ? ' · ' + n.label : ''}${STATE[r.state] ? ' · ' + STATE[r.state] : ''}${r.state === 'ready' ? ` (take ${r.n}${r.takes > 1 ? ' of ' + r.takes : ''})` : ''}` })];
+  const set = (key, value) => { if (value === '' || value === undefined || value === null || value === false) delete n[key]; else n[key] = value; save(); };
+  const field = (label, key, input) => el('div', { class: 'f' }, el('label', { text: label }), input);
+  const text = (label, key, rows = 3, hint) => field(label, key, el('textarea', { rows, placeholder: hint || '', oninput: (e) => set(key, e.target.value) }, document.createTextNode(n[key] ?? '')));
+  const line = (label, key, hint, list) => field(label, key, el('input', { type: 'text', value: n[key] ?? '', placeholder: hint || '', list: list || null, oninput: (e) => set(key, e.target.value.trim()) }));
+  const pick = (label, key, options, none = '—') => field(label, key, el('select', { onchange: (e) => set(key, e.target.value) }, el('option', { value: '', text: none }), ...options.map(([v, t]) => el('option', { value: v, text: t, selected: n[key] === v }))));
+  const nodes = (kind) => Object.keys(S.flow.nodes).filter((id) => S.flow.nodes[id].kind === kind && id !== sel).map((id) => ['@' + id, id]);
+  const models = (kind) => { const id = 'models-' + kind; if (!document.getElementById(id)) document.body.append(el('datalist', { id }, ...Object.entries(S.models.known).filter(([, m]) => m.kind === kind).map(([name]) => el('option', { value: name })))); return id; };
+  if (r.state === 'stuck' || (r.state === 'wait' && r.why)) kids.push(el('div', { class: 'msg ' + (r.state === 'stuck' ? 'bad' : 'note'), text: r.why }));
+  if (failed.has(sel) && r.state !== 'ready') kids.push(el('div', { class: 'msg bad', text: 'It was not made: ' + failed.get(sel) }));
+  if (n.kind === 'text') kids.push(text('Words (other nodes bring them in with @' + sel + ')', 'text', 6));
+  if (n.kind === 'person' || n.kind === 'place') kids.push(line('Name', 'name'), text('Looks like', 'look', 4));
+  if (n.kind === 'person') { const v = n.voice || {}, voices = Object.entries(S.models.known[S.flow.models?.voice || '']?.voices || S.models.known[S.models.prefer.voice[0]]?.voices || {}).flatMap(([g, all]) => Object.entries(all).map(([name, sounds]) => [name, `${name} — ${g}, ${sounds}`]));
+    kids.push(text('Wears', 'wardrobe', 2), text('Speaks and moves', 'manner', 2), el('div', { class: 'f' }, el('label', { text: 'Voice' }), el('select', { onchange: (e) => set('voice', { ...v, voice: e.target.value || undefined }) }, el('option', { value: '', text: '—' }), ...voices.map(([name, t]) => el('option', { value: name, text: t, selected: v.voice === name })))),
+      el('div', { class: 'f' }, el('label', { text: 'How the voice sounds' }), el('input', { type: 'text', value: v.style || '', oninput: (e) => set('voice', { ...v, style: e.target.value || undefined }) }))); }
+  if (n.kind === 'picture') { if (n.file !== undefined) kids.push(line('A picture of yours (path in the project)', 'file')); else if (n.grab !== undefined) kids.push(pick('A frame taken from', 'grab', nodes('clip')), line('At (seconds, or "end")', 'at')); else kids.push(text('Prompt', 'prompt', 9), pick('Shape', 'aspect', Object.keys(RATIO).map((a) => [a, a]), 'the frame of the film'), line('Model', 'model', S.flow.models?.picture || 'the series’ picture model', models('picture'))); }
+  if (n.kind === 'voice') kids.push(pick('Who says it', 'who', nodes('person')), text('The line', 'text', 3), line('How it is said', 'how', 'quiet, hurt, holding back'), line('Model', 'model', S.flow.models?.voice || 'the series’ voice model', models('voice')));
+  if (n.kind === 'clip') kids.push(text('Prompt', 'prompt', 6), el('div', { class: 'rowf' }, pick('Starts on', 'frame', nodes('picture')), pick('Ends on', 'end', nodes('picture'))), el('div', { class: 'rowf' }, pick('Line', 'voice', nodes('voice'), 'nobody speaks'),
+    n.voice ? field('The speaker is', 'heard', el('select', { onchange: (e) => set('heard', e.target.value === 'heard') }, el('option', { value: '', text: 'seen speaking' }), el('option', { value: 'heard', text: 'only heard', selected: !!n.heard }))) : null),
+    el('div', { class: 'rowf' }, field('Seconds', 'seconds', el('input', { type: 'number', min: 1, max: 30, step: .5, value: n.seconds ?? '', placeholder: 'auto', title: 'Left empty, a shot lasts as long as its line, or four seconds when nobody speaks', oninput: (e) => set('seconds', e.target.value ? +e.target.value : undefined) })), line('Model', 'model', S.flow.models?.[n.voice && !n.heard ? 'talk' : 'clip'] || 'the series’ clip model', models('clip'))));
+  if (n.kind === 'music') kids.push(text('Prompt', 'prompt', 4), line('Model', 'model', S.flow.models?.music || '', models('music')));
+  if (n.kind === 'cut') kids.push(field('Shots, in order (one per line: @clip, or @clip 0.4-3.1 to keep a part)', 'shots', el('textarea', { rows: 8, oninput: (e) => { const shots = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const m = /^(@?[a-z0-9-]+)\s+([\d.]+)\s*-\s*([\d.]+)$/.exec(l); return m ? { clip: '@' + bare(m[1]), from: +m[2], to: +m[3] } : '@' + bare(l.split(/\s/)[0]); }); n.shots = shots; save(); } },
+    document.createTextNode(list(n.shots).map((s) => (typeof s === 'string' ? s : `${s.clip}${s.from !== undefined || s.to !== undefined ? ` ${s.from ?? 0}-${s.to ?? ''}` : ''}`)).join('\n')))), pick('Music', 'music', nodes('music'), 'none'), line('Title', 'title'), line('Notice shown throughout', 'notice'));
+  if (/prompt|text/.test((K.one || K.must || []).join())) kids.push(el('div', { class: 'hint', text: 'Write @name to bring another node in: a note’s words, a person or place described, or a picture handed to the model as a reference.' }));
+  if (r.recipe?.prompt) kids.push(el('details', {}, el('summary', { text: `As ${r.recipe.model || 'the model'} reads it` }), el('div', { class: 'read', text: r.recipe.prompt + (r.recipe.refs?.length ? `\n\n(${r.recipe.refs.length} reference${r.recipe.refs.length > 1 ? 's' : ''} handed over)` : '') })));
+  if (r.url) kids.push(el('div', { class: 'out' }, n.kind === 'picture' ? el('img', { src: r.url }) : n.kind === 'clip' || n.kind === 'cut' ? el('video', { src: r.url, controls: true, playsinline: true }) : el('audio', { src: r.url, controls: true })));
+  const takes = el('div', { class: 'takes' }); kids.push(takes);
+  if (r.state === 'ready' && r.takes > 1) api('/api/takes?id=' + sel).then((x) => x.json()).then((t) => { if (t.takes?.length > 1) takes.replaceChildren(...t.takes.map((k) => el('button', { class: 'btn small' + (k.current ? ' on' : ''), text: 'take ' + k.n, title: `${k.by || ''} ${String(k.at || '').slice(0, 16).replace('T', ' ')}`, onclick: () => post('/api/pick', { id: sel, n: k.n }) }))); });
+  const acts = el('div', { class: 'acts' }); kids.push(acts);
+  if (K.ext && !n.file) { if (['make', 'wait'].includes(r.state)) acts.append(el('button', { class: 'btn go', text: 'Make it', disabled: S.running, onclick: () => run({ want: [sel] }) })); if (r.state === 'ready') acts.append(el('button', { class: 'btn', text: 'Another take', disabled: S.running, onclick: () => run({ again: [sel] }) }));
+    if (r.state === 'ready' || r.state === 'held') acts.append(el('button', { class: 'btn', text: r.held ? 'Let it follow again' : 'Hold this take', onclick: () => post('/api/hold', { id: sel, on: !r.held }) })); }
+  acts.append(el('button', { class: 'btn stop', text: 'Delete', onclick: () => api('/api/delete', { method: 'POST', body: JSON.stringify({ id: sel }) }).then((x) => x.json()).then((x) => { if (x.error || x.bad) return say(x.error || x.bad[0], true); sel = null; take(x); draw(); panel(); }) }));
+  if (n.by === 'director') kids.push(el('div', { class: 'mark', text: 'Written by the director from the series and the script. Once you change it here it is yours: the director leaves it alone.' }));
+  const problems = el('div', { id: 'problems' }); kids.push(problems);
+  side.replaceChildren(...kids);
+}
+function save() {      // a moment after the last keystroke; a canvas that would not be sound is not kept, and the page says why
+  $('#saved').hidden = false; $('#saved').textContent = 'saving…'; clearTimeout(saving); const id = sel, node = S.flow.nodes[id];
+  saving = setTimeout(async () => {
+    const x = await api('/api/node?id=' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(node) }).then((r) => r.json()), box = document.getElementById('problems');
+    if (x.error || x.saved === false) { $('#saved').textContent = 'not saved'; $('#saved').className = 'tag warn'; if (box && sel === id) box.replaceChildren(...(x.bad || [x.error]).map((b) => el('div', { class: 'msg bad', text: b }))); return; }
+    $('#saved').textContent = 'saved'; $('#saved').className = 'tag on'; const typed = S.flow.nodes[id]; take(x); if (sel === id) S.flow.nodes[id] = { ...x.flow.nodes[id], ...typed, by: x.flow.nodes[id].by, as: x.flow.nodes[id].as, of: x.flow.nodes[id].of }; draw(); if (box) box.replaceChildren();
+  }, 600);
+}
+const post = (where, body) => api(where, { method: 'POST', body: JSON.stringify(body) }).then((x) => x.json()).then((x) => { if (x.error) return say(x.error, true); take(x); draw(); panel(); });
+
+// ---- making ----
+async function run(what) {
+  const x = await api('/api/run', { method: 'POST', body: JSON.stringify(what) }).then((r) => r.json()); if (x.error) return say(x.error, true);
+  S.running = true; draw(); panel(); listen();
+}
+function listen() {
+  if (events) events.close(); events = new EventSource(prefix + '/api/events');
+  events.onmessage = async (m) => { const e = JSON.parse(m.data);
+    if (e.type === 'start') { busy.add(e.id); failed.delete(e.id); say(`${e.id}: ${e.by}`); } else if (e.type === 'done') busy.delete(e.id); else if (e.type === 'failed') { busy.delete(e.id); failed.set(e.id, e.error); say(`${e.id}: ${e.error}`, true); } else if (e.type === 'line') say(e.text, /^songbe:/.test(e.text));
+    if (e.type === 'end') { events.close(); events = null; busy.clear(); }
+    if (['done', 'failed', 'end'].includes(e.type)) { take(await api('/api/state').then((r) => r.json())); panel(); }
+    draw(); };
+  events.onerror = () => { events?.close(); events = null; };
+}
+
+// ---- hands: move the view, move a card, choose a card ----
+let drag = null;
+board.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('#zoom')) return;
+  const node = e.target.closest('.node'), id = node?.dataset.id;
+  drag = node && e.target.closest('.nh') ? { id, x: e.clientX, y: e.clientY, at: [...place(id)], moved: false } : { pan: true, id, x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+  board.setPointerCapture(e.pointerId);
+});
+board.addEventListener('pointermove', (e) => {
+  if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true; if (!drag.moved) return;
+  if (drag.pan) { view.x = drag.vx + dx; view.y = drag.vy + dy; board.classList.add('panning'); world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`; }
+  else { S.flow.nodes[drag.id].xy = [Math.round(drag.at[0] + dx / view.k), Math.round(drag.at[1] + dy / view.k)]; draw(); }
+});
+board.addEventListener('pointerup', () => {
+  const d = drag; drag = null; board.classList.remove('panning'); if (!d) return;
+  if (!d.moved) { sel = d.id || null; draw(); panel(); return; }
+  if (!d.pan) api('/api/place', { method: 'POST', body: JSON.stringify({ [d.id]: S.flow.nodes[d.id].xy }) });
+});
+board.addEventListener('wheel', (e) => { e.preventDefault(); const r = board.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, k = Math.min(2.5, Math.max(.08, view.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  view.x = mx - (mx - view.x) * (k / view.k); view.y = my - (my - view.y) * (k / view.k); view.k = k; world.style.transform = `translate(${view.x}px,${view.y}px) scale(${k})`; }, { passive: false });
+$('#zoom').addEventListener('click', (e) => { const z = e.target.dataset.z; if (!z) return; if (z === 'fit') return fit(); const k = Math.min(2.5, Math.max(.08, view.k * (z === 'in' ? 1.25 : .8))), cx = board.clientWidth / 2, cy = board.clientHeight / 2; view.x = cx - (cx - view.x) * (k / view.k); view.y = cy - (cy - view.y) * (k / view.k); view.k = k; draw(); });
+$('#go').addEventListener('click', () => run({})); $('#stop').addEventListener('click', () => api('/api/stop', { method: 'POST', body: '{}' }));
+
+// ---- a new node ----
+const FIRST = { text: () => ({ text: 'Write here.' }), person: (name) => ({ name }), place: (name) => ({ name }), picture: () => ({ prompt: 'Describe the picture.' }), voice: () => ({ text: 'The line.' }), clip: () => ({ prompt: 'Describe what happens.' }), music: () => ({ prompt: 'Instrumental, no vocals.' }) };
+$('#addb').addEventListener('click', () => {
+  const menu = $('#menu'); if (!menu.hidden) return (menu.hidden = true);
+  let kind = 'picture'; const name = el('input', { type: 'text', placeholder: 'its name, like rain-on-glass' }), kinds = el('div', { class: 'kinds' }), msg = el('div', { class: 'msg bad' });
+  const paint = () => kinds.replaceChildren(...Object.keys(FIRST).map((k) => el('button', { class: 'btn small' + (k === kind ? ' on' : ''), text: k, onclick: () => { kind = k; paint(); } })));
+  const add = async () => { const id = name.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); if (!id) return (msg.textContent = 'Give it a name.'); if (S.flow.nodes[id]) return (msg.textContent = 'That name is taken.');
+    const xy = [Math.round((board.clientWidth / 2 - view.x) / view.k - 95), Math.round((board.clientHeight / 2 - view.y) / view.k - 80)];
+    const x = await api('/api/node?id=' + id, { method: 'PUT', body: JSON.stringify({ kind, ...FIRST[kind](name.value.trim()), xy }) }).then((r) => r.json()); if (x.error || x.saved === false) return (msg.textContent = x.error || x.bad[0]);
+    menu.hidden = true; take(x); sel = id; draw(); panel(); };
+  paint(); menu.replaceChildren(kinds, name, el('div', { class: 'acts' }, el('button', { class: 'btn go', text: 'Add', onclick: add })), msg); menu.hidden = false; name.focus(); name.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+});
+
+window.ready = api('/api/state').then((r) => r.json()).then((x) => { take(x); fit(); panel(); if (S.running) listen(); return Object.keys(S.flow.nodes).length; });
+</script>
+</body></html>
