@@ -7,9 +7,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { STAGES, stageNodes, sync } from './director.mjs';
 import { ID, KINDS, checkFlow, estimate, look, needs, openStore, readFlow, writeFlow } from './flow.mjs';
-import { KNOWN, PREFER } from './models.mjs';
-import { hasEpisode, readEpisode, readSeries, written } from './series.mjs';
-import { writeEpisode } from './writer.mjs';
+import { KNOWN, PREFER, modelFor } from './models.mjs';
+import { SIZES, checkEpisode, checkSeries, episodeFile, hasEpisode, readEpisode, readSeries, seriesFile, writeJson, written } from './series.mjs';
+import { scriptSeconds, voicesFor, writeEpisode } from './writer.mjs';
 import { FORMATS } from '../spec.mjs';
 import { ROOT, WIN, exists, killTree } from '../util.mjs';
 
@@ -30,6 +30,12 @@ export function filmCard(id, dir, home) {
     planned: Array.isArray(series?.episodes) ? series.episodes.length : 0, written: written(dir).length, cut: cuts.length, nodes: Object.keys(flow?.nodes || {}).length,
     edited: fs.statSync(path.join(dir, 'flow.json')).mtimeMs, poster: poster ? `/c/${id}/poster?v=${Math.round(fs.statSync(poster).mtimeMs)}` : null };
 }
+
+// A script as a page sends it, with what was left empty taken out: a shot's camera, sound and model, a line nobody wrote
+const tidyScript = (ep) => ({ ...ep, scenes: (Array.isArray(ep.scenes) ? ep.scenes : []).map((scene) => (scene && typeof scene === 'object' ? { ...scene, shots: (Array.isArray(scene.shots) ? scene.shots : []).map((shot) => { if (!shot || typeof shot !== 'object') return shot; const x = { ...shot };
+  for (const k of ['camera', 'sound', 'model']) if (!String(x[k] ?? '').trim()) delete x[k];
+  if (x.line && !String(x.line.text ?? '').trim()) delete x.line; else if (x.line && !String(x.line.how ?? '').trim()) { x.line = { ...x.line }; delete x.line.how; }
+  if (!x.continues) delete x.continues; if (x.seconds === null || x.seconds === '') delete x.seconds; return x; }) } : scene)) });
 
 // `h` is what the server lends: { send, json, serveFile, keysFor, version }
 export function canvasRoutes(h) {
@@ -80,6 +86,39 @@ export function canvasRoutes(h) {
       return h.send(res, 200, { started: true, n });
     }
     if (what === 'GET /api/state') return h.send(res, 200, await state());
+    // ---- the script: the series and its episodes as they are written, and changed from the page ----
+    const scriptsOf = () => Object.fromEntries(written(dir).map((k) => [k, readEpisode(dir, k)]));
+    const timed = (series, scripts) => Object.fromEntries(Object.entries(scripts).map(([k, e]) => { try { return [k, scriptSeconds(series, e)]; } catch { return [k, null]; } }));
+    if (what === 'GET /api/script') {
+      let series; try { series = readSeries(dir); } catch { return h.send(res, 200, { series: null }); }
+      try { const episodes = scriptsOf(); return h.send(res, 200, { series, episodes, seconds: timed(series, episodes), sizes: Object.keys(SIZES), voices: voicesFor(series.models, process.env) }); }
+      catch (e) { return h.send(res, 200, { series, episodes: {}, seconds: {}, sizes: Object.keys(SIZES), voices: null, error: e.message }); }
+    }
+    // One change to the series or to the script of an episode: kept only when the series and every script are sound with it;
+    // the director then brings the canvas up to it, and exactly what works from what changed is to be made again.
+    if (what === 'PUT /api/script' || what === 'PUT /api/series') {
+      if (busy) return h.send(res, 409, { error: 'Something is being made. Change the script when it is done.' });
+      const sent = await h.json(req), held = []; let series, scripts, n = null, before = null;
+      if (!sent || typeof sent !== 'object' || Array.isArray(sent) || !Object.keys(sent).length) return h.send(res, 400, { error: 'Nothing was sent.' });
+      try { series = readSeries(dir); scripts = scriptsOf(); } catch (e) { return h.send(res, 400, { error: e.message }); }
+      if (what.endsWith('script')) { n = +u.searchParams.get('episode'); if (!Number.isInteger(n) || n < 1 || n > (series.episodes?.length || 0)) return h.send(res, 400, { error: `The series plans no episode ${u.searchParams.get('episode')}.` }); scripts[n] = tidyScript(sent); }
+      else { before = series; series = sent; }
+      const bad = checkSeries(series, dir);
+      if (!bad.length) { for (const [role, name] of Object.entries(series.models || {})) { try { modelFor(role, name, {}, false); } catch (e) { bad.push(`models.${role}: ${e.message}`); } }
+        for (const [k, ep] of Object.entries(scripts)) bad.push(...checkEpisode(series, ep).map((x) => (n === +k ? x : `episode ${k}: ${x}`))); }
+      if (bad.length) return h.send(res, 200, { saved: false, bad });
+      // Other clothes do not make someone another person. A face drawn by an older Songbe was drawn with the clothes described,
+      // so it would be drawn again: the face that stands is held instead, and let go of again when their looks change.
+      if (before) { const flow = readFlow(dir), store = openStore(dir), restyled = before.look !== series.look || before.style !== series.style; let rows = null;      // (another look for the whole series is another look for every face)
+        for (const [who, c] of Object.entries(series.cast || {})) { const was = before.cast?.[who], face = `${who}-face`; if (!was) continue;
+          if (was.look !== c.look || was.name !== c.name || restyled) { if (store.heldFor(face) === 'clothes') store.release(face); continue; }
+          if (was.wardrobe === c.wardrobe || !new RegExp(`@${who}(?![a-z0-9-])`).test(String(flow.nodes[face]?.prompt || ''))) continue;
+          rows ||= await look(dir, flow, { env: process.env }); const row = rows.find((x) => x.id === face);
+          if (row?.state === 'ready') { store.hold(face, row.key, row.n, 'clothes'); held.push(face); } } }
+      if (n) writeJson(episodeFile(dir, n), scripts[n]); else writeJson(seriesFile(dir), series);
+      const r = sync(dir, series, scripts);
+      return h.send(res, 200, { saved: true, changed: { added: r.added, updated: r.updated, removed: r.removed, kept: r.kept, mended: r.mended, held }, seconds: timed(series, scripts), ...(await state(r.flow)) });
+    }
     if (what === 'GET /api/plan') {      // what making these nodes (everything, when none is named) would ask for, and about what it costs
       const flow = readFlow(dir), names = (v) => String(u.searchParams.get(v) || '').split(',').filter((x) => flow.nodes[x]), again = names('again');
       try { const want = u.searchParams.get('episode') ? meant(flow, { episode: u.searchParams.get('episode'), upto: u.searchParams.get('upto') || 'cut' }) : names('want');

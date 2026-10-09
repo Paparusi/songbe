@@ -27,6 +27,8 @@ other makers through fal.ai. With both, each model is asked at its maker when th
 
 - **Faces.** Every person gets a portrait and from it a reference sheet (the face from three sides, the whole figure from the
   front and the back, in their one outfit). Every picture a person appears in is drawn with that sheet handed to the model.
+  The portrait is drawn from what someone looks like and never from what they wear, so other clothes mean a new sheet from
+  the same face: the same person.
 - **Scenes.** Every scene gets one wide picture that fixes the place, the light and where everyone is. Every shot's first frame is
   drawn from that picture and the sheets of the people in the frame; the clip starts from that frame.
 - **Voices.** Every person has one voice, and every line is recorded in it with the delivery the script asks for. A clip model
@@ -103,6 +105,15 @@ shot table of its first episode, and opens the canvas with everything laid out a
 *Episodes* menu makes one episode up to a point — its pictures first, to look at before any clip is paid for — and writes the
 next episode when the one before is done. *Open a folder* takes a film's folder too.
 
+**The script, in the app.** *Script* opens the series and the shots of every episode beside the canvas. The *Series* tab holds
+the look, the model for each kind of work, the cast with their looks, clothes and voices, the places, and the episodes planned
+(add more as the story grows). Each *Episode* tab holds its scenes and shots — size, camera, who is in the frame, what is
+seen, the line and who says it, the sound, a model of its own — with the first frame of each shot beside it, and whether its
+clip is made. Shots are added, moved and removed without renaming the others (a shot added after 3 is 3b). What is typed is
+saved a moment later, only when the series and every script are still sound with it — the drawer says what is not — and the
+canvas follows: exactly the cards that work from what changed are to be made again, and putting back what was there brings
+back what was made from it. An episode that is planned and not written is written by the writer from there, or by hand.
+
 **The window** (`songbe flow open`, or a film's card in the app) shows every node as a card — a picture, a clip that plays, a line of dialogue — with a line
 to each node it works from. Drag the background to move and scroll to zoom; drag a card by its top to place it. Choosing a card
 opens its panel: its words, the nodes it starts from, its model, the prompt exactly as the model reads it, the result, its takes.
@@ -134,7 +145,9 @@ again. Going back to an earlier take brings back everything that was made from i
 
 The director (`songbe film expand`, and every `film run`) writes a node again only when what it was written from changed —
 the shot's action, the person's outfit — and only if the node is still as the director wrote it. A node you changed by hand is
-left alone, and the command says so; a node you added is never touched. A film already made is therefore not disturbed by a
+left alone, and the command says so; a node you added is never touched. A cut is the exception that follows the script even
+after you changed it: your order, your trims and the clips you added stay, a shot the script loses leaves the cut, and a new
+shot goes in after the one it follows. A film already made is therefore not disturbed by a
 newer Songbe that words its prompts differently; `songbe film expand --rewrite` asks for the newer wording on purpose.
 
 ## Models

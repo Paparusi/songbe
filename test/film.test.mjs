@@ -12,7 +12,7 @@ import { expand, stageNodes, sync } from '../src/film/director.mjs';
 import { checkFlow, estimate, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
 import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
 import { grave, inWords, reviewClip, reviewPicture, reviewVoice } from '../src/film/review.mjs';
-import { LEAD, TAIL, checkEpisode, checkSeries, lengthOf, readEpisode, readSeries, speechSeconds } from '../src/film/series.mjs';
+import { LEAD, TAIL, checkEpisode, checkSeries, episodeFile, lengthOf, readEpisode, readSeries, seriesFile, speechSeconds, writeJson, written } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
 import { serve } from '../src/studio.mjs';
@@ -340,7 +340,8 @@ test('the director fills the canvas: everyone a face and a sheet, every scene a 
   const flow = expand(SERIES, { 1: EPISODE }), n = flow.nodes;
   assert.deepEqual(checkFlow(flow), []); assert.equal(flow.language, 'Vietnamese'); assert.equal(flow.accent, SERIES.accent);
   assert.deepEqual(Object.keys(n), ['style', 'look', 'keep', 'lan', 'lan-face', 'lan-sheet', 'minh', 'minh-face', 'minh-sheet', 'can-ho', 'can-ho-plate', 'e1-scene1', 'e1-s1-frame', 'e1-s1-line', 'e1-s1', 'e1-s2-frame', 'e1-s2', 'e1-s3-frame', 'e1-s3-line', 'e1-s3', 'e1-s4-frame', 'e1-s4', 'e1-music', 'e1']);
-  assert.equal(n.look.text, '@style Cold blue moonlight, deep shadows.'); assert.match(n['lan-face'].prompt, /^@style Portrait of @lan\./); assert.match(n['lan-sheet'].prompt, /the person in @lan-face.*every view wears a beige blouse/);
+  assert.equal(n.look.text, '@style Cold blue moonlight, deep shadows.'); assert.match(n['lan-face'].prompt, /^@style Portrait of Lan: 26, slim, a black bob\. Chest-up.*Wearing a plain dark top\./); assert.doesNotMatch(n['lan-face'].prompt, /beige/, 'a face is who someone is, not what they wear'); assert.deepEqual(needs(flow, 'lan-face'), []);
+  assert.match(n['lan-sheet'].prompt, /the person in @lan-face.*every view wears a beige blouse/);
   assert.deepEqual(needs(flow, 'e1-scene1').sort(), ['can-ho-plate', 'lan-sheet', 'minh-sheet']); assert.deepEqual(needs(flow, 'e1-s1-frame').sort(), ['e1-scene1', 'lan-sheet']);
   assert.match(n['e1-s1-frame'].prompt, /In the frame: Lan; Minh is outside the frame\. Lan's mouth is closed, about to speak\./);
   assert.deepEqual([n['e1-s1'].voice, n['e1-s1'].heard, n['e1-s3'].heard, n['e1-s2'].seconds], ['@e1-s1-line', undefined, true, 3], 'a line whose speaker is not in the frame is heard, not seen');
@@ -377,7 +378,28 @@ test('the director rewrites only what is still as it wrote it: a node changed by
   const old = readFlow(dir), bare = ({ by, as, of, xy, ...rest }) => rest; old.nodes['lan-face'].prompt = 'Portrait of @lan, as an older version worded it.'; old.nodes['lan-face'].as = sha(bare(old.nodes['lan-face'])); delete old.nodes['minh-face'].of; writeFlow(dir, old);
   assert.deepEqual(sync(dir, SERIES, { 1: changed }).updated, []); assert.match(readFlow(dir).nodes['lan-face'].prompt, /as an older version worded it/); assert.match(readFlow(dir).nodes['minh-face'].of, /^[0-9a-f]{16}$/, 'a node from before the marks is taken as it stands');
   const renamed = structuredClone(SERIES); renamed.cast.lan.wardrobe = 'a red coat'; assert.deepEqual(sync(dir, renamed, { 1: changed }).updated.sort(), ['lan', 'lan-sheet'], 'what the face is written from did not change');
-  assert.deepEqual(sync(dir, renamed, { 1: changed }, { rewrite: true }).updated, ['lan-face']); assert.match(readFlow(dir).nodes['lan-face'].prompt, /^@style Portrait of @lan\./);
+  assert.deepEqual(sync(dir, renamed, { 1: changed }, { rewrite: true }).updated, ['lan-face']); assert.match(readFlow(dir).nodes['lan-face'].prompt, /^@style Portrait of Lan: 26, slim/);
+  // a face from before faces were drawn without the clothes carries the mark an older Songbe gave it: the same facts, so its words stay
+  const older = readFlow(dir), face = older.nodes['minh-face']; face.prompt = '@style Portrait of @minh. Chest-up.'; face.of = sha(['face', { id: 'minh', name: 'Minh', own: null, medium: true }]); face.as = sha(bare(face)); writeFlow(dir, older);
+  assert.deepEqual(sync(dir, renamed, { 1: changed }).updated, []); assert.equal(readFlow(dir).nodes['minh-face'].prompt, '@style Portrait of @minh. Chest-up.');
+  const taller = structuredClone(renamed); taller.cast.minh.wardrobe = 'a grey suit'; assert.deepEqual(sync(dir, taller, { 1: changed }).updated.sort(), ['minh', 'minh-sheet'], 'other clothes: the person and the sheet, never the face');
+  assert.deepEqual(sync(dir, taller, { 1: changed }, { rewrite: true }).updated, ['minh-face']); assert.match(readFlow(dir).nodes['minh-face'].prompt, /^@style Portrait of Minh: 31, broad shoulders\./);
+});
+
+test('a cut a person changed still follows the script in what it is made of: a shot that is gone leaves it, a new one goes in where it belongs', () => {
+  const dir = fresh('mend'); sync(dir, SERIES, { 1: EPISODE });
+  // their own order, a trim, and a clip of their own at the end
+  const flow = readFlow(dir); flow.nodes.rain = { kind: 'clip', prompt: 'Rain on the glass.' }; flow.nodes.e1.shots = ['@e1-s2', { clip: '@e1-s1', from: .2, to: 1.5 }, '@e1-s3', '@e1-s4', '@rain']; writeFlow(dir, flow);
+  const next = structuredClone(EPISODE); next.scenes[0].shots.splice(3, 1); next.scenes[0].shots.splice(1, 0, { id: '1b', size: 'close', who: ['minh'], action: 'Minh blinks.' });      // shot 4 goes, a shot comes after shot 1
+  const r = sync(dir, SERIES, { 1: next });
+  assert.deepEqual(r.mended, ['e1']); assert.ok(r.kept.includes('e1')); assert.deepEqual(r.removed.sort(), ['e1-s4', 'e1-s4-frame']); assert.deepEqual(r.added.sort(), ['e1-s1b', 'e1-s1b-frame']);
+  assert.deepEqual(readFlow(dir).nodes.e1.shots, ['@e1-s2', { clip: '@e1-s1', from: .2, to: 1.5 }, '@e1-s1b', '@e1-s3', '@rain'], 'after the shot it follows in the script; everything of theirs as it was');
+  assert.deepEqual(checkFlow(readFlow(dir)), []); assert.deepEqual(sync(dir, SERIES, { 1: next }).mended, [], 'and it is left alone when nothing changed');
+  // a shot they took out of their cut is not put back; a node of theirs that still works from a shot keeps that shot on the canvas
+  const mine = readFlow(dir); mine.nodes.e1.shots = ['@e1-s2', '@e1-s3']; mine.nodes.still = { kind: 'picture', grab: '@e1-s3' }; writeFlow(dir, mine);
+  const less = structuredClone(next); less.scenes[0].shots.splice(3, 1);      // shot 3 goes from the script
+  const kept = sync(dir, SERIES, { 1: less }), now = readFlow(dir).nodes;
+  assert.deepEqual(now.e1.shots, ['@e1-s2'], 'gone from the cut'); assert.ok(now['e1-s3'] && now['e1-s3-frame'] && kept.kept.includes('e1-s3'), 'but still there for the picture taken from it'); assert.ok(!kept.removed.includes('e1-s3')); assert.deepEqual(checkFlow(readFlow(dir)), []);
 });
 
 test('the writer drafts a series and a script, and is handed back what the checks find', async () => {
@@ -443,6 +465,49 @@ test('the canvas window is handed the nodes, what stands for each and the lines 
     assert.equal((await send('/api/delete', 'POST', { id: 'rain' })).saved, true); assert.ok(!readFlow(dir).nodes.rain);
     await send('/api/place', 'POST', { lan: [120.4, 40], nobody: [1, 2] }); assert.deepEqual(readFlow(dir).nodes.lan.xy, [120, 40]);
     assert.match((await send('/api/pick', 'POST', { id: 'lan-sheet', n: 1 })).error, /no take yet/); assert.deepEqual((await get('/api/takes?id=lan-sheet')).takes, []);
+  } finally { s.close(); }
+});
+
+test('the script is changed from the canvas window: kept only when sound, and the canvas follows — exactly what works from the change is to be made again', async () => {
+  const dir = fresh('script'), home = fresh('script-home'); writeJson(seriesFile(dir), SERIES); writeJson(episodeFile(dir, 1), EPISODE); sync(dir, SERIES, { 1: EPISODE });
+  const s = await serve({ port: 0, film: dir, home }), origin = s.url.replace(/\/$/, '');
+  try {
+    const at = origin + (await fetch(s.url, { redirect: 'manual' })).headers.get('location').replace(/\/$/, ''), get = (p) => fetch(at + p).then((r) => r.json()), put = (p, body) => fetch(at + p, { method: 'PUT', headers: { 'X-Songbe': '1' }, body: JSON.stringify(body) }).then((r) => r.json());
+    const had = await get('/api/script'); assert.equal(had.series.title, 'Hai giờ sáng'); assert.deepEqual(Object.keys(had.episodes), ['1']); assert.ok(had.seconds[1] > 7 && had.seconds[1] < 17); assert.ok(had.sizes.includes('over shoulder')); assert.equal(had.voices.female.Kore, 'firm');
+    assert.equal((await fetch(at + '/api/script?episode=1', { method: 'PUT', body: '{}' })).status, 403, 'a change needs the header a foreign page cannot send');
+    // a line is changed, and a shot is given an empty camera and a line nobody wrote: both are left out of the file
+    const ep = structuredClone(had.episodes[1]); ep.scenes[0].shots[0].line.text = 'Anh đi đâu vậy?'; ep.scenes[0].shots[3].camera = ''; ep.scenes[0].shots[3].line = { who: 'minh', text: ' ' };
+    const one = await put('/api/script?episode=1', ep);
+    assert.equal(one.saved, true); assert.deepEqual(one.changed.updated, ['e1-s1-line']); assert.deepEqual([one.changed.added, one.changed.removed, one.changed.kept], [[], [], []]); assert.ok(one.seconds[1] < had.seconds[1]);
+    assert.equal(readEpisode(dir, 1).scenes[0].shots[0].line.text, 'Anh đi đâu vậy?'); assert.deepEqual(Object.keys(readEpisode(dir, 1).scenes[0].shots[3]), ['id', 'size', 'who', 'action', 'continues', 'seconds']); assert.equal(one.flow.nodes['e1-s1-line'].text, 'Anh đi đâu vậy?'); assert.ok(one.rows.find((x) => x.id === 'e1-s1-line'));
+    // what is not sound is not kept, and the reason is said
+    const stranger = structuredClone(ep); stranger.scenes[0].shots[1].who = ['tam'];
+    const no = await put('/api/script?episode=1', stranger); assert.equal(no.saved, false); assert.match(no.bad[0], /scenes\[0\]\.shots\[1\]\.who: "tam" is not in the cast/); assert.deepEqual(readEpisode(dir, 1).scenes[0].shots[1].who, ['minh']);
+    assert.match((await put('/api/script?episode=9', ep)).error, /The series plans no episode 9/); assert.match((await put('/api/script?episode=1', {})).error, /Nothing was sent/);
+    // a new shot after shot 1, and shot 4 gone: their nodes come and go, and the cut follows
+    const more = structuredClone(ep); more.scenes[0].shots.splice(1, 0, { id: '1b', size: 'insert', who: [], action: 'A key turns in the lock.', seconds: 2 }); more.scenes[0].shots.pop();
+    const two = await put('/api/script?episode=1', more); assert.deepEqual([two.changed.added.sort(), two.changed.removed.sort(), two.changed.updated], [['e1-s1b', 'e1-s1b-frame'], ['e1-s4', 'e1-s4-frame'], ['e1']]); assert.deepEqual(readFlow(dir).nodes.e1.shots, ['@e1-s1', '@e1-s1b', '@e1-s2', '@e1-s3']);
+    // the second episode is planned and has no script: one written by hand is taken like any other
+    assert.deepEqual(written(dir), [1]); const hand = await put('/api/script?episode=2', { title: 'Cánh cửa', scenes: [{ where: 'can-ho', time: 'dawn', staging: 'Lan stands at the door on the right.', shots: [{ id: '1', size: 'wide', who: ['lan'], action: 'Lan opens the door.' }] }] });
+    assert.equal(hand.saved, true); assert.deepEqual(written(dir), [1, 2]); assert.ok(readFlow(dir).nodes.e2 && readFlow(dir).nodes['e2-s1']); assert.deepEqual(hand.episodes.written, [1, 2]);
+    // the series: what someone wears is changed — the person and their sheet are written again, the face is not
+    const series = structuredClone(had.series); series.cast.lan.wardrobe = 'a red coat';
+    const three = await put('/api/series', series); assert.equal(three.saved, true); assert.deepEqual(three.changed.updated.sort(), ['lan', 'lan-sheet']); assert.equal(readSeries(dir).cast.lan.wardrobe, 'a red coat');
+    // A face an older Songbe drew was drawn with the clothes described. When only the clothes change, the face that stands is held —
+    // the same person in other clothes — and let go of again when their looks change.
+    const old = readFlow(dir); old.nodes['minh-face'] = { kind: 'picture', prompt: '@style Portrait of @minh.', aspect: '3:4', by: 'director', of: sha(['face', { id: 'minh', name: 'Minh', own: null, medium: true }]) }; old.nodes['minh-face'].as = sha((({ by, as, of, xy, ...rest }) => rest)(old.nodes['minh-face'])); writeFlow(dir, old);
+    const drawn = standIns(), named = drawn.modelFor; drawn.modelFor = (role, name) => ({ ...named(role, name), name: name || 'nano-banana-2.1' });      // (under the name the app itself would ask, so that the app finds the takes)
+    await runFlow(dir, readFlow(dir), { use: drawn, want: ['minh-face', 'lan-face'] }); const stood = (await get('/api/state')).rows.find((x) => x.id === 'minh-face'); assert.equal(stood.state, 'ready');
+    const suit = structuredClone(series); suit.cast.minh.wardrobe = 'a grey suit'; suit.cast.lan.wardrobe = 'a green dress';
+    const dressed = await put('/api/series', suit); assert.deepEqual(dressed.changed.held, ['minh-face'], 'only the face that would have been drawn again');
+    assert.deepEqual(dressed.rows.filter((x) => /-face$/.test(x.id)).map((x) => `${x.id} ${x.state} ${x.n}`), ['lan-face ready 1', 'minh-face held 1']); assert.equal(dressed.rows.find((x) => x.id === 'minh-face').take, stood.take);
+    const older = structuredClone(suit); older.cast.minh.look = '45, broad shoulders, grey at the temples'; const aged = await put('/api/series', older); assert.equal(aged.rows.find((x) => x.id === 'minh-face').state, 'make', 'other looks: the face follows again');
+    series.cast = older.cast;
+    // models by name, and nobody the scripts still need may leave
+    assert.match((await put('/api/series', { ...series, models: { clip: 'sora-9' } })).bad[0], /models\.clip: no model is called "sora-9"/); assert.match((await put('/api/series', { ...series, models: { clip: 'gemini-tts' } })).bad[0], /models\.clip: gemini-tts makes a voice, not a clip/);
+    const fewer = structuredClone(series); delete fewer.cast.minh; const left = await put('/api/series', fewer); assert.equal(left.saved, false); assert.match(left.bad.join('\n'), /episode 1: scenes\[0\]\.shots\[\d\]\.who: "minh" is not in the cast/); assert.ok(readSeries(dir).cast.minh);
+    const veo = await put('/api/series', { ...series, models: { talk: 'veo-3.1-fast' }, retakes: 2, budget: 12 }); assert.equal(veo.saved, true); assert.deepEqual([veo.flow.models, veo.flow.retakes, veo.flow.budget], [{ talk: 'veo-3.1-fast' }, 2, 12]); assert.equal(veo.flow.nodes['e1-s1-line'].fit, '@e1-s1', 'a model that speaks films first: the line is now recorded to its lips');
+    assert.match((await put('/api/series', { ...series, retakes: 7 })).bad[0], /retakes: how many more takes/); assert.match((await put('/api/series', { ...series, episodes: [{ summary: 'x' }] })).bad[0], /episodes\[0\]: every episode planned needs a title/);
   } finally { s.close(); }
 });
 

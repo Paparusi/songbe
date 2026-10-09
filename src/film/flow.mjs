@@ -165,7 +165,8 @@ export function openStore(dir) {
     // a person's choice: it stands even when the run that made it could not use it
     pick(id, key, n) { if (!(s.takes[key] || []).some((t) => t.n === n)) throw new Error(`${id} has no take ${n}`); s.picks[id] = { key, n, chosen: true }; this.save(); },
     // hold the take a node stands on now (named by its key and number), or let the node follow what it is made from again
-    hold(id, key, n) { this.pick(id, key, n); s.locks[id] = true; this.save(); }, release(id) { delete s.locks[id]; this.save(); }, locked: (id) => !!s.locks[id], picked: (id) => s.picks[id] || null,
+    // (`why`: who holds it, when it is not the person — so that only they let go of it again)
+    hold(id, key, n, why = true) { this.pick(id, key, n); s.locks[id] = why; this.save(); }, release(id) { delete s.locks[id]; this.save(); }, locked: (id) => !!s.locks[id], heldFor: (id) => s.locks[id] || null, picked: (id) => s.picks[id] || null,
   };
 }
 const own = (dir, node) => { const file = path.resolve(dir, node.file); if (!exists(file)) throw new Error(`the file ${node.file} is not there`); return { file, take: 'own-' + crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 16), info: {} }; };

@@ -2,6 +2,20 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.29
+- **The script, changed in the app.** *Script* in the canvas window opens the series and the shots of every episode beside the
+  canvas: the look, the models, the cast with their looks, clothes and voices, the places, the episodes planned — and for each
+  episode its scenes and shots, with the first frame of each shot beside it. Shots are added, moved and removed; an episode
+  that is planned and not written is written by the writer from there, or by hand. What is typed is saved a moment later,
+  only when the series and every script are sound with it, and the canvas follows: exactly what works from the change is to
+  be made again, and putting back what was there brings back what was made from it.
+- **A cut you changed still follows the script.** Your order, trims and added clips stay; a shot the script loses leaves the
+  cut, and a new shot goes in after the one it follows. Nothing that stays is left working from a node that goes.
+- **A face is who someone is, not what they wear.** The director draws a portrait from the person's looks alone, so giving
+  someone other clothes draws their sheet again from the same face instead of drawing a new person. A film made before this
+  keeps its words; when only the clothes change there, the app holds the face that stands.
+- `seconds`, `budget`, `retakes` and the episodes planned are checked in `series.json`, and the models it names must exist.
+
 ## 0.28
 - **Songbe looks at what it makes.** Every take is measured the moment it is made — decoded small, no model asked, no cost.
   A take that cannot be used (the model was to say the line and nobody is heard; the picture never moves; the recording holds

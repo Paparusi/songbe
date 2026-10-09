@@ -76,6 +76,10 @@ export function checkSeries(series, dir = null) {
   }
   if (series.models !== undefined && !isObject(series.models)) bad.push('models: must be an object like { "clip": "veo-3.1-fast" }');
   if (series.episodes !== undefined && !Array.isArray(series.episodes)) bad.push('episodes: must be a list');
+  else (series.episodes || []).forEach((e, i) => { if (!isObject(e) || !text(e.title)) bad.push(`episodes[${i}]: every episode planned needs a title`); });
+  if (series.seconds !== undefined && !(typeof series.seconds === 'number' && series.seconds >= 5 && series.seconds <= 600)) bad.push('seconds: how long an episode runs, between 5 and 600');
+  if (series.budget !== undefined && !(typeof series.budget === 'number' && series.budget >= 0)) bad.push('budget: what a run may spend, a number of dollars');
+  if (series.retakes !== undefined && !(Number.isInteger(series.retakes) && series.retakes >= 0 && series.retakes <= 3)) bad.push('retakes: how many more takes a run may ask for by itself when a take cannot be used, 0 to 3');
   return bad;
 }
 export function checkEpisode(series, episode) {
