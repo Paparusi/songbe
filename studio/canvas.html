@@ -10,15 +10,21 @@ main { display: grid; grid-template-columns: 1fr 400px; height: calc(100% - 56px
 #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 #wires { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 #wires path { fill: none; stroke: #5A6B80; stroke-width: 1.4; opacity: .28; } #wires path.on { stroke: var(--accent); opacity: .95; stroke-width: 2; }
-.node { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 6px 18px #0006; }
+#wires path.hit { stroke: transparent; stroke-width: 14; opacity: 1; pointer-events: stroke; cursor: pointer; } #wires path.new { stroke: var(--accent); opacity: .95; stroke-width: 2; stroke-dasharray: 6 5; }
+#wires path.soft { stroke: #9B8CFF; opacity: .8; stroke-dasharray: 3 5; } #wires path.cut { stroke: var(--bad); opacity: 1; stroke-width: 2.4; }
+.port { position: absolute; right: -9px; top: calc(50% - 9px); width: 18px; height: 18px; border-radius: 50%; background: var(--panel); border: 2px solid var(--accent); cursor: crosshair; opacity: 0; transition: opacity .12s; z-index: 2; }
+.node:hover .port, .node.sel .port, #world.linking .node.from .port { opacity: 1; } .port:hover { background: var(--accent); }
+#world.linking .node:not(.can):not(.from) { opacity: .3; } #world.linking .node.can { border-color: color-mix(in srgb, var(--accent) 65%, transparent); } #world.linking .node.over { box-shadow: 0 0 0 3px var(--accent); }
+#choose { position: absolute; z-index: 9; display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: 0 10px 30px #000A; cursor: default; max-width: 320px; } #choose .btn { text-align: left; white-space: normal; }
+.node { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; box-shadow: 0 6px 18px #0006; }
 .node:hover { border-color: #46566A; } .node.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent), 0 8px 22px #0008; }
 .node.dim { opacity: .38; }
-.nh { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 9px; font-size: 12px; cursor: move; background: var(--raise); border-bottom: 1px solid var(--line); }
+.nh { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 9px; font-size: 12px; cursor: move; background: var(--raise); border-bottom: 1px solid var(--line); border-radius: 11px 11px 0 0; }
 .nh b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .nh i { font-style: normal; color: var(--soft); margin-left: auto; flex: none; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #55616F; flex: none; } .nh .flag { color: var(--warn); font-weight: 800; flex: none; } .msg.warn { color: var(--warn); }
 .s-ready .dot, .s-held .dot, .s-own .dot { background: #46D39A; } .s-make .dot { background: var(--warn); } .s-stuck .dot { background: var(--bad); } .s-words .dot { background: #6E8BFF; }
 .s-busy .dot { background: var(--accent); animation: pulse 1s infinite; } @keyframes pulse { 50% { opacity: .25; } }
-.nb { position: relative; background: #0B0F15; } .nb img, .nb video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nb { position: relative; background: #0B0F15; border-radius: 0 0 11px 11px; overflow: hidden; } .nb img, .nb video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .nb .none { position: absolute; inset: 0; display: grid; place-items: center; color: #5B6878; font-size: 12px; text-align: center; padding: 8px; }
 .nb .words { padding: 8px 10px; font-size: 12px; line-height: 1.4; color: #C4CEDA; height: 100%; overflow: hidden; } .nb .words b { color: #fff; }
 .nb .play { position: absolute; right: 8px; bottom: 8px; width: 28px; height: 28px; border-radius: 50%; background: #000A; display: grid; place-items: center; font-size: 12px; color: #fff; }
@@ -68,6 +74,7 @@ textarea { resize: vertical; min-height: 38px; } .rowf { display: flex; gap: 8px
     <div id="zoom"><button class="btn small" data-z="out">−</button><button class="btn small" data-z="fit">Fit</button><button class="btn small" data-z="in">+</button></div></section>
   <aside id="side"></aside>
 </main>
+<script src="/studio/wires.js"></script>
 <script>
 // The canvas: flow.json drawn as cards and lines. Nothing here decides what a film is; it shows the nodes there are, lets each be
 // changed, and asks the server to have the missing ones made. Text from the file is always set as text, never as markup.
@@ -120,18 +127,22 @@ function card(id) {
   else if (n.kind === 'clip' || n.kind === 'cut') { const f = n.kind === 'clip' ? rows.get(bare(n.frame)) : null; body.append(r.url ? el('video', { src: r.url + '#t=0.1', preload: 'metadata', muted: true, playsinline: true }) : f?.url ? el('img', { src: f.url, draggable: 'false', style: 'opacity:.45' }) : el('div', { class: 'none', text: STATE[state] || 'to make' })); if (r.url) body.append(el('div', { class: 'play', text: '▶' })); }
   else { const words = el('div', { class: 'words' }); if (n.name) words.append(el('b', { text: n.name + (n.voice?.voice ? ` · ${n.voice.voice}` : '') }), el('br')); words.append(String(n.text || n.look || n.prompt || '').slice(0, 260)); body.append(words); }
   return el('div', { class: `node k-${n.kind} s-${state}${id === sel ? ' sel' : ''}`, 'data-id': id, style: `left:${x}px;top:${y}px;width:${w}px` },
-    el('div', { class: 'nh' }, el('span', { class: 'dot' }), el('b', { text: id }), r.review || r.refused ? el('span', { class: 'flag', text: '!', title: r.review ? r.review.map((f) => f.says).join('; ') : 'takes were made and not used: ' + r.refused.at(-1).why }) : null, el('i', { text: n.kind })), body);
+    el('div', { class: 'nh' }, el('span', { class: 'dot' }), el('b', { text: id }), r.review || r.refused ? el('span', { class: 'flag', text: '!', title: r.review ? r.review.map((f) => f.says).join('; ') : 'takes were made and not used: ' + r.refused.at(-1).why }) : null, el('i', { text: n.kind })), body, n.kind === 'cut' ? null : el('div', { class: 'port', title: 'Drag onto another card to use this there, or onto an empty place to make something from it' }));
 }
-function wire([from, to]) {
+// a line between two cards: the one that is seen, and for a line that can be cut a wide unseen one that takes the click
+function wire([from, to], soft = false) {
   const [ax, ay] = place(from), [aw, ah] = sizeOf(from), [bx, by] = place(to), [bw, bh] = sizeOf(to), down = Math.abs(bx - ax) < 60 && by > ay;
   const p = down ? [ax + aw / 2, ay + ah, bx + bw / 2, by] : bx >= ax ? [ax + aw, ay + ah / 2, bx, by + bh / 2] : [ax, ay + ah / 2, bx + bw, by + bh / 2];
   const d = down ? `M${p[0]},${p[1]} C${p[0]},${p[1] + 40} ${p[2]},${p[3] - 40} ${p[2]},${p[3]}` : `M${p[0]},${p[1]} C${p[0] + (bx >= ax ? 1 : -1) * Math.max(60, Math.abs(p[2] - p[0]) * .4)},${p[1]} ${p[2] - (bx >= ax ? 1 : -1) * Math.max(60, Math.abs(p[2] - p[0]) * .4)},${p[3]} ${p[2]},${p[3]}`;
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); if (sel && (from === sel || to === sel)) path.setAttribute('class', 'on'); return path;
+  const path = document.createElementNS(SVG, 'path'); path.setAttribute('d', d);
+  const cut = wireSel && wireSel[0] === from && wireSel[1] === to; path.setAttribute('class', soft ? 'soft' : cut ? 'cut' : sel && (from === sel || to === sel) ? 'on' : '');
+  if (soft) return [path];
+  const hit = document.createElementNS(SVG, 'path'); hit.setAttribute('d', d); hit.setAttribute('class', 'hit'); hit.dataset.from = from; hit.dataset.to = to; return [path, hit];
 }
 function draw() {
   for (const n of [...world.querySelectorAll('.node')]) n.remove();
-  wires.replaceChildren(...S.edges.filter(([a, b]) => S.flow.nodes[a] && S.flow.nodes[b]).map(wire));
-  world.append(...Object.keys(S.flow.nodes).map(card));
+  wires.replaceChildren(...S.edges.filter(([a, b]) => S.flow.nodes[a] && S.flow.nodes[b]).flatMap((e) => wire(e)), ...(sel ? softEdges().filter(([a, b]) => a === sel || b === sel).flatMap((e) => wire(e, true)) : []));
+  world.append(...Object.keys(S.flow.nodes).map(card)); if (drag?.link) linkShown(drag.link);
   world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
   const todo = S.rows.filter((r) => r.state === 'make' || r.state === 'wait').length, done = S.rows.filter((r) => ['ready', 'held', 'own'].includes(r.state)).length;
   $('#count').textContent = S.bad.length ? `${S.bad.length} problem${S.bad.length > 1 ? 's' : ''}` : `${done} made · ${todo} to make`; $('#count').className = 'tag' + (S.bad.length ? ' warn' : todo ? '' : ' on');
@@ -174,7 +185,7 @@ const say = (text, bad) => { const d = el('div', { text, class: bad ? 'bad' : ''
 
 // ---- the panel of one node ----
 function panel() {
-  if (!sel) return side.replaceChildren(el('h2', { text: 'Nothing chosen' }), el('div', { class: 'hint', text: 'Click a card to see what it is made from and change it. Drag the background to move, scroll to zoom; drag a card by its top to place it.' }),
+  if (!sel) return side.replaceChildren(el('h2', { text: 'Nothing chosen' }), el('div', { class: 'hint', text: 'Click a card to see what it is made from and change it. Drag the background to move, scroll to zoom; drag a card by its top to place it. Drag from the dot on a card’s right edge onto another card to use it there, or onto an empty place to make something from it; click a line to cut it.' }),
     ...(S.bad.length ? [el('div', { class: 'f' }, el('label', { text: 'Problems in flow.json' }), ...S.bad.map((b) => el('div', { class: 'msg bad', text: b })))] : []));
   const n = S.flow.nodes[sel], r = rows.get(sel) || {}, K = S.kinds[n.kind], kids = [el('h2', { text: sel }), el('div', { class: 'kind', text: `${n.kind}${n.label ? ' · ' + n.label : ''}${STATE[r.state] ? ' · ' + STATE[r.state] : ''}${r.state === 'ready' ? ` (take ${r.n}${r.takes > 1 ? ' of ' + r.takes : ''})` : ''}` })];
   const set = (key, value) => { if (value === '' || value === undefined || value === null || value === false) delete n[key]; else n[key] = value; save(); };
@@ -247,18 +258,23 @@ function listen() {
 // ---- hands: move the view, move a card, choose a card ----
 let drag = null;
 board.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('#zoom') || e.target.closest('#script')) return;      // the script drawer is not the canvas
-  const node = e.target.closest('.node'), id = node?.dataset.id;
-  drag = node && e.target.closest('.nh') ? { id, x: e.clientX, y: e.clientY, at: [...place(id)], moved: false } : { pan: true, id, x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
-  board.setPointerCapture(e.pointerId);
+  if (e.target.closest('#zoom') || e.target.closest('#script') || e.target.closest('#choose')) return;      // the script drawer is not the canvas
+  hideChooser(); if (wireSel) { wireSel = null; draw(); }
+  const node = e.target.closest('.node'), id = node?.dataset.id, hit = e.target.closest('path.hit'), at = { x: e.clientX, y: e.clientY, moved: false };
+  // a line pulled out of a card's port · a line clicked · a card moved by its top · the view moved
+  drag = node && e.target.closest('.port') ? { link: id, ...at } : hit ? { wire: [hit.dataset.from, hit.dataset.to], ...at } : node && e.target.closest('.nh') ? { id, ...at, at: [...place(id)] } : { pan: true, id, ...at, vx: view.x, vy: view.y };
+  if (drag.link) linkStart(drag.link);
+  try { board.setPointerCapture(e.pointerId); } catch {}
 });
 board.addEventListener('pointermove', (e) => {
   if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true; if (!drag.moved) return;
+  if (drag.link) return linkMove(drag.link, e); if (drag.wire) return;
   if (drag.pan) { view.x = drag.vx + dx; view.y = drag.vy + dy; board.classList.add('panning'); world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`; }
   else { S.flow.nodes[drag.id].xy = [Math.round(drag.at[0] + dx / view.k), Math.round(drag.at[1] + dy / view.k)]; draw(); }
 });
-board.addEventListener('pointerup', () => {
+board.addEventListener('pointerup', (e) => {
   const d = drag; drag = null; board.classList.remove('panning'); if (!d) return;
+  if (d.link) return linkEnd(d.link, e, d.moved); if (d.wire) return d.moved ? null : wirePick(d.wire, e);
   if (!d.moved) { sel = d.id || null; draw(); panel(); return; }
   if (!d.pan) api('/api/place', { method: 'POST', body: JSON.stringify({ [d.id]: S.flow.nodes[d.id].xy }) });
 });

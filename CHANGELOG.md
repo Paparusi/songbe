@@ -2,6 +2,14 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.30
+- **Lines by hand on the canvas.** Drag from the dot on a card's right edge onto another card to use it there — a picture as
+  the frame a clip starts or ends on or as a reference, a line as what a clip says, a note, a person or a place into a prompt,
+  a clip into a cut, music under it — and the page asks which when it could be more than one. Dropped on an empty place, the
+  line makes something new from the card: the clip that starts on a picture, the clip that carries on from a clip's last
+  frame, a line a person says. Click a line to cut it. Where a note, a person or a place is brought in is drawn, dotted, for
+  the chosen card.
+
 ## 0.29
 - **The script, changed in the app.** *Script* in the canvas window opens the series and the shots of every episode beside the
   canvas: the look, the models, the cast with their looks, clothes and voices, the places, the episodes planned — and for each

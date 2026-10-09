@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
 import { boardHtml } from '../src/film/board.mjs';
 import { timeline } from '../src/film/cut.mjs';
 import { expand, stageNodes, sync } from '../src/film/director.mjs';
@@ -310,6 +311,36 @@ test('takes made before Songbe looked at them are looked at on request, and a cl
   const made = await runFlow(lost, flow, { use: forgetful }); assert.deepEqual(made.failed, []);
   assert.equal(Object.values(JSON.parse(fs.readFileSync(path.join(lost, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat().find((t) => t.info?.how === 'voice').info.lost, true);
   const heard = speechSpans(made.out.get('film').file); assert.ok(heard.length && Math.abs(heard[0][0] - LEAD) < .15, `the line is in the film all the same: ${JSON.stringify(heard)}`);
+});
+
+test('lines by hand on the canvas: what dropping one card on another means, what is made from a card dropped on nothing, and how a line is cut', () => {
+  // the page's own rules, run here as the page runs them, on the small canvas
+  const flow = small(); flow.nodes.rain = { kind: 'picture', prompt: 'Rain on glass.' }; flow.nodes.last = { kind: 'picture', grab: '@s2' };
+  const page = vm.createContext({ S: { flow }, list: (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]), bare: (r) => String(r || '').replace(/^@/, ''), structuredClone });
+  const rules = vm.runInContext(fs.readFileSync(new URL('../studio/wires.js', import.meta.url), 'utf8') + '\n;({ linkWays, linkNew, unlinked, softEdges })', page), plain = (x) => JSON.parse(JSON.stringify(x ?? null));
+  const says = (a, b) => plain(rules.linkWays(a, b).map((w) => w.says)), after = (a, b, which = 0) => { const n = structuredClone(flow.nodes[b]); rules.linkWays(a, b)[which].change(n); return plain(n); }, sound = (id, node) => checkFlow({ ...flow, nodes: { ...flow.nodes, [id]: node } });
+  // a picture onto a clip: three things it can be there
+  assert.deepEqual(says('rain', 's2'), ['Start on it instead of s1-frame', 'End on it', 'Hand it over as a reference']);
+  assert.equal(after('rain', 's2', 0).frame, '@rain'); assert.equal(after('rain', 's2', 1).end, '@rain'); assert.deepEqual(after('rain', 's2', 2).refs, ['@rain']); for (const k of [0, 1, 2]) assert.deepEqual(sound('s2', after('rain', 's2', k)), []);
+  assert.deepEqual(says('rain', 'lan-sheet'), ['Hand it over as a reference']); assert.deepEqual(says('s1-line', 's2'), ['It is the line of this clip']); assert.deepEqual(says('s1-line', 's1'), ['It is the line of this clip instead of s1-line']);
+  // words are brought in by name; a person says a line; a clip goes into a cut, music under it
+  assert.deepEqual(says('look', 's2'), ['Put its words into the prompt']); assert.equal(after('look', 's2').prompt, 'Wide, static. The room is empty. @look'); assert.deepEqual(says('lan', 'rain'), ['Bring them into the prompt']);
+  assert.deepEqual(says('lan', 's1-line'), ['They say this line']); assert.deepEqual(says('s1', 's1-line'), ['Record the line to the lips of this clip, after it is filmed']); assert.deepEqual(says('s2', 's1-line'), [], 'only the clip that has this line');
+  assert.deepEqual(says('rain', 'film'), []); assert.deepEqual(says('s1', 'film'), ['Add it as the last shot']); assert.deepEqual(after('s1', 'film').shots, ['@s1', { clip: '@s2', to: 1.5 }, '@s1']); assert.deepEqual(says('music', 'film'), ['Play it under the cut instead of music']);
+  assert.deepEqual(says('s1', 'last'), ['Take the frame from this clip instead of s2']); assert.deepEqual(says('s1', 'rain'), [], 'a drawn picture is not a frame of a clip'); assert.deepEqual(says('s1-line', 'rain'), []); assert.deepEqual(says('rain', 'rain'), []);
+  // dropped on nothing: something new, named after what it is made from
+  const made = (a) => plain(rules.linkNew(a));
+  assert.deepEqual(made('rain').map((m) => [m.says, m.nodes[0][0]]), [['A clip that starts on it', 'rain-clip'], ['Another picture made from it', 'rain-next']]); assert.deepEqual(made('rain')[0].nodes[0][1], { kind: 'clip', frame: '@rain', prompt: 'Describe what happens.' });
+  const on = made('s2')[1]; assert.equal(on.says, 'The clip that carries on from it'); assert.deepEqual(on.nodes, [['s2-end', { kind: 'picture', grab: '@s2', at: 'end' }], ['s2-on', { kind: 'clip', frame: '@s2-end', prompt: 'Describe what happens next.' }]]);
+  assert.deepEqual(checkFlow({ ...flow, nodes: { ...flow.nodes, ...Object.fromEntries(on.nodes) } }), []); flow.nodes['s2-end'] = on.nodes[0][1]; assert.equal(made('s2')[0].nodes[0][0], 's2-end2', 'a name that is free'); delete flow.nodes['s2-end'];
+  assert.deepEqual(made('lan').map((m) => m.says), ['A picture of them', 'A line they say']); assert.deepEqual(made('s1-line')[0].nodes[0][1], { kind: 'clip', voice: '@s1-line', prompt: 'Describe what happens.' }); assert.deepEqual(made('music'), []);
+  // a line that is cut: every way the one card uses the other is taken out — or nothing, when it only comes in through another card
+  const cut = (a, b) => plain(rules.unlinked(a, b));
+  assert.equal(cut('s1-frame', 's1').frame, undefined); assert.equal(cut('s1-line', 's1').voice, undefined); assert.equal(cut('music', 'film').music, undefined); assert.deepEqual(cut('s1', 'film').shots, [{ clip: '@s2', to: 1.5 }]);
+  assert.equal(cut('lan-sheet', 's1-frame').prompt, 'is the sheet of @lan. Close-up of @lan at a table. @look'); assert.equal(cut('look', 'lan-face').prompt, 'Portrait of @lan.'); assert.equal(cut('s2', 'last').grab, undefined);
+  assert.equal(cut('s1-line', 'film'), null, 'the cut has the line through its clip'); assert.equal(cut('rain', 's1'), null);
+  // where notes and people are brought in: drawn for the chosen card only
+  const soft = plain(rules.softEdges()).map((e) => e.join('→')); for (const e of ['look→lan-face', 'lan→lan-face', 'lan→s1-frame', 'look→s1-frame', 'lan→s1-line']) assert.ok(soft.includes(e), e); assert.ok(!soft.some((e) => e.startsWith('lan-sheet')), 'pictures have lines of their own');
 });
 
 // ---- the director and the writer ----

@@ -121,6 +121,14 @@ Changes are saved as you type, and only when the canvas is still sound with them
 again, *Make what is missing* runs everything that is out of date, and a node that failed says why. *+ Add* puts a new node of
 any kind on the canvas.
 
+**Lines by hand.** Drag from the dot on a card's right edge onto another card to use it there: a picture as the frame a clip
+starts or ends on, or as a reference; a recorded line as what a clip says; a note, a person or a place into a prompt; a person
+as who says a line; a clip into a cut, music under it. When it could be more than one of these, the page asks which. Dropped on
+an empty place, the line makes something new from the card — the clip that starts on a picture, the clip that carries on from
+a clip's last frame, a picture from a note, a line a person says. Click a line to cut it. Each is one change to one node, kept
+only when the canvas is still sound with it (two cards cannot work from each other). Lines to notes, people and places are
+many, so they are drawn for the chosen card only.
+
 **Money.** Clips are paid by the second, so a run says before it starts what it will ask of which model and about what that
 costs by list price, and it may spend $5 unless `--budget=N` or `"budget"` in `series.json` says otherwise: a run that would
 spend more stops before anything is asked, and one that reaches its budget on the way holds back what is left and says so. The
@@ -178,7 +186,6 @@ Claude.ai sign-in or to run on a person's Pro or Max plan, and xAI publishes no 
 
 ## What it cannot do yet
 
-- In the canvas window a node is wired to another by writing `@name` or choosing it in a list; lines cannot be dragged yet.
 - One line per shot, one speaker per shot. Two people talking over each other is not written.
 - Reference pictures for clips go to fal.ai endpoints only; Google's Veo is asked with a first frame (and a last one).
 - A clip is taken from its start; `from` and `to` in a cut choose the part to keep by hand.
