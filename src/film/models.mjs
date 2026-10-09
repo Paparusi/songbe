@@ -145,6 +145,29 @@ export async function lipsOf(file, { who = 'the speaker', voice, lead = 0 } = {}
   } finally { for (const f of frames) fs.rmSync(f, { force: true }); }
 }
 
+// One look at someone in a picture, or in a few moments of a clip, beside their reference sheet — by a model that sees, when
+// there is a key for one; null when there is none, or it answers with something else than what was asked. The answer describes
+// before it judges: { hair_here, hair_sheet, same_haircut, face, same_face, clothes_here, clothes_sheet, same_clothes, marks,
+// daylight }. `moments`: the seconds of a clip to look at (a picture when left out). `hour`: the hour of a night scene.
+// (One person at a time, and described first: asked for a verdict on the whole picture at once, the same model let most faults by.)
+const SEES = 'gemini-3.8-flash';
+const lookWords = (who, n, clip, hour) => `${clip ? `Pictures 1 to ${n - 1} are moments of one film shot, in order` : 'Picture 1 is one frame of a film, drawn by an image model'}; picture ${n} is the reference sheet of ${who}, who is in it: how ${who} must look.
+Compare ${who} ${clip ? 'in the shot' : 'in the frame'} with the sheet, one thing at a time. For each, first write what you see, then judge. Another angle, pose, expression or light is never a difference.
+- hair: its lowest point (ears, jaw, shoulders, below shoulders, tied up, cannot see) ${clip ? 'at the end of the shot' : 'in the frame'} and on the sheet, and how it is worn. same_haircut: would a viewer who knows ${who} from the sheet take it for the same haircut? False also when so little of the hair shows that ${who} looks short-haired and is not.
+- face: age, shape, features. same_face: is it the same person? null when the face cannot be seen.
+- clothes: the main garments and their colours, here and on the sheet. same_clothes: the same outfit? null when the clothes cannot be seen; a garment partly out of the picture is not a difference.
+- marks: anything on the face or body ${clip ? 'at any moment of the shot' : 'in the frame'} that the sheet does not have and a viewer would notice at once — a large dark spot, a patch of colour, a wound. Tears, sweat, shadows and the small moles a face has are not marks. "none" when there is nothing.${hour ? `\n- daylight: the scene is set at this hour: ${hour}. Is the outdoors, seen through a window, bright as by day? null when no window shows the outdoors; a pale window frame or a lamp is not daylight.` : ''}
+Answer with JSON only: {"hair_here":"","hair_sheet":"","same_haircut":true,"face":"","same_face":true,"clothes_here":"","clothes_sheet":"","same_clothes":true,"marks":"none"${hour ? ',"daylight":null' : ''}}`;
+export async function lookAt(file, { who = 'the person', sheet, hour = null, moments = null } = {}, env = process.env) {
+  if (!google.available(env) || !sheet) return null;
+  const made = [], small = (src, at = null) => { const out = `${file}.look${made.length}.jpg`; ff(...(at === null ? [] : ['-ss', (+at).toFixed(2)]), '-i', src, '-frames:v', '1', '-vf', "scale='if(gt(iw,ih),768,-2)':'if(gt(iw,ih),-2,768)'", '-q:v', '4', out); made.push(out); return out; };
+  try {
+    const files = [...(moments ? moments.map((t) => small(file, t)) : [small(file)]), small(sheet)];
+    const said = await google.see({ model: SEES, files, prompt: lookWords(who, files.length, !!moments, hour) }, env);
+    try { const j = JSON.parse(String(said).replace(/^```(?:json)?\s*|\s*```$/g, '')); return j && typeof j === 'object' && !Array.isArray(j) ? j : null; } catch { return null; }
+  } finally { for (const f of made) fs.rmSync(f, { force: true }); }
+}
+
 // { prompt } → instrumental music (mp3)
 export async function makeMusic(r, w, file, env = process.env) {
   if (r.door === 'google') { const s = await google.music({ model: r.id, prompt: w.prompt }, env); return keep(s.bytes, file, 'mp3'); }

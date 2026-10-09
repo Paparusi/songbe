@@ -173,7 +173,7 @@ Takes made before Songbe did this are looked at once when the film is opened in 
 to once, and what was heard is kept with it. A line of three words or more of which almost nothing can be made out is recorded
 again by the run itself — before a clip is acted to it, which is what a take nobody understands used to cost. A line that is
 only doubtful is used and pointed at, with what the listener heard; a line of one or two words is never refused for it, and
-words are compared without their marks, because a listener often hears another tone. `"listen": false` in `series.json`
+words are compared without their marks, because a listener often hears another tone. `"inspect": false` in `series.json`
 turns it off. It costs a fraction of a cent for a whole film, and nothing is concluded when nobody can listen.
 
 **Looking at the lips.** A clip acted to a recording can come back with the voice and a mouth that stays shut through the
@@ -181,6 +181,17 @@ whole line — nothing measured can tell, and it reads as a voice from nowhere. 
 clip, taken at the loudest moments of the line, are shown to a model that sees, which counts the frames in which the speaker's
 lips are parted. None at all: the clip is filmed again by the run itself. Only one in five or six: it is used and pointed at.
 The same switch turns it off.
+
+**A second look.** With that key, every picture and every clip with someone in it is also looked at beside that person's
+reference sheet, by a model that sees: the hair (how far down it reaches, how it is worn), the face, the clothes, and anything
+on them the sheet does not have — each described first and judged after, one person at a time. Someone who is not the person
+of their sheet — hair that reads as a crop, another face, another shirt, a dark spot on a cheek — means the take is made again
+by the run itself, and the next take is told why the last was refused. A frame of a night scene is asked whether day shows in
+its window; that is pointed at, not made again. Who is looked at: the people whose sheets a picture is drawn from (a picture
+named `<person>-sheet` is that person's sheet), and in a clip those of its first frame, at the beginning, the middle and the
+end of what the cut keeps. A picture of the whole scene, its people small in it, is not looked at; `"inspect": false` on a
+picture or a clip leaves that one out, and in `series.json` turns all listening and looking off. It costs some ten to twenty
+cents of an episode on the Google key.
 
 Every result is a **take**, kept under a key made from everything it was made from — the words, the model, and the takes of the
 nodes it works from. So running again costs nothing, and changing one thing leaves exactly the nodes that work from it to be made

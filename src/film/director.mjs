@@ -111,7 +111,7 @@ export function expand(series, scripts = {}) {
     put(`e${n}-music`, 'music', { n, music: ep.music || series.tone });
     put(`e${n}`, 'cut', { n, shots: all.map(({ shot }) => shot.id), title: ep.title, notice: series.notice ?? NOTICE[String(series.language || '').toLowerCase()] ?? NOTICE.english });
   }
-  const flow = { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), ...(typeof series.budget === 'number' ? { budget: series.budget } : {}), ...(Number.isInteger(series.retakes) ? { retakes: series.retakes } : {}), ...(typeof series.listen === 'boolean' ? { listen: series.listen } : {}), nodes };
+  const flow = { format: series.format || 'tall', ...(series.language ? { language: series.language } : {}), ...(series.accent ? { accent: series.accent } : {}), ...(series.resolution ? { resolution: series.resolution } : {}), ...(series.models ? { models: series.models } : {}), ...(typeof series.budget === 'number' ? { budget: series.budget } : {}), ...(Number.isInteger(series.retakes) ? { retakes: series.retakes } : {}), ...(typeof series.inspect === 'boolean' ? { inspect: series.inspect } : {}), nodes };
   return Object.defineProperty(flow, 'was', { value: was });
 }
 
@@ -154,7 +154,7 @@ export function sync(dir, series, scripts = {}, { rewrite = false } = {}) {
   for (let again = true; again;) { again = false; for (const id of [...leaving]) if (Object.keys(flow.nodes).some((x) => !leaving.has(x) && needs(flow, x).includes(id))) { leaving.delete(id); kept.push(id); again = true; } }
   for (const id of leaving) { delete flow.nodes[id]; removed.push(id); }
   const { nodes, ...settings } = wanted;
-  for (const k of ['format', 'language', 'accent', 'resolution', 'models', 'budget', 'retakes', 'listen']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
+  for (const k of ['format', 'language', 'accent', 'resolution', 'models', 'budget', 'retakes', 'inspect']) { if (settings[k] === undefined) delete flow[k]; else flow[k] = settings[k]; }
   writeFlow(dir, { ...Object.fromEntries(Object.entries(flow).filter(([k]) => k !== 'nodes')), nodes: flow.nodes });
   return { flow, added, updated, removed, kept, mended };
 }

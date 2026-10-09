@@ -122,9 +122,28 @@ export function reviewHeard(text, heard) {
 // could tell, and it read as a voice from nowhere.)
 export function reviewLips(lips) {
   if (!lips || !(lips.of >= 3)) return [];
-  if (lips.open === 0) return [{ what: 'lips', grave: true, says: `the line is heard, and in none of ${lips.of} moments of it are the speaker's lips parted` }];
+  if (lips.open === 0) return [{ what: 'lips', grave: true, says: `the line is heard, and in none of ${lips.of} moments of it are the speaker's lips parted`, tell: 'the line was heard while the speaker\'s mouth stayed shut' }];
   if (lips.of >= 5 && lips.open === 1) return [{ what: 'lips', says: `the speaker's lips are parted in only one of ${lips.of} moments of the line: look at it` }];
   return [];
+}
+
+// ---- a second look ----
+// `looks` is what a model that sees wrote down about each person of a picture or of a clip, set beside that person's reference
+// sheet: the hair, the face, the clothes, anything on them the sheet does not have — each described first and judged after — and,
+// for a picture of a night scene, whether day shows in a window. What it finds is told to the next take (`tell`).
+// (Measured on thirty-three frames and clips of one film, eight of them known to be wrong: asked this way, one person at a
+// time, all eight were found and one of the twenty-five good ones was doubted — for daylight, which is therefore only pointed at.)
+const nothing = (t) => !t || /^(none|no|nothing|n\/?a)\.?$/i.test(String(t).trim()), brief = (t) => String(t || '').trim().replace(/[.;,\s]+$/, '');
+export function reviewLook(looks) {
+  const found = [];
+  for (const l of looks || []) {
+    if (l.same_face === false) found.push({ what: 'person', grave: true, says: `${l.who} does not look like the person on the reference sheet: ${brief(l.face)}`, tell: `${l.who} did not look like the person on the reference sheet (${brief(l.face)})` });
+    if (l.same_haircut === false) found.push({ what: 'hair', grave: true, says: `${l.who}'s hair is not the hair of the reference sheet: here ${brief(l.hair_here)}; on the sheet ${brief(l.hair_sheet)}`, tell: `${l.who}'s hair was wrong (${brief(l.hair_here)}); on the reference sheet it is ${brief(l.hair_sheet)}` });
+    if (l.same_clothes === false) found.push({ what: 'clothes', grave: true, says: `${l.who}'s clothes are not those of the reference sheet: here ${brief(l.clothes_here)}; on the sheet ${brief(l.clothes_sheet)}`, tell: `${l.who}'s clothes were wrong (${brief(l.clothes_here)}); on the reference sheet they are ${brief(l.clothes_sheet)}` });
+    if (!nothing(l.marks)) found.push({ what: 'mark', grave: true, says: `on ${l.who} there is something the reference sheet does not have: ${brief(l.marks)}`, tell: `${l.who} had ${brief(l.marks)}, which is not on the reference sheet` });
+    if (l.daylight === true) found.push({ what: 'daylight', says: 'daylight shows in a window, and the scene is at night' });
+  }
+  return found;
 }
 
 // ---- a line recorded to picture ----

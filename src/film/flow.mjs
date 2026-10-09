@@ -17,7 +17,7 @@ import path from 'node:path';
 import { cut } from './cut.mjs';
 import * as MODELS from './models.mjs';
 import { costOf, nameOf, secondsOf } from './models.mjs';
-import { grave, inWords, reviewClip, reviewFit, reviewHeard, reviewLips, reviewPicture, reviewSound, reviewVoice } from './review.mjs';
+import { grave, inWords, reviewClip, reviewFit, reviewHeard, reviewLips, reviewLook, reviewPicture, reviewSound, reviewVoice } from './review.mjs';
 import { ASPECT, LEAD, TAIL, lengthOf, speechSeconds } from './series.mjs';
 import { layLine, speechSpans, spokenPart } from './speech.mjs';
 import { FORMATS } from '../spec.mjs';
@@ -30,9 +30,9 @@ export const KINDS = {
   text: { must: ['text'], may: [] },
   person: { must: ['name'], may: ['look', 'figure', 'wardrobe', 'manner', 'voice'] },
   place: { must: ['name'], may: ['look'] },
-  picture: { one: ['prompt', 'file', 'grab'], may: ['model', 'aspect', 'refs', 'at', 'options'], ext: 'jpg' },
+  picture: { one: ['prompt', 'file', 'grab'], may: ['model', 'aspect', 'refs', 'at', 'options', 'inspect'], ext: 'jpg' },
   voice: { one: ['text', 'file'], may: ['who', 'how', 'voice', 'model', 'style', 'speed', 'fit', 'options'], ext: 'wav' },
-  clip: { one: ['prompt', 'file'], may: ['frame', 'end', 'voice', 'heard', 'ownVoice', 'refs', 'model', 'seconds', 'sound', 'sounds', 'resolution', 'options'], ext: 'mp4' },
+  clip: { one: ['prompt', 'file'], may: ['frame', 'end', 'voice', 'heard', 'ownVoice', 'refs', 'model', 'seconds', 'sound', 'sounds', 'resolution', 'options', 'inspect'], ext: 'mp4' },
   music: { one: ['prompt', 'file'], may: ['model', 'options'], ext: 'mp3' },
   // a sound made from words (a knock, a door, rain) or a recording of your own; a clip says at which second it is heard ("sounds")
   sound: { one: ['prompt', 'file'], may: ['model', 'seconds', 'options'], ext: 'wav' },
@@ -105,7 +105,7 @@ export function checkFlow(flow, dir = null) {
   if (flow.format !== undefined && !FORMATS[flow.format]) bad.push(`format: "${flow.format}" is not one of ${Object.keys(FORMATS).join(', ')}`);
   if (flow.budget !== undefined && !(typeof flow.budget === 'number' && flow.budget >= 0)) bad.push('budget: what a run may spend, a number of dollars');
   if (flow.retakes !== undefined && !(Number.isInteger(flow.retakes) && flow.retakes >= 0 && flow.retakes <= 3)) bad.push('retakes: how many more takes a run may ask for by itself when a take cannot be used, 0 to 3');
-  if (flow.listen !== undefined && typeof flow.listen !== 'boolean') bad.push('listen: true or false — whether a recorded line is listened to by a model that hears, when there is a key for one');
+  if (flow.inspect !== undefined && typeof flow.inspect !== 'boolean') bad.push('inspect: true or false — whether what is made is listened to and looked at by a model that hears and sees, when there is a key for one');
   for (const [id, n] of Object.entries(nodes)) {
     if (!ID.test(id) || id.length > 48) bad.push(`${id}: a node's name is lower-case letters, digits and dashes (like "lan-sheet" or "e1-s3")`);
     const shape = KINDS[n?.kind];
@@ -193,6 +193,24 @@ const ff = (...args) => run(tools.ffmpeg, ['-v', 'error', '-y', ...args]);
 const take = (x) => x?.take;
 // the references a node lists in "refs" beyond those its prompt mentions
 const more = (c, n, w) => list(n.refs).filter((x) => !w.files.some((f) => f.id === idOf(x))).map((x) => ({ id: idOf(x), kind: c.flow.nodes[idOf(x)].kind, ...c.got(idOf(x)) }));
+// ---- a second look ----
+// Who a picture shows, for the one who looks at it: the people whose reference sheets it is drawn from — a picture named
+// "<person>-sheet" is that person's sheet — each with the file of the sheet. (A sheet itself, drawn from a face, shows nobody's
+// sheet; and a picture of the whole scene, its people small in it, is not looked at.)
+const WHOLE = /in a wide shot that shows the whole space/;
+const castOf = (c, n, files) => (c.flow.inspect === false || n.inspect === false || !c.use.lookAt || WHOLE.test(String(n.prompt || '')) ? []
+  : [...new Map(files.filter((f) => f.kind === 'picture' && f.file && /-sheet$/.test(f.id) && c.flow.nodes[f.id.replace(/-sheet$/, '')]?.kind === 'person').map((f) => [f.id, { who: c.flow.nodes[f.id.replace(/-sheet$/, '')].name, sheet: f.file }])).values()]);
+// the hour of a picture drawn from a scene picture that names one, when that hour is night (by day a bright window is right)
+const NIGHT = /\b(night|midnight|moon(?:light|lit)?|after dark|completely dark|no daylight|(?:1[0-2]|[1-4]) ?am|(?:9|1[01]) ?pm)\b/i;
+const hourOf = (c, n) => { for (const id of mentioned(c.flow, n.prompt)) { const m = /The hour and the light are this moment's, not that picture's: (.+?)\. Any window shows the sky of that hour\./.exec(String(c.flow.nodes[id]?.prompt || '')); if (m) return NIGHT.test(m[1]) ? m[1] : null; } return null; };
+// each of them looked at, beside their sheet → { looks: [{ who, … }] }, or nothing when nobody could look
+async function looksAt(c, file, cast, w = {}) {
+  const looks = (await Promise.all(cast.map(async (p) => { try { const seen = await c.use.lookAt(file, { who: p.who, sheet: p.sheet, ...w }, c.env); return seen ? { who: p.who, ...seen } : null; } catch { return null; } }))).filter(Boolean);
+  return looks.length ? { looks } : undefined;
+}
+// what a take is told when the one before it was refused for something that can be said in words
+const told = (refused) => (refused?.length ? ` An earlier take of this was refused for these faults: ${refused.join('; ')}. Do not repeat them.` : '');
+
 function picture(c, id, n) {
   if (n.grab) {      // one frame of a clip, as the start of something else
     const clip = c.got(idOf(n.grab)), at = n.at === undefined || n.at === 'end' ? 'end' : +n.at;
@@ -200,8 +218,10 @@ function picture(c, id, n) {
   }
   const r = c.use.modelFor('picture', n.model || c.flow.models?.picture, c.env, c.strict), w = wordsOf(c.flow, n.prompt, c.got), files = [...w.files, ...more(c, n, w)];
   const aspect = n.aspect || ASPECT[c.flow.format] || ASPECT.tall;
-  return { recipe: { kind: 'picture', model: r.name, prompt: w.words, refs: files.map(take), aspect, options: n.options }, by: r, units: 1, review: (file) => reviewPicture(file, { aspect }),
-    make: (file, { seed }) => c.use.makePicture(r, { prompt: w.words, refs: files.map((f) => f.file), aspect, seed, options: n.options }, file, c.env) };
+  const cast = castOf(c, n, files), draw = (file, { seed, refused }) => c.use.makePicture(r, { prompt: w.words + told(refused), refs: files.map((f) => f.file), aspect, seed, options: n.options }, file, c.env);
+  return { recipe: { kind: 'picture', model: r.name, prompt: w.words, refs: files.map(take), aspect, options: n.options }, by: r, units: 1, review: (file, found) => [...reviewPicture(file, { aspect }), ...reviewLook(found?.looks)],
+    // when someone can look, each person in the picture is looked at beside their sheet (and a night scene for day in its window)
+    make: cast.length ? async (file, o) => { await draw(file, o); return looksAt(c, file, cast, { hour: hourOf(c, n) }); } : draw };
 }
 function voice(c, id, n) {
   const person = n.who ? c.flow.nodes[idOf(n.who)] : null, set = { ...(person?.voice || {}), ...Object.fromEntries(['voice', 'model', 'style', 'speed'].filter((k) => n[k] !== undefined).map((k) => [k, n[k]])) };
@@ -213,7 +233,7 @@ function voice(c, id, n) {
   const spoken = String(n.text).length / 1000;      // thousands of characters, which is what voices are priced by
   // when someone can listen (a key for a model that hears) a take is listened to once, and what was heard is kept with it: a line
   // nobody can make out is recorded again before a clip is acted to it. (Not being able to listen says nothing about the take.)
-  const listens = c.flow.listen !== false && !!c.use.listen, heardIn = async (file) => { try { const heard = await c.use.listen(file, { language }, c.env); return typeof heard === 'string' ? { heard } : undefined; } catch { return undefined; } };
+  const listens = c.flow.inspect !== false && !!c.use.listen, heardIn = async (file) => { try { const heard = await c.use.listen(file, { language }, c.env); return typeof heard === 'string' ? { heard } : undefined; } catch { return undefined; } };
   if (!n.fit) return { recipe: { kind: 'voice', model: r.name, voice: name, style, text: n.text, language, speed: set.speed, options: n.options }, by: r, units: spoken, make: listens ? async (file) => { await say(style, file); return heardIn(file); } : (file) => say(style, file),
     review: (file, found) => [...reviewVoice(file, { text: n.text, language }), ...reviewHeard(n.text, found?.heard)] };
   // Recorded to picture, the way a line is dubbed: the clip was filmed first with the actor speaking in a voice of the model's
@@ -271,22 +291,24 @@ async function clip(c, id, n) {
   const speech = how === 'voice' ? ` ${who} speaks${manner}, saying: "${line.text}" The lips move with the words. Nobody else speaks.`
     : how === 'native' ? ` ${who} says in ${c.flow.language || 'the language of the line'}${manner}: "${line.text}" Nobody else speaks.` : ' Nobody in the frame speaks; lips stay closed.';
   const prompt = `${w.words.trim()}${speech} No subtitles, no captions, no text on screen. No music.`, aspect = ASPECT[c.flow.format] || ASPECT.tall, resolution = n.resolution || c.flow.resolution || '720p';
+  // who is in it, for the one who looks: the people its first frame was drawn from the sheets of, and those it names itself
+  const first = n.frame ? c.flow.nodes[idOf(n.frame)] : null, cast = castOf(c, n, [...w.files, ...(first?.prompt ? wordsOf(c.flow, first.prompt, c.got).files : [])]);
   return { recipe: { kind: 'clip', model: r.name, how, prompt, frame: take(frame), end: take(end), voice: how === 'voice' ? rec.take : undefined, refs: refs.map(take), seconds, aspect, resolution, sound: n.sound !== false, options: n.options }, by: r,
     info: { how, length: how === 'native' ? null : length, keeps: how === 'voice' && can.acts === 'keeps' }, units: seconds,
-    review: (file, found) => [...reviewClip(file, { start: frame?.file || null, how, spoke: found?.spoke || null, text: line?.text || null, language: c.flow.language, asked: seconds }), ...reviewLips(found?.lips)],
-    make: async (file, { seed }) => {
+    review: (file, found) => [...reviewClip(file, { start: frame?.file || null, how, spoke: found?.spoke || null, text: line?.text || null, language: c.flow.language, asked: seconds }), ...reviewLips(found?.lips), ...reviewLook(found?.looks)],
+    make: async (file, { seed, refused }) => {
       const track = how === 'voice' ? file + '.talk.wav' : null;      // the recording as the actor hears it: a breath of silence, the line, then silence to the end of the clip
       if (track) ff('-f', 'lavfi', '-t', String(LEAD), '-i', 'anullsrc=r=48000:cl=mono', '-i', rec.file, '-filter_complex', `[0][1]concat=n=2:v=0:a=1,apad=whole_dur=${Math.max(2, seconds)}`, '-ar', '48000', '-ac', '1', track);
-      try { await c.use.makeClip(r, { prompt, frame: frame?.file, end: end?.file, voice: track, refs: refs.map((f) => ({ file: f.file, kind: f.kind })), seconds, aspect, resolution, sound: n.sound !== false, seed, options: n.options }, file, c.env); }
+      try { await c.use.makeClip(r, { prompt: prompt + told(refused), frame: frame?.file, end: end?.file, voice: track, refs: refs.map((f) => ({ file: f.file, kind: f.kind })), seconds, aspect, resolution, sound: n.sound !== false, seed, options: n.options }, file, c.env); }
       finally { if (track) fs.rmSync(track, { force: true }); }
-      if (how === 'native') return { spoke: speechSpans(file) };      // where the model spoke, for the cut
       // a model that keeps the recording it acts to, and came back without it: the cut lays the recording in
-      const found = how === 'voice' && can.acts === 'keeps' && !(MODELS.hasSound(file) && speechSpans(file).length) ? { lost: true } : null;
-      // when someone can look (a key for a model that sees), the speaker's lips are looked at in a few moments of the line: a clip in
-      // which the voice is heard and the mouth stays shut is filmed again. (Not being able to look says nothing about the take.)
-      if (how !== 'voice' || c.flow.listen === false || !c.use.lipsOf) return found;
-      let lips = null; try { lips = await c.use.lipsOf(file, { who, voice: rec.file, lead: LEAD }, c.env); } catch {}
-      return lips ? { ...(found || {}), lips } : found;
+      let found = how === 'native' ? { spoke: speechSpans(file) } : how === 'voice' && can.acts === 'keeps' && !(MODELS.hasSound(file) && speechSpans(file).length) ? { lost: true } : null;      // (spoke: where the model spoke, for the cut)
+      // When someone can look (a key for a model that sees): the speaker's lips, in a few moments of the line — a clip in which the
+      // voice is heard and the mouth stays shut is filmed again — and each person in it, beside their sheet, at its beginning, its
+      // middle and the end of what the cut keeps. (Not being able to look says nothing about the take.)
+      if (how === 'voice' && c.flow.inspect !== false && n.inspect !== false && c.use.lipsOf) { let lips = null; try { lips = await c.use.lipsOf(file, { who, voice: rec.file, lead: LEAD }, c.env); } catch {} if (lips) found = { ...(found || {}), lips }; }
+      if (cast.length) { const kept = Math.min(secondsOf(file), how === 'native' ? secondsOf(file) : length), seen = await looksAt(c, file, cast, { moments: [.2, +(kept / 2).toFixed(2), +Math.max(.3, kept - .15).toFixed(2)] }); if (seen) found = { ...(found || {}), ...seen }; }
+      return found;
     } };
 }
 function music(c, id, n) {
@@ -386,7 +408,7 @@ export async function runFlow(dir, flow, { want = null, again = [], limit = 4, e
         for (;;) {      // a take, and another as long as it cannot be used and the run may ask again
           const slot = store.next(key, KINDS[n.kind].ext), t0 = Date.now(); let found = null;      // found: what making it learnt about the result, kept with the take
           for (let tries = 1; ; tries++) {      // a busy or unreachable provider gets a second and a third chance; a refusal does not
-            try { found = await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n }); break; }
+            try { found = await p.make(slot.file, { seed: seedOf(key, slot.n), n: slot.n, refused: (last?.faults || []).map((f) => f.tell).filter(Boolean) }); break; }      // (a take after one that was refused is told why, where that can be said)
             catch (e) { fs.rmSync(slot.file, { force: true });
               // a provider that says "too many at once" is given a good while (its limits are counted by the minute), up to five times
               const paid = !NO_MONEY.test(e.message), full = /(answered|fal) 429/.test(e.message) && paid, again = full || (paid && /could not be reached|answered 5\d\d|fal 5\d\d|timed out|fetch failed|ECONNRESET/i.test(e.message));

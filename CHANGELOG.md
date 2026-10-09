@@ -2,6 +2,19 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.37
+- **A second look.** With a key for a model that sees, every picture and every clip with someone in it is looked at beside
+  that person's reference sheet as soon as it is made: the hair, the face, the clothes, anything on them the sheet does not
+  have. A take in which someone is not the person of their sheet is made again by the run itself, and **the next take is told
+  why the last was refused** — a second take drawn from the same words had been seen to repeat the fault of the first. A
+  frame of a night scene is also asked whether day shows in its window; that is only pointed at.
+  Measured on thirty-three frames and clips of one film, eight of them known to be wrong (hair that reads as a crop, another
+  woman, another man in another shirt, a black spot on a cheek, daylight at midnight): asked for one verdict on the whole
+  picture, a small model found two of the eight and a larger one five; asked to describe one person at a time and judge
+  after, the larger model found all eight and doubted one of the twenty-five good ones (for daylight). The small model is not
+  enough for this. It costs some ten to twenty cents of an episode.
+- One switch for all of it: `"inspect": false` in `series.json` (it was `"listen"`), or on a single picture or clip.
+
 ## 0.36
 - **The same person through a clip.** A clip model sees its first frame and nothing else of the people in it: what that
   picture does not show, the clip makes up. Seen twice on one film, and both mended in what the models are told:
@@ -20,7 +33,7 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
   of a line is now listened to once: a line of three words or more of which almost nothing is heard is recorded again by the
   run itself, a doubtful one is pointed at with what was heard, and what was heard is kept with the take. Tried on that
   line: the take that could not be understood was heard as three other words and refused, the one recorded after it was heard
-  right. `"listen": false` in `series.json` turns it off.
+  right. `"inspect": false` in `series.json` turns it off.
 - **The lips of someone who speaks are looked at.** A clip acted to a recording came back with the voice and a mouth shut
   through a five-second line, and nothing measured could tell. With a key for a model that sees, a few frames taken at the
   loudest moments of the line are shown to it, and it counts those in which the speaker's lips are parted: none, and the

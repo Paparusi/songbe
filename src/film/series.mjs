@@ -95,7 +95,7 @@ export function checkSeries(series, dir = null) {
   if (series.seconds !== undefined && !(typeof series.seconds === 'number' && series.seconds >= 5 && series.seconds <= 600)) bad.push('seconds: how long an episode runs, between 5 and 600');
   if (series.budget !== undefined && !(typeof series.budget === 'number' && series.budget >= 0)) bad.push('budget: what a run may spend, a number of dollars');
   if (series.retakes !== undefined && !(Number.isInteger(series.retakes) && series.retakes >= 0 && series.retakes <= 3)) bad.push('retakes: how many more takes a run may ask for by itself when a take cannot be used, 0 to 3');
-  if (series.listen !== undefined && typeof series.listen !== 'boolean') bad.push('listen: true or false — whether a recorded line is listened to by a model that hears, when there is a key for one');
+  if (series.inspect !== undefined && typeof series.inspect !== 'boolean') bad.push('inspect: true or false — whether what is made is listened to and looked at by a model that hears and sees, when there is a key for one');
   return bad;
 }
 export function checkEpisode(series, episode) {

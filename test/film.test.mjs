@@ -12,7 +12,7 @@ import { timeline } from '../src/film/cut.mjs';
 import { expand, stageNodes, sync } from '../src/film/director.mjs';
 import { checkFlow, estimate, look, needs, openStore, ordered, readFlow, runFlow, wordsOf, writeFlow } from '../src/film/flow.mjs';
 import { KNOWN, chosen, costOf, fitSeconds, modelFor, reach, secondsOf } from '../src/film/models.mjs';
-import { grave, heardShare, inWords, reviewClip, reviewFit, reviewHeard, reviewLips, reviewPicture, reviewVoice } from '../src/film/review.mjs';
+import { grave, heardShare, inWords, reviewClip, reviewFit, reviewHeard, reviewLips, reviewLook, reviewPicture, reviewVoice } from '../src/film/review.mjs';
 import { LEAD, TAIL, checkEpisode, checkSeries, episodeFile, lengthOf, readEpisode, readSeries, seriesFile, speechSeconds, writeJson, written } from '../src/film/series.mjs';
 import { layLine, speechSpans, spokenPart } from '../src/film/speech.mjs';
 import { bibleSystem, castVoices, writeEpisode, writeSeries } from '../src/film/writer.mjs';
@@ -364,9 +364,9 @@ test('a recorded line is listened to when someone can: one nobody can make out i
   assert.equal(use.asked.filter((x) => x.kind === 'clip').length, 2, 'no clip was acted to the take that was refused');
   assert.deepEqual(takes(dir).filter((t) => t.info?.heard !== undefined).map((t) => [t.n, !!t.bad, t.info.heard]), [[1, true, 'chết chóc hoang mang'], [2, false, 'Anh dìa rồi à']], 'what was heard is kept with each take');
   // turned off, nobody listens; and from a listener that fails nothing is concluded
-  const off = standIns(); let asked = 0; off.listen = async () => { asked++; return ''; }; await runFlow(fresh('listen-off'), { ...small(), listen: false }, { use: off }); assert.equal(asked, 0); assert.equal(lines(off), 1);
+  const off = standIns(); let asked = 0; off.listen = async () => { asked++; return ''; }; await runFlow(fresh('listen-off'), { ...small(), inspect: false }, { use: off }); assert.equal(asked, 0); assert.equal(lines(off), 1);
   const down = standIns(); down.listen = async () => { throw new Error('no answer'); }; assert.deepEqual((await runFlow(fresh('listen-down'), small(), { use: down })).failed, []); assert.equal(lines(down), 1);
-  assert.match(checkFlow({ ...small(), listen: 'yes' }).join(), /listen: true or false/); assert.match(checkSeries({ ...SERIES, listen: 1 }).join(), /listen: true or false/); assert.equal(expand({ ...SERIES, listen: false }, {}).listen, false); assert.equal(expand(SERIES, {}).listen, undefined);
+  assert.match(checkFlow({ ...small(), inspect: 'yes' }).join(), /inspect: true or false/); assert.match(checkSeries({ ...SERIES, inspect: 1 }).join(), /inspect: true or false/); assert.equal(expand({ ...SERIES, inspect: false }, {}).inspect, false); assert.equal(expand(SERIES, {}).inspect, undefined);
   // the measure: the share of the line's words that were heard, in their order and without their marks; a line of a word or two is never refused for it
   assert.equal(heardShare('Rồi sao hả anh?', 'Gọi sao hả anh?'), .75); assert.equal(heardShare('Rồi sao hả anh?', 'Cô Sáu Hán'), 0); assert.equal(heardShare('你在哪里？', '你在那里'), .75);
   assert.deepEqual(reviewHeard('Không...', 'Hãy subscribe cho kênh').map((f) => [f.what, !!f.grave]), [['unclear', false]]); assert.deepEqual(reviewHeard('Về phòng đi.', '').map((f) => [f.what, !!f.grave]), [['unheard', true]]);
@@ -382,9 +382,37 @@ test('the lips of someone who speaks are looked at when someone can: a clip with
   assert.equal(asked.length, 2, 'only the clip someone speaks in is looked at'); assert.equal(asked[0].who, 'Lan'); assert.ok(/\.wav$/.test(asked[0].voice) && asked[0].lead > 0, 'told whose lips, and where the line lies in the clip');
   const takes = Object.values(JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat().filter((t) => t.info?.lips); assert.deepEqual(takes.map((t) => [t.n, !!t.bad, t.info.lips.open]), [[1, true, 0], [2, false, 4]]);
   // turned off, nobody looks; and from someone who cannot look nothing is concluded
-  const off = standIns(); let looked = 0; off.lipsOf = async () => { looked++; return { open: 0, of: 6 }; }; await runFlow(fresh('lips-off'), { ...small(), listen: false }, { use: off }); assert.equal(looked, 0);
+  const off = standIns(); let looked = 0; off.lipsOf = async () => { looked++; return { open: 0, of: 6 }; }; await runFlow(fresh('lips-off'), { ...small(), inspect: false }, { use: off }); assert.equal(looked, 0);
   const down = standIns(); down.lipsOf = async () => { throw new Error('no answer'); }; assert.deepEqual((await runFlow(fresh('lips-down'), small(), { use: down })).failed, []); assert.equal(down.asked.filter((x) => x.kind === 'clip').length, 2);
   assert.deepEqual(reviewLips({ open: 1, of: 6 }).map((f) => [f.what, !!f.grave]), [['lips', false]]); assert.deepEqual(reviewLips({ open: 0, of: 2 }), [], 'too few moments to say'); assert.deepEqual(reviewLips({ open: 3, of: 6 }), []); assert.deepEqual(reviewLips(null), []);
+});
+
+test('a second look: someone who is not the person of their sheet, in a picture or a clip, is made again — and the next take is told why', async () => {
+  const fine = { hair_here: 'a black bob to the jaw', hair_sheet: 'a black bob to the jaw', same_haircut: true, face: 'a woman of about 26', same_face: true, clothes_here: 'a yellow cardigan', clothes_sheet: 'a yellow cardigan', same_clothes: true, marks: 'none' };
+  // the one who looks finds her hair cropped in the first frame, and a spot on her cheek in the first take of the clip she speaks in
+  const dir = fresh('look'), flow = small(), use = standIns(), events = [], looked = []; let frames = 0, clips = 0; flow.nodes.s2.inspect = false;
+  use.lookAt = async (file, w) => { looked.push({ file: path.basename(file), ...w });
+    if (!w.moments) return ++frames === 1 ? { ...fine, hair_here: 'cropped above the ears', same_haircut: false } : fine;
+    return ++clips === 1 ? { ...fine, marks: 'a large black spot on the left cheek' } : fine; };
+  const r = await runFlow(dir, flow, { use, on: (e) => events.push(`${e.type} ${e.id}${e.why ? ': ' + e.why : ''}`) });
+  assert.deepEqual(r.failed, []); const drawn = use.asked.filter((x) => x.kind === 'picture' && /Close-up of Lan/.test(x.prompt)), filmed = use.asked.filter((x) => x.kind === 'clip' && /Lan looks up/.test(x.prompt));
+  assert.equal(drawn.length, 2, 'the frame is drawn once more'); assert.ok(events.includes("again s1-frame: Lan's hair is not the hair of the reference sheet: here cropped above the ears; on the sheet a black bob to the jaw"), events.join(' | '));
+  assert.doesNotMatch(drawn[0].prompt, /refused/); assert.match(drawn[1].prompt, / An earlier take of this was refused for these faults: Lan's hair was wrong \(cropped above the ears\); on the reference sheet it is a black bob to the jaw\. Do not repeat them\.$/, 'and is told why the first was refused');
+  assert.equal(filmed.length, 2, 'the clip is filmed once more'); assert.ok(events.includes('again s1: on Lan there is something the reference sheet does not have: a large black spot on the left cheek'), events.join(' | ')); assert.match(filmed[1].prompt, /refused for these faults: Lan had a large black spot on the left cheek, which is not on the reference sheet\. Do not repeat them\.$/);
+  // who is looked at: the people whose sheets a picture is drawn from — not the sheet or the face themselves — and in a clip those of its first frame, at three moments of what the cut keeps
+  assert.equal(looked.filter((l) => !l.moments).length, 2, 'only the frame, twice'); assert.ok(looked.every((l) => l.who === 'Lan' && /\.jpg$/.test(l.sheet))); const moments = looked.find((l) => l.moments).moments; assert.equal(moments.length, 3); assert.ok(moments[0] < moments[1] && moments[1] < moments[2]);
+  assert.equal(looked.filter((l) => l.moments).length, 2, 'the clip marked inspect: false is not looked at'); assert.equal(use.asked.filter((x) => x.kind === 'clip').length, 3);
+  const takes = Object.values(JSON.parse(fs.readFileSync(path.join(dir, '.songbe', 'flow', 'takes.json'), 'utf8')).takes).flat().filter((t) => t.info?.looks); assert.equal(takes.length, 4, 'what was seen is kept with each take'); assert.equal(takes.filter((t) => t.bad).length, 2);
+  // turned off for the whole canvas, nobody looks; and from someone who cannot look, or answers nothing, nothing is concluded
+  const off = standIns(); let n = 0; off.lookAt = async () => { n++; return { ...fine, same_face: false }; }; assert.deepEqual((await runFlow(fresh('look-off'), { ...small(), inspect: false }, { use: off })).failed, []); assert.equal(n, 0);
+  const down = standIns(); down.lookAt = async () => { throw new Error('no answer'); }; assert.deepEqual((await runFlow(fresh('look-down'), small(), { use: down })).failed, []); const mute = standIns(); mute.lookAt = async () => null; assert.deepEqual((await runFlow(fresh('look-mute'), small(), { use: mute })).failed, []);
+  // what a look is turned into: faults that are told on, and daylight in a night scene only pointed at
+  assert.deepEqual(reviewLook([{ who: 'Lan', ...fine }]), []); assert.deepEqual(reviewLook([{ who: 'Lan', ...fine, same_face: null, same_clothes: null, marks: 'None.' }]), [], 'what cannot be seen is not a fault');
+  assert.deepEqual(reviewLook([{ who: 'Minh', ...fine, same_face: false, face: 'a younger man with a rounder face.', same_clothes: false, clothes_here: 'a white T-shirt', clothes_sheet: 'a green tank top', daylight: true }]).map((f) => [f.what, !!f.grave, !!f.tell]), [['person', true, true], ['clothes', true, true], ['daylight', false, false]]);
+  // a frame of a night scene is also asked whether day shows in its window; one of a day scene is not
+  const night = standIns(), hours = []; night.lookAt = async (file, w) => { hours.push(w.hour); return fine; }; const film = expand(SERIES, { 1: EPISODE }); assert.deepEqual(checkFlow(film), []);
+  await runFlow(fresh('look-night'), film, { use: night, want: ['e1-s1-frame'] }); assert.deepEqual(hours, ['2 AM, moonlight']);
+  const day = structuredClone(EPISODE); day.scenes[0].time = 'early morning, grey light'; hours.length = 0; await runFlow(fresh('look-day'), expand(SERIES, { 1: day }), { use: night, want: ['e1-s1-frame'] }); assert.deepEqual(hours, [null]);
 });
 
 test('a run looks at what it makes: a take that cannot be used is asked for again, the better one stands, and nothing is built on a node that has none', async () => {
