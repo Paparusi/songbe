@@ -28,6 +28,10 @@ What changed, newest first. Versions before 1.0 may change the shape of `video.j
 - Tried against the models: the second episode of that film — fifteen clips by MiniMax H3, six lines, five sounds set at
   their seconds. Thirteen clips stood as filmed; one was filmed again for its people (above), one for a line that could not
   be understood as first recorded.
+  And the third: fifteen clips, six lines. Two clips were filmed again for the mole (above). One clip cut to a closer
+  framing nine frames in; the review pointed at the jump, and the cut starts that shot after it (`{ "clip": "@e3-s14",
+  "from": 0.4 }`). Google's prepaid credit ran out before the episode's music was made: nothing more was asked of Google in
+  that run, and the episode was cut with the first episode's theme.
 
 ## 0.35
 - **Acting.** An episode came out stiff: its picture moved half as much as that of the film before it, on the same clip
