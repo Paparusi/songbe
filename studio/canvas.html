@@ -43,6 +43,7 @@ textarea { resize: vertical; min-height: 38px; } .rowf { display: flex; gap: 8px
   <a class="logo" href="/home" title="All your videos"><img src="/studio/logo.png" alt=""><b>Song<span>be</span></b></a>
   <span class="sep">/</span><div class="proj" id="proj"></div><div class="gap"></div>
   <span class="tag" id="count">loading…</span><span class="tag" id="saved" hidden></span>
+  <select id="eps" title="Make a part of an episode, or write the next one" style="width:auto;max-width:190px;padding:7px 10px;border-radius:10px;background:var(--raise)" hidden></select>
   <div id="add"><button class="btn" id="addb">+ Add</button><div id="menu" hidden></div></div>
   <button class="btn stop" id="stop" hidden>Stop</button><button class="btn go" id="go">Make what is missing</button>
 </header>
@@ -118,8 +119,29 @@ function draw() {
   world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
   const todo = S.rows.filter((r) => r.state === 'make' || r.state === 'wait').length, done = S.rows.filter((r) => ['ready', 'held', 'own'].includes(r.state)).length;
   $('#count').textContent = S.bad.length ? `${S.bad.length} problem${S.bad.length > 1 ? 's' : ''}` : `${done} made · ${todo} to make`; $('#count').className = 'tag' + (S.bad.length ? ' warn' : todo ? '' : ' on');
+  episodes();
   $('#go').textContent = todo ? `Make what is missing (${todo})${plan?.pieces?.length ? ` · about $${plan.usd.toFixed(2)}` : ''}` : 'Everything is made'; $('#go').disabled = !todo || S.running || !!S.bad.length; $('#go').hidden = S.running; $('#stop').hidden = !S.running;
 }
+// The episodes: each can be made up to a point (its pictures first, to look at before any clip is paid for), and the next one written.
+const UPTO = { board: 'its pictures (to look at first)', voice: 'its pictures and lines', clips: 'everything but the cut', cut: 'the whole episode' };
+let epTimer = null, epFailed = null;
+function episodes() {
+  const E = S.episodes, box = $('#eps'); if (!E) return;
+  const made = E.written.filter((n) => S.flow.nodes['e' + n]), next = E.planned.find((p) => !E.written.includes(p.n));
+  box.hidden = !made.length && !next; if (box.hidden) return;
+  box.replaceChildren(el('option', { value: '', text: E.writing ? `Writing episode ${E.writing}…` : 'Episodes…' }), ...made.flatMap((n) => Object.entries(UPTO).map(([upto, words]) => el('option', { value: `${n}:${upto}`, text: `Episode ${n}: make ${words}` }))),
+    ...(next && !E.writing ? [el('option', { value: 'write', text: `Write episode ${next.n}${next.title ? ': ' + next.title : ''}` })] : []));
+  box.disabled = S.running || !!E.writing;
+  if (E.failed && E.failed !== epFailed) { epFailed = E.failed; say(E.failed.split('\n')[0], true); }
+  if (E.writing && !epTimer) epTimer = setTimeout(async () => { epTimer = null; take(await api('/api/state').then((r) => r.json())); draw(); panel(); }, 2500);      // look again until it is written
+}
+$('#eps').addEventListener('change', async (e) => { const v = e.target.value; e.target.value = ''; if (!v) return;
+  if (v === 'write') { const x = await api('/api/episode', { method: 'POST', body: '{}' }).then((r) => r.json()); if (x.error) return say(x.error, true); take(await api('/api/state').then((r) => r.json())); draw(); return; }
+  const [episode, upto] = v.split(':'), p = await api(`/api/plan?episode=${episode}&upto=${upto}`).then((r) => r.json());
+  if (!p.pieces.length) return say(`Episode ${episode}: that much is already made.`);
+  if (p.usd > p.budget) { say(`That is about $${p.usd.toFixed(2)}, over the $${p.budget} a run may spend. Choose it again to spend it.`, true); if (armedFor !== v) { armedFor = v; return; } }
+  armedFor = null; run({ episode: +episode, upto, ...(p.usd > p.budget ? { budget: Math.ceil(p.usd * 1.15) } : {}) }); });
+let armedFor = null;
 // what the missing pieces would cost by list price; asked for again whenever the canvas changes
 let plan = null, armed = 0;
 const price = () => api('/api/plan').then((r) => r.json()).then((p) => { plan = p; if (S) draw(); }).catch(() => {});

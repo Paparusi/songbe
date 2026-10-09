@@ -15,7 +15,10 @@ import { FFMPEG_WINDOWS, ffmpegAdvice, installFfmpeg } from './setup.mjs';
 import { installedPacksDir, listPacks, starterDir, starterList } from './packs.mjs';
 import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES, refreshStyles } from './spec.mjs';
 import { rewriteScene, writeSpec, writerFor } from './write.mjs';
-import { canvasRoutes } from './film/canvas.mjs';
+import { canvasRoutes, filmCard } from './film/canvas.mjs';
+import { sync } from './film/director.mjs';
+import { readEpisode } from './film/series.mjs';
+import { writeEpisode, writeSeries } from './film/writer.mjs';
 import { KIT, ROOT, WIN, dataDir, exists, killTree, log, mkdir, openOutside, projectsHome, readDotEnv, sha, tools } from './util.mjs';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
@@ -56,7 +59,7 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
   const pinned = project ? path.resolve(project) : null;      // `songbe studio <dir>`: this project is the front door
   const pinnedFilm = film ? path.resolve(film) : null;        // `songbe flow open <dir>`: the canvas of this film is
   const registry = path.join(dataDir(), 'projects.json');
-  const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map();
+  const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map(), filming = new Map();
   let setup = { running: false, step: null, done: 0, total: 0, error: null, version: null }, toolsSeen = null, toolsAt = 0;
 
   const send = (res, code, body, type = 'application/json; charset=utf-8', more = {}) => { res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', ...more }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
@@ -120,6 +123,24 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
     recent().forEach(add); if (pinnedFilm) add(pinnedFilm);
     return dirs;
   }
+  // "New film": the folder is made at once; the series, the script of its first episode and the canvas are written in the
+  // background, and the page asks how that is getting on. Nothing is drawn or filmed here: that is asked for on the canvas.
+  function createFilm({ name, idea, episodes, seconds, format, language }) {
+    if (String(idea || '').trim().length < 12) throw new Error('Say a little more about the story: who it is about, where, and what goes wrong.');
+    if (format && !FORMATS[format]) throw new Error('Unknown frame.');
+    if (!ask && !writerFor(keyEnv())) throw new Error('Writing needs a key: add your Google or fal.ai key in Settings.');
+    const clean = tidyName(name) || tidyName(String(idea).trim().split(/\s+/).slice(0, 5).join(' ')) || 'My film';
+    mkdir(home);
+    let dir = path.join(home, clean); for (let n = 2; exists(dir); n++) dir = path.join(home, `${clean} ${n}`);
+    const id = idOf(dir), job = { id, step: 'series', done: false, error: null }, env = keyEnv();
+    filming.set(id, job); mkdir(dir);
+    (async () => {
+      const made = await writeSeries(dir, String(idea), { episodes: Math.min(12, Math.max(1, +episodes || 3)), seconds: Math.min(180, Math.max(10, +seconds || 60)), format: format || 'tall', language: language || undefined, ask, env });
+      job.step = 'script'; await writeEpisode(dir, made.series, 1, { ask, env });
+      job.step = 'canvas'; sync(dir, made.series, { 1: readEpisode(dir, 1) });
+    })().catch((e) => { job.error = e.message; try { if (!exists(path.join(dir, 'series.json'))) fs.rmSync(dir, { recursive: true, force: true }); } catch {} }).finally(() => { job.done = true; });
+    return id;
+  }
   // asked for on every request of a project (a preview loads thirty frames a second), so the answer is remembered while it holds
   const known = new Map();
   const dirOf = (id) => {
@@ -177,9 +198,9 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
   }
   function adopt(given) {      // a folder made elsewhere (by hand, by an agent, by `songbe init`)
     let dir = path.resolve(String(given ?? '').trim().replace(/^"(.*)"$/, '$1'));
-    if (path.basename(dir).toLowerCase() === 'video.json') dir = path.dirname(dir);
-    if (!exists(path.join(dir, 'video.json'))) throw new Error('There is no video.json in that folder.');
-    remember(dir); return idOf(dir);
+    if (['video.json', 'flow.json', 'series.json'].includes(path.basename(dir).toLowerCase())) dir = path.dirname(dir);
+    if (!exists(path.join(dir, 'video.json')) && !exists(path.join(dir, 'flow.json'))) throw new Error('There is no video.json and no flow.json in that folder.');
+    remember(dir); return exists(path.join(dir, 'video.json')) ? { id: idOf(dir) } : { film: idOf(dir) };
   }
 
   // ---- posters: one small still per project, drawn in a separate process so the pages stay responsive ----
@@ -297,7 +318,7 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
     send(res, 404, { error: 'not found' });
   }
 
-  const canvas = canvasRoutes({ send, json, serveFile, keysFor, version: VERSION });
+  const canvas = canvasRoutes({ send, json, serveFile, keysFor, version: VERSION, ask, keyEnv });
   const server = http.createServer(async (req, res) => {
     try {
       // SONGBE_TRACE=1: one line per request (who asked for what, never the query), for finding out what a window really loaded
@@ -316,6 +337,7 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
         const dir = films().get(c[1]);
         if (!dir) return send(res, 404, '<body style="font:16px system-ui;color:#ddd;padding:24px;background:#111">This film is no longer where it was. <a style="color:#4FE0D6" href="/home">Back to your videos</a></body>', MIME['.html']);
         if (!c[2]) return send(res, 302, '', 'text/plain', { Location: `/c/${c[1]}/` });
+        if (c[2] === '/' && req.method === 'GET' && !pinnedFilm) remember(dir);      // opening a film moves it to the top of the list
         return await canvas(req, res, u, c[1], dir, c[2]);
       }
       if (route === 'GET /') return send(res, 302, '', 'text/plain', { Location: pinnedFilm ? `/c/${idOf(pinnedFilm)}/` : pinned ? `/p/${idOf(pinned)}/` : '/home' });
@@ -329,17 +351,20 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
       if (route === 'GET /api/home') {
         refreshStyles();      // a pack may have been added since the last look
         return send(res, 200, { packs: listPacks().map((p) => ({ id: p.id, name: p.name, version: p.version, about: p.about, licence: p.licence, where: p.where, styles: p.styles.map((x) => x.name), starters: p.starters.length })), packsDir: installedPacksDir(), version: VERSION, home, data: dataDir(), shell: process.env.SONGBE_SHELL || null, pinned: pinned ? idOf(pinned) : null,
-          projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
+          projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), films: [...films()].map(([id, dir]) => filmCard(id, dir, home)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
           setup: { ...setup, canFetch: WIN, advice: ffmpegAdvice(), pick: { version: FFMPEG_WINDOWS.version, megabytes: Math.round(FFMPEG_WINDOWS.bytes / 1e6), from: FFMPEG_WINDOWS.from, licence: FFMPEG_WINDOWS.licence } } });
       }
       if (route === 'GET /api/model') {      // what one model takes: the editor's "settings of this model"
         try { const d = await describeModel(u.searchParams.get('id') || ''); return d ? send(res, 200, settingsOf(d)) : send(res, 502, { error: 'fal.ai did not say what this model takes (no connection?). Its settings can still be written in the JSON tab.' }); }
         catch (e) { return send(res, 404, { error: e.message }); }
       }
+      if (route === 'POST /api/films') { try { return send(res, 200, { id: createFilm(await json(req)) }); } catch (e) { return send(res, 400, { error: e.message }); } }
+      const fw = /^\/api\/filmwriting\/([0-9a-f]{16})$/.exec(u.pathname);
+      if (req.method === 'GET' && fw) { const job = filming.get(fw[1]); return job ? send(res, 200, job) : send(res, 404, { error: 'not found' }); }
       if (route === 'POST /api/projects') { try { const q = await json(req), id = create(q); return send(res, 200, { id, writing: q.starter === 'write' }); } catch (e) { return send(res, 400, { error: e.message }); } }
       const wr = /^\/api\/writing\/([0-9a-f]{16})$/.exec(u.pathname);
       if (req.method === 'GET' && wr) { const job = writing.get(wr[1]); return job ? send(res, 200, job) : send(res, 404, { error: 'not found' }); }
-      if (route === 'POST /api/projects/open') { try { return send(res, 200, { id: adopt((await json(req)).dir) }); } catch (e) { return send(res, 400, { error: e.message }); } }
+      if (route === 'POST /api/projects/open') { try { return send(res, 200, adopt((await json(req)).dir)); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (route === 'POST /api/projects/duplicate' || route === 'POST /api/projects/rename') {
         const q = await json(req), from = dirOf(q.id), busy = jobs.get(q.id) && !jobs.get(q.id).done;
         if (!from) return send(res, 404, { error: 'That project is no longer there.' });

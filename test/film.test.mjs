@@ -353,3 +353,30 @@ test('the canvas window is handed the nodes, what stands for each and the lines 
     assert.match((await send('/api/pick', 'POST', { id: 'lan-sheet', n: 1 })).error, /no take yet/); assert.deepEqual((await get('/api/takes?id=lan-sheet')).takes, []);
   } finally { s.close(); }
 });
+
+test('in the app: a film is written from an idea, listed on the home screen, and its next episode written from the canvas', async () => {
+  const home = fresh('app-home'), draft = { title: SERIES.title, logline: 'Một bí mật.', style: SERIES.style, look: SERIES.look, accent: SERIES.accent, cast: structuredClone(SERIES.cast), places: SERIES.places, episodes: SERIES.episodes };
+  const model = scripted(draft, EPISODE, EPISODE), s = await serve({ port: 0, home, ask: model.ask }), origin = s.url.replace(/\/$/, '');
+  const get = (p) => fetch(origin + p).then((r) => r.json()), send = (p, body) => fetch(origin + p, { method: 'POST', headers: { 'X-Songbe': '1' }, body: JSON.stringify(body) }).then((r) => r.json());
+  const until = async (ask, done) => { for (let i = 0; i < 100; i++) { const x = await ask(); if (done(x)) return x; await new Promise((r) => setTimeout(r, 40)); } throw new Error('it never finished'); };
+  try {
+    assert.deepEqual((await get('/api/home')).films, []);
+    assert.match((await send('/api/films', { idea: 'Too short' })).error, /Say a little more about the story/);
+    const made = await send('/api/films', { idea: 'Lan phát hiện chồng rời nhà lúc hai giờ sáng.', episodes: 2, seconds: 12, format: 'tall' }); assert.match(made.id, /^[0-9a-f]{16}$/);
+    const job = await until(() => get('/api/filmwriting/' + made.id), (j) => j.done); assert.equal(job.error, null); assert.equal(job.step, 'canvas');
+    // on disk: the series, the script of episode 1, and the canvas laid out from them — nothing drawn or filmed
+    const film = (await get('/api/home')).films[0], dir = film.dir; assert.equal(path.dirname(dir), home); assert.equal(path.basename(dir), 'Lan phát hiện chồng rời');
+    assert.deepEqual([film.title, film.planned, film.written, film.cut, film.poster, film.nodes], ['Hai giờ sáng', 2, 1, 0, null, 23]); assert.deepEqual(film.size, [1080, 1920]);
+    assert.equal(readSeries(dir).seconds, 12); assert.equal(readEpisode(dir, 1).scenes.length, 1); assert.ok(readFlow(dir).nodes.e1);
+    // the canvas says which episodes there are and what making a part of one would ask for
+    const at = `/c/${made.id}`, st = await get(at + '/api/state'); assert.deepEqual([st.title, st.episodes.planned.map((e) => e.n), st.episodes.written, st.episodes.writing], ['Hai giờ sáng', [1, 2], [1], null]);
+    const board = await get(at + '/api/plan?episode=1&upto=board'); assert.deepEqual(board.pieces.map((p) => p.id), ['lan-face', 'lan-sheet', 'minh-face', 'minh-sheet', 'can-ho-plate', 'e1-scene1', 'e1-s1-frame', 'e1-s2-frame', 'e1-s3-frame']);
+    assert.equal(board.usd, .45); assert.equal(board.budget, 5); assert.ok((await get(at + '/api/plan?episode=1')).pieces.length > board.pieces.length);
+    assert.match((await send(at + '/api/run', { episode: 7 })).error, /no episode 7 on this canvas/);
+    // the next episode: written in the background, then on the canvas beside the first
+    assert.deepEqual(await send(at + '/api/episode', {}), { started: true, n: 2 });
+    const after = await until(() => get(at + '/api/state'), (x) => x.episodes.written.length === 2 && !x.episodes.writing); assert.equal(after.episodes.failed, null); assert.ok(after.flow.nodes.e2 && after.flow.nodes['e2-s1-line']);
+    assert.match(model.asked[2].prompt, /THE STORY SO FAR\nEpisode 1: Hai giờ sáng/); assert.match((await send(at + '/api/episode', {})).error, /Every episode the series plans has its script/);
+    assert.equal((await fetch(origin + at + '/poster')).status, 404, 'no picture yet to stand for the film');
+  } finally { s.close(); }
+});

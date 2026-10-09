@@ -95,7 +95,12 @@ songbe flow board my-series                # one picture of the whole canvas
 songbe flow models                         # the models known by name
 ```
 
-**The window** (`songbe flow open`) shows every node as a card — a picture, a clip that plays, a line of dialogue — with a line
+**In the app** the home screen lists your films beside your videos. *New film* takes a few sentences, writes the series and the
+shot table of its first episode, and opens the canvas with everything laid out and nothing made yet. On the canvas the
+*Episodes* menu makes one episode up to a point — its pictures first, to look at before any clip is paid for — and writes the
+next episode when the one before is done. *Open a folder* takes a film's folder too.
+
+**The window** (`songbe flow open`, or a film's card in the app) shows every node as a card — a picture, a clip that plays, a line of dialogue — with a line
 to each node it works from. Drag the background to move and scroll to zoom; drag a card by its top to place it. Choosing a card
 opens its panel: its words, the nodes it starts from, its model, the prompt exactly as the model reads it, the result, its takes.
 Changes are saved as you type, and only when the canvas is still sound with them. *Make it* makes one node, *Another take* asks
@@ -132,7 +137,6 @@ read from fal's description of them.
 ## What it cannot do yet
 
 - In the canvas window a node is wired to another by writing `@name` or choosing it in a list; lines cannot be dragged yet.
-  Films are opened with `songbe flow open`; the app's home screen does not list them yet.
 - One line per shot, one speaker per shot. Two people talking over each other is not written.
 - Reference pictures for clips go to fal.ai endpoints only; Google's Veo is asked with a first frame (and a last one).
 - A clip is taken from its start; `from` and `to` in a cut choose the part to keep by hand.

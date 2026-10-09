@@ -2,6 +2,12 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.25
+- **Films in the app.** The home screen lists your films beside your videos, each with the first frame of its first shot and how
+  far it has come. *New film* takes a few sentences and writes the series and the shot table of its first episode, then opens the
+  canvas. There the *Episodes* menu makes an episode up to a point (its pictures first) or writes the next one. *Open a folder*
+  takes a film's folder; a film opened from the app joins the list.
+
 ## 0.24
 - **What a run costs, before it runs.** `songbe flow plan` says what a run would ask of which model and about what that costs by
   list price; `songbe flow spent` what the takes made so far cost. A run may spend $5 unless `--budget=N` or `budget` in

@@ -31,6 +31,7 @@ h1 { font-size: 26px; font-weight: 800; letter-spacing: -.6px; line-height: 1.2;
 .tools button:hover { border-color: var(--soft); } .tools svg { width: 15px; height: 15px; }
 
 /* nothing yet: the starters are the first screen */
+#nofilm { border: 1px dashed var(--line); border-radius: 18px; padding: 22px 26px; color: var(--soft); } #nofilm b { color: var(--text); }
 #empty { border: 1px dashed var(--line); border-radius: 18px; padding: 34px 28px 30px; text-align: center; }
 #empty h2 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; } #empty p { color: var(--soft); margin: 6px 0 22px; }
 .starts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 200px)); gap: 14px; justify-content: center; }
@@ -76,6 +77,12 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
 <main>
   <section id="need" hidden></section>
   <div class="top">
+    <div><h1>Your films</h1><div class="where">A series from an idea: the script, the cast with their faces and voices, every shot, every episode.</div></div>
+    <div class="acts"><button class="btn go" id="bfilm">New film</button></div>
+  </div>
+  <div id="films" class="grid"></div>
+  <div id="nofilm" hidden>No film yet. <b>New film</b> writes a series from a few sentences and lays it out on a canvas. Nothing is drawn or filmed until you ask for it there.</div>
+  <div class="top" style="margin-top:44px">
     <div><h1>Your videos</h1><div class="where"><span id="home"></span> · <a id="ohome">open folder</a></div></div>
     <div class="acts"><button class="btn" id="bopen">Open a folder…</button><button class="btn go" id="bnew">New video</button></div>
   </div>
@@ -93,6 +100,18 @@ dialog .end { display: flex; gap: 8px; justify-content: flex-end; align-items: c
   </div>
   <label for="nname">Name</label><input type="text" id="nname" maxlength="60" autocomplete="off" spellcheck="false">
   <div class="end"><span class="msg bad" id="nerr"></span><span class="msg busy" id="nbusy" hidden><i></i><span></span></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" id="ngo" type="submit">Create</button></div>
+</form></dialog>
+
+<dialog id="dfilm"><form method="dialog" id="ffilm">
+  <h2>New film</h2><div class="lead">Describe the story. Songbe writes the series — its look, its people with their voices, its places, its episodes — and the shot table of the first episode, and lays everything out on a canvas for you to change.</div>
+  <div class="write" style="margin-top:0">
+    <textarea id="fidea" spellcheck="false" placeholder="Who it is about, where, and what goes wrong. For example: Lan, 26, finds out that her husband leaves the house at two every night. She thinks there is someone else. The truth is in an old rented room he never told her about, and it has to do with her own family."></textarea>
+    <div class="two"><div><label for="feps">Episodes</label><select id="feps"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>8</option><option>12</option></select></div>
+      <div><label for="fsecs">Each about</label><select id="fsecs"><option value="30">30 seconds</option><option value="45" selected>45 seconds</option><option value="60">a minute</option><option value="90">a minute and a half</option></select></div></div>
+    <div class="two"><div><label for="fformat">Frame</label><select id="fformat"><option value="tall">Tall 9:16 (TikTok, Reels, Shorts)</option><option value="wide">Wide 16:9 (YouTube)</option></select></div>
+      <div><label for="fname2">Folder name (optional)</label><input type="text" id="fname2" maxlength="60" autocomplete="off" spellcheck="false" placeholder="from the story"></div></div>
+  </div>
+  <div class="end"><span class="msg bad" id="ferr"></span><span class="msg busy" id="fbusy" hidden><i></i><span></span></span><button class="btn" type="button" data-close>Cancel</button><button class="btn go" id="fgo" type="submit">Write it</button></div>
 </form></dialog>
 
 <dialog id="dname"><form method="dialog" id="fname" style="min-width:min(460px, calc(100vw - 80px))">
@@ -145,7 +164,7 @@ const ICON = { folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
   pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>' };
 
-let H = null, seen = '', pick = null, tries = 0, timer = null;
+let H = null, seen = '', seenFilms = '', pick = null, tries = 0, timer = null;
 const shape = ([w, h]) => (w === 1080 && h === 1920 ? 'Tall 9:16' : w === h ? 'Square 1:1' : w === 1920 && h === 1080 ? 'Wide 16:9' : `${w}×${h}`);
 function ago(ms) {
   const s = (Date.now() - ms) / 1000;
@@ -168,6 +187,14 @@ function status(p) {
   if (p.broken) return ['old', 'video.json needs fixing'];
   if (!p.built) return ['', 'Not built yet'];
   return p.edited > p.built + 1500 ? ['old', 'Changed since the last build'] : ['ok', 'Built ' + ago(p.built)];
+}
+// a film: the first frame of its first shot on the same little stage, then how far it has come
+function filmCard(f) {
+  const a = el('a', { className: 'proj', href: `/c/${f.id}/` }), title = f.title || f.name;
+  const done = f.cut ? ['ok', `${f.cut} episode${f.cut === 1 ? '' : 's'} cut`] : f.poster ? ['old', 'Pictures made, no episode cut yet'] : ['', 'Nothing made yet'];
+  a.append(stage({ size: f.size, poster: f.poster, colours: { ink: '#0B1220', primary: '#27344A', accent: '#4FE0D6' } }, title), el('div', { className: 'meta' }, el('div', { className: 'nm', textContent: title, title: f.dir }),
+    el('div', { className: 'sub', textContent: `${f.written} of ${f.planned || f.written} episode${(f.planned || f.written) === 1 ? '' : 's'} written`, title: `${f.nodes} pieces on its canvas` }), el('div', { className: 'st' }, el('span', { className: 'dot ' + done[0] }), done[1])));
+  return a;
 }
 function card(p) {
   const a = el('a', { className: 'proj', href: `/p/${p.id}/` }), [dot, text] = status(p), tools = el('div', { className: 'tools' });
@@ -229,6 +256,8 @@ function paint() {
   $('#home').textContent = H.home; need(); settings();
   const kt = $('#ktools'); kt.hidden = H.tools.ready; kt.textContent = 'setup needed'; kt.className = 'tag warn';
   const kk = $('#kkeys'); kk.textContent = H.keys.fal ? 'voice · music ready' : 'no key: silent builds'; kk.classList.toggle('on', H.keys.fal);
+  const films = JSON.stringify(H.films || []);
+  if (films !== seenFilms) { seenFilms = films; $('#films').replaceChildren(...(H.films || []).map(filmCard)); $('#films').hidden = !(H.films || []).length; $('#nofilm').hidden = (H.films || []).length > 0; }
   const now = JSON.stringify(H.projects);
   if (now === seen) return; seen = now;
   $('#grid').replaceChildren(...H.projects.map(card)); $('#empty').hidden = H.projects.length > 0; $('#grid').hidden = !H.projects.length;
@@ -276,6 +305,25 @@ $('#fnew').onsubmit = async (e) => {
     location.href = `/p/${r.id}/`; return;
   }
 };
+// a new film: the idea goes to the writer, and when the series, the first script and the canvas are there, the canvas opens
+const filming = (text) => { $('#fbusy').hidden = !text; $('#fbusy').lastChild.textContent = text || ''; for (const x of $('#ffilm').querySelectorAll('input, textarea, select, #fgo')) x.disabled = !!text; };
+$('#bfilm').onclick = () => { $('#ferr').textContent = ''; filming(null); $('#dfilm').showModal(); $('#fidea').focus(); };
+$('#ffilm').onsubmit = async (e) => {
+  e.preventDefault(); $('#ferr').textContent = '';
+  if (!H.writer) { $('#ferr').textContent = 'Add your Google or fal.ai key in Settings first: the writer runs on it.'; return; }
+  if ($('#fidea').value.trim().length < 12) { $('#ferr').textContent = 'Describe the story in a sentence or two first.'; $('#fidea').focus(); return; }
+  const r = await post('/api/films', { name: $('#fname2').value.trim(), idea: $('#fidea').value, episodes: +$('#feps').value, seconds: +$('#fsecs').value, format: $('#fformat').value });
+  if (!r.id) { $('#ferr').textContent = r.error || 'That did not work.'; return; }
+  filming('Writing the series…');
+  for (;;) {
+    await new Promise((ok) => setTimeout(ok, 800));
+    let j; try { j = await (await fetch('/api/filmwriting/' + r.id)).json(); } catch { continue; }
+    if (!j.done) { filming({ series: 'Writing the series: its look, its people, its places, its episodes…', script: 'Writing the shot table of episode 1…', canvas: 'Laying it out on the canvas…' }[j.step] || 'Writing…'); continue; }
+    filming(null);
+    if (j.error) { $('#ferr').textContent = j.error.split('\n')[0]; return; }
+    location.href = `/c/${r.id}/`; return;
+  }
+};
 // one small dialog for the two things that only need a name
 let named = null;
 function askName(title, value, button, then) { named = then; $('#tname').textContent = title; $('#gname').textContent = button; $('#ename').textContent = ''; $('#iname').value = value; $('#dname').showModal(); $('#iname').select(); }
@@ -283,7 +331,7 @@ $('#fname').onsubmit = async (e) => { e.preventDefault(); const r = await named(
 $('#bopen').onclick = () => { $('#oerr').textContent = ''; $('#odir').value = ''; $('#odir').placeholder = H.home; $('#dopen').showModal(); $('#odir').focus(); };
 $('#fopen').onsubmit = async (e) => {
   e.preventDefault();
-  const r = await post('/api/projects/open', { dir: $('#odir').value }); if (r.id) location.href = `/p/${r.id}/`; else $('#oerr').textContent = r.error || 'That did not work.';
+  const r = await post('/api/projects/open', { dir: $('#odir').value }); if (r.id) location.href = `/p/${r.id}/`; else if (r.film) location.href = `/c/${r.film}/`; else $('#oerr').textContent = r.error || 'That did not work.';
 };
 const showSettings = () => { settings(); $('#kmsg').textContent = 'Keys stay on this computer and are sent only to the service they belong to.'; $('#kmsg').className = 'msg note'; $('#dset').showModal(); };
 $('#bset').onclick = $('#kkeys').onclick = showSettings; $('#ktools').onclick = () => $('#need').scrollIntoView({ behavior: 'smooth' });
