@@ -2,6 +2,15 @@
 
 What changed, newest first. Versions before 1.0 may change the shape of `video.json`; when one does, it says so here.
 
+## 0.38
+- **Songbe is free software again.** It is published under the GNU Affero General Public License, version 3: use it, study
+  it, change it, pass it on; whoever changes it and lets others use the changed version, as a program or over a network, owes
+  them its source under the same licence. Every earlier version in this repository may be used under that licence too
+  (`NOTICE`). The name and logo remain the project's.
+- The licence key and the fourteen-day trial are gone: nothing is held back, and there is nothing to enter. `songbe licence`,
+  *Settings → Licence* and `tools/licence.mjs` are removed.
+- `CONTRIBUTING.md` says how a change gets in and under what terms.
+
 ## 0.37
 - **A second look.** With a key for a model that sees, every picture and every clip with someone in it is looked at beside
   that person's reference sheet as soon as it is made: the hair, the face, the clothes, anything on them the sheet does not

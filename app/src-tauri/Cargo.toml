@@ -1,6 +1,6 @@
 [package]
 name = "songbe-app"
-version = "0.37.0"
+version = "0.38.0"
 description = "Songbe desktop app: a native window around the Songbe studio"
 edition = "2021"
 license-file = "../../LICENSE"

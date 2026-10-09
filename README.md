@@ -21,7 +21,7 @@ of its own: change a line, hand one shot to another model, add a prop of yours, 
 
 <p align="center"><img src="docs/img/film-canvas.jpg" width="92%" alt="The canvas: every first frame, clip and line of an episode as a card; the chosen clip's panel shows its prompt as the model reads it"></p>
 
-> Version 0.37.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
+> Version 0.38.0. Nine scene types, three looks, packs for more, three frames from one spec, captions, cuts on the beat, a writer
 > that drafts and corrects the script, built-in checks, an app with a visual editor. Tested on Linux, Windows and macOS (the tests
 > and each installer run on all three for every release). Named after the Sông Bé, a river in southern Vietnam.
 
@@ -362,12 +362,13 @@ Frames are drawn without cached layers, so a frame is the same pixels whatever w
 
 ## Licence
 
-A copy runs as a trial for 14 days; after that a licence key keeps it making things (*Settings → Licence*, or
-`songbe licence <key>`). Without one, everything you made still opens and exports.
+Songbe is free software: you can use it, study it, change it and pass it on under the terms of the GNU Affero General Public
+License, version 3 (`LICENSE`). If you change it and let others use your version — as a program or as a service over a
+network — you owe them the source of your version under the same licence. It comes with no warranty. What you make with it
+is yours.
 
-Songbe is proprietary software. Copyright © 2026 Le Hieu, all rights reserved: using it needs a licence from its owner, and it may
-not be copied, passed on or changed without one (`LICENSE`). What you make with it is yours. Versions 0.19.1 and earlier were
-published under Apache-2.0, which still applies to those versions only.
+Copyright © 2026 Paparusi and the Songbe contributors. The Songbe name and logo stand for this project; the licence covers
+the code, not the right to present something else under that name (`NOTICE`).
 
 It is distributed with the work of others under their own licences: the fonts Be Vietnam Pro, Anton and Playfair Display (all SIL
 OFL 1.1), and in the installed app Node.js next to the engine and the Rust crates of the window. ffmpeg is never part of a Songbe

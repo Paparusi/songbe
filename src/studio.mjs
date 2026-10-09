@@ -16,7 +16,6 @@ import { installedPacksDir, listPacks, starterDir, starterList } from './packs.m
 import { validate, TOP, SCENES, TEMPLATES, FORMATS, STYLES, refreshStyles } from './spec.mjs';
 import { rewriteScene, writeSpec, writerFor } from './write.mjs';
 import { canvasRoutes, filmCard } from './film/canvas.mjs';
-import { enter, forget, inWords, licence, mayMake } from './licence.mjs';
 import * as chatgpt from './providers/chatgpt.mjs';
 import { WRITERS, chooseWriter, chosenWriter, writersFor } from './providers/llm.mjs';
 import { sync } from './film/director.mjs';
@@ -59,7 +58,7 @@ export function trusted(req) {
 // The plan carries file:// addresses for the renderer; a page served over http gets the same files through `link`.
 export const forBrowser = (plan, link) => JSON.parse(JSON.stringify(plan), (k, v) => (typeof v === 'string' && v.startsWith('file://') ? link(fileURLToPath(v)) : v));
 
-export async function serve({ port: wantPort = 4173, project = null, film = null, home = projectsHome(), ask = null, describeModel = describe, licencePublic = undefined, browse = openOutside } = {}) {      // (`licencePublic`: the tests issue keys of their own)      // `ask` stands in for the language model in tests, `describeModel` for fal.ai's catalogue
+export async function serve({ port: wantPort = 4173, project = null, film = null, home = projectsHome(), ask = null, describeModel = describe, browse = openOutside } = {}) {      // `ask` stands in for the language model in tests, `describeModel` for fal.ai's catalogue
   const pinned = project ? path.resolve(project) : null;      // `songbe studio <dir>`: this project is the front door
   const pinnedFilm = film ? path.resolve(film) : null;        // `songbe flow open <dir>`: the canvas of this film is
   const registry = path.join(dataDir(), 'projects.json');
@@ -70,9 +69,6 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
   const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map(), filming = new Map();
   let setup = { running: false, step: null, done: 0, total: 0, error: null, version: null }, toolsSeen = null, toolsAt = 0;
 
-  const lic = (now) => ({ ...(licencePublic ? { publicKey: licencePublic } : {}), ...(now ? { now } : {}) }), standing = () => { const l = licence(lic()); return { ...l, words: inWords(l) }; };
-  // making needs a licence or a running trial: asked before anything is started, so the page can say why nothing happened
-  const mayNot = (res) => { try { mayMake(lic()); return false; } catch (e) { send(res, 402, { error: e.message, licence: standing() }); return true; } };
   const send = (res, code, body, type = 'application/json; charset=utf-8', more = {}) => { res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', ...more }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
   const body = (req) => new Promise((ok, no) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); req.on('error', no); });
   const json = async (req) => { try { return JSON.parse((await body(req)).toString('utf8') || '{}'); } catch { return {}; } };
@@ -282,7 +278,6 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
       return send(res, 200, { path: 'media/' + name });
     }
     if (route === 'POST /api/build') {
-      if (mayNot(res)) return;
       if (job && !job.done) return send(res, 409, { error: 'A build is already running.' });
       const want = (await json(req)).formats, formats = Array.isArray(want) && want.length && want.every((f) => FORMATS[f]) ? [...new Set(want)] : null;
       const j = { lines: [], done: false, code: null, stopped: false, watchers: new Set(), formats }; jobs.set(id, j);
@@ -306,12 +301,10 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
       job.watchers.add(res); req.on('close', () => job.watchers.delete(res)); return;
     }
     if (route === 'POST /api/rewrite') {      // one scene, rewritten the way the person asks; the page puts it in place and can undo it
-      if (mayNot(res)) return;
       const q = await json(req);
       try { return send(res, 200, await rewriteScene(dir, +q.scene, String(q.ask || ''), { ask, env: { ...keyEnv(), ...readDotEnv(path.join(dir, '.env')) } })); } catch (e) { return send(res, 400, { error: e.message }); }
     }
     if (route === 'POST /api/footage') {      // generate what one scene asks for now, in a process of its own (a clip takes minutes)
-      if (mayNot(res)) return;
       const n = +(await json(req)).scene, old = footage.get(id);
       if (old && !old.done) return send(res, 409, { error: 'Footage is already being generated.' });
       if (!Number.isInteger(n) || n < 0) return send(res, 400, { error: 'which scene?' });
@@ -332,7 +325,7 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
     send(res, 404, { error: 'not found' });
   }
 
-  const canvas = canvasRoutes({ send, json, serveFile, keysFor, version: VERSION, ask, keyEnv, mayNot, standing });
+  const canvas = canvasRoutes({ send, json, serveFile, keysFor, version: VERSION, ask, keyEnv });
   const server = http.createServer(async (req, res) => {
     try {
       // SONGBE_TRACE=1: one line per request (who asked for what, never the query), for finding out what a window really loaded
@@ -365,7 +358,7 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
       if (route === 'GET /api/home') {
         refreshStyles();      // a pack may have been added since the last look
         return send(res, 200, { packs: listPacks().map((p) => ({ id: p.id, name: p.name, version: p.version, about: p.about, licence: p.licence, where: p.where, styles: p.styles.map((x) => x.name), starters: p.starters.length })), packsDir: installedPacksDir(), version: VERSION, home, data: dataDir(), shell: process.env.SONGBE_SHELL || null, pinned: pinned ? idOf(pinned) : null,
-          licence: standing(), accounts: accounts(), projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), films: [...films()].map(([id, dir]) => filmCard(id, dir, home)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
+          accounts: accounts(), projects: [...folders()].map(([id, dir]) => card(id, dir)).sort((a, b) => b.edited - a.edited), films: [...films()].map(([id, dir]) => filmCard(id, dir, home)).sort((a, b) => b.edited - a.edited), starters: starters(), tools: toolState(), keys: keysFor(null), writer: ask ? 'custom' : writerFor(keyEnv()), styles: STYLES, formats: Object.keys(FORMATS),
           setup: { ...setup, canFetch: WIN, advice: ffmpegAdvice(), pick: { version: FFMPEG_WINDOWS.version, megabytes: Math.round(FFMPEG_WINDOWS.bytes / 1e6), from: FFMPEG_WINDOWS.from, licence: FFMPEG_WINDOWS.licence } } });
       }
       if (route === 'GET /api/model') {      // what one model takes: the editor's "settings of this model"
@@ -381,13 +374,10 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
       }
       if (route === 'POST /api/accounts/chatgpt/signout') { await chatgpt.signOut(); signing.error = null; return send(res, 200, accounts()); }
       if (route === 'PUT /api/writer') { try { chooseWriter((await json(req)).writer || null); return send(res, 200, accounts()); } catch (e) { return send(res, 400, { error: e.message }); } }
-      if (route === 'PUT /api/licence') { try { enter((await json(req)).key, lic()); return send(res, 200, standing()); } catch (e) { return send(res, 400, { error: e.message }); } }
-      if (route === 'DELETE /api/licence') { forget(lic()); return send(res, 200, standing()); }
-      if (route === 'POST /api/films' && mayNot(res)) return;
       if (route === 'POST /api/films') { try { return send(res, 200, { id: createFilm(await json(req)) }); } catch (e) { return send(res, 400, { error: e.message }); } }
       const fw = /^\/api\/filmwriting\/([0-9a-f]{16})$/.exec(u.pathname);
       if (req.method === 'GET' && fw) { const job = filming.get(fw[1]); return job ? send(res, 200, job) : send(res, 404, { error: 'not found' }); }
-      if (route === 'POST /api/projects') { try { const q = await json(req); if (q.starter === 'write' && mayNot(res)) return; const id = create(q); return send(res, 200, { id, writing: q.starter === 'write' }); } catch (e) { return send(res, 400, { error: e.message }); } }
+      if (route === 'POST /api/projects') { try { const q = await json(req); const id = create(q); return send(res, 200, { id, writing: q.starter === 'write' }); } catch (e) { return send(res, 400, { error: e.message }); } }
       const wr = /^\/api\/writing\/([0-9a-f]{16})$/.exec(u.pathname);
       if (req.method === 'GET' && wr) { const job = writing.get(wr[1]); return job ? send(res, 200, job) : send(res, 404, { error: 'not found' }); }
       if (route === 'POST /api/projects/open') { try { return send(res, 200, adopt((await json(req)).dir)); } catch (e) { return send(res, 400, { error: e.message }); } }

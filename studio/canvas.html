@@ -61,7 +61,7 @@ textarea { resize: vertical; min-height: 38px; } .rowf { display: flex; gap: 8px
 <header class="bar">
   <a class="logo" href="/home" title="All your videos"><img src="/studio/logo.png" alt=""><b>Song<span>be</span></b></a>
   <span class="sep">/</span><div class="proj" id="proj"></div><div class="gap"></div>
-  <a class="tag warn" id="lic" href="/home#settings" hidden></a><span class="tag" id="count">loading…</span><span class="tag" id="saved" hidden></span>
+  <span class="tag" id="count">loading…</span><span class="tag" id="saved" hidden></span>
   <button class="btn" id="scriptb" title="The series and the shots of every episode, to read and to change" hidden>Script</button>
   <select id="eps" title="Make a part of an episode, or write the next one" style="width:auto;max-width:190px;padding:7px 10px;border-radius:10px;background:var(--raise)" hidden></select>
   <div id="add"><button class="btn" id="addb">+ Add</button><div id="menu" hidden></div></div>
@@ -146,7 +146,6 @@ function draw() {
   world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
   const todo = S.rows.filter((r) => r.state === 'make' || r.state === 'wait').length, done = S.rows.filter((r) => ['ready', 'held', 'own'].includes(r.state)).length;
   $('#count').textContent = S.bad.length ? `${S.bad.length} problem${S.bad.length > 1 ? 's' : ''}` : `${done} made · ${todo} to make`; $('#count').className = 'tag' + (S.bad.length ? ' warn' : todo ? '' : ' on');
-  const L = S.licence; $('#lic').hidden = !L || L.kind === 'licensed' || (L.kind === 'trial' && L.left > 3); if (L) $('#lic').textContent = L.kind === 'over' ? 'Licence needed to make more' : `Trial · ${L.left} day${L.left === 1 ? '' : 's'}`;
   episodes();
   // takes made by an older Songbe are being looked at: ask again until that is done, and their marks appear
   if (S.reviewing && !lookTimer) lookTimer = setTimeout(async () => { lookTimer = null; take(await api('/api/state').then((r) => r.json())); draw(); panel(); }, 2500);

@@ -57,7 +57,7 @@ export function canvasRoutes(h) {
       }
       // the episodes: which are planned, which have a script, and whether one is being written now
       const episodes = { planned: Array.isArray(series?.episodes) ? series.episodes.map((e, i) => ({ n: i + 1, title: e.title || null })) : [], written: written(dir), writing: job && !job.done ? job.n : null, failed: job?.done && job.error ? job.error : null, stages: STAGES };
-      return { id, dir, name: path.basename(dir), title, episodes, version: h.version, flow, bad, running: busy, reviewing: !!reviews.get(id) && !reviews.get(id).done, keys: h.keysFor(dir), licence: h.standing?.() || null,
+      return { id, dir, name: path.basename(dir), title, episodes, version: h.version, flow, bad, running: busy, reviewing: !!reviews.get(id) && !reviews.get(id).done, keys: h.keysFor(dir),
         rows: rows.map(({ file, ...r }) => ({ ...r, url: file && exists(file) ? link(file) : null, held: store.locked(r.id) })),
         edges: bad.length ? [] : Object.keys(flow.nodes).flatMap((to) => needs(flow, to).map((from) => [from, to])),
         models: { known: Object.fromEntries(Object.entries(KNOWN).map(([name, m]) => [name, { kind: m.kind, by: m.by, acts: !!m.acts, speaks: !!m.speaks, voices: m.voices || null }])), prefer: PREFER }, kinds: KINDS };
@@ -76,7 +76,6 @@ export function canvasRoutes(h) {
     // the nodes a request means: those it names, or a part of an episode (everything up to its board, its lines, its clips, its cut)
     const meant = (flow, q) => (q.episode ? (flow.nodes[`e${+q.episode}`] ? stageNodes(flow, +q.episode, q.upto || 'cut') : []) : Array.isArray(q.want) ? q.want.filter((x) => flow.nodes[x] && made(flow.nodes[x])) : []);
     if (what === 'POST /api/episode') {      // write the script of the next episode and lay it out on the canvas (nothing is drawn or filmed)
-      if (h.mayNot?.(res)) return;
       if (scripts.get(id) && !scripts.get(id).done) return h.send(res, 409, { error: 'An episode is already being written.' });
       let series; try { series = readSeries(dir); } catch (e) { return h.send(res, 400, { error: 'This canvas has no series.json to write episodes from.' }); }
       const n = (series.episodes || []).map((_, i) => i + 1).find((k) => !hasEpisode(dir, k));
@@ -163,7 +162,6 @@ export function canvasRoutes(h) {
       return h.send(res, 200, await state());
     }
     if (what === 'POST /api/run') {
-      if (h.mayNot?.(res)) return;
       if (busy) return h.send(res, 409, { error: 'Something is already being made.' });
       const q = await h.json(req), flow = readFlow(dir), names = (list) => (Array.isArray(list) ? list.filter((x) => flow.nodes[x] && made(flow.nodes[x])) : []), again = names(q.again);
       let want; try { want = meant(flow, q); } catch (e) { return h.send(res, 400, { error: e.message }); }

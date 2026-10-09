@@ -19,7 +19,7 @@
     "category": "Video",
     "shortDescription": "Films, series and short ads made with AI",
     "longDescription": "Songbe makes a series from an idea — the script, the cast with their faces and voices, every shot, every episode — on a canvas where each piece can be changed, and turns one description file into a finished short ad.",
-    "copyright": "Copyright © 2026 Le Hieu. All rights reserved.",
+    "copyright": "Copyright © 2026 Paparusi and the Songbe contributors. GNU AGPL version 3.",
     "windows": {
       "nsis": { "installMode": "currentUser", "installerIcon": "icons/icon.ico", "sidebarImage": "installer/sidebar.bmp", "headerImage": "installer/header.bmp" },
       "webviewInstallMode": { "type": "downloadBootstrapper" }

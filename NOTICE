@@ -1,9 +1,15 @@
 Songbe
-Copyright © 2026 Le Hieu. All rights reserved.
+Copyright © 2026 Paparusi and the Songbe contributors.
 
-Songbe is proprietary software: see LICENSE. The Songbe name and logo (app/icon.png and the pictures made from it) belong to its
-owner and may not be used for anything else. Versions 0.19.1 and earlier, logo included, were published under the Apache License,
-Version 2.0, which continues to apply to those versions only.
+Songbe is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License,
+version 3, as published by the Free Software Foundation (see LICENSE). It is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Every earlier version in this repository's history may be used under that same licence, whatever the LICENSE file of its day
+says. Versions 0.19.1 and earlier may also be used under the Apache License, Version 2.0, under which they were first published.
+
+The Songbe name and logo (app/icon.png and the pictures made from it) stand for this project. The licence covers the code and
+what is distributed with it; it does not give the right to present another product, or a changed version, under that name.
 
 What follows is the work of others that Songbe is distributed with, each under its own licence.
 

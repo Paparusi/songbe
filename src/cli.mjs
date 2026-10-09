@@ -9,7 +9,6 @@ import { makeAudio, mux } from './audio.mjs';
 import { check } from './check.mjs';
 import { tools, loadDotEnv, exists, log, mkdir, dataDir, openOutside, projectsHome, ROOT, WIN } from './util.mjs';
 import { validate, jsonSchema, STYLES, FORMATS } from './spec.mjs';
-import { enter, forget, inWords, licence, mayMake } from './licence.mjs';
 
 const HELP = `Songbe — short ads from a single video.json
 
@@ -18,7 +17,6 @@ const HELP = `Songbe — short ads from a single video.json
   songbe studio <dir> [--port=N]  the same editor, opened straight on one project (http://127.0.0.1:4173)
 
   songbe doctor                   check that ffmpeg, ffprobe and a browser are found and which keys are set (songbe --version: which Songbe)
-  songbe licence [<key>|remove]   how this copy is licensed; with a key, enter it for this computer
   songbe account                  who writes scripts: which keys are set, and whether you are signed in with ChatGPT
                                   (songbe account signin chatgpt | signout chatgpt | writer <name>|auto)
   songbe setup ffmpeg             Windows: fetch ffmpeg into Songbe's own folder (elsewhere: says which package to install)
@@ -71,13 +69,8 @@ export async function main(argv) {
     if (target && !target.startsWith('--')) loadDotEnv(path.resolve(target));
     loadDotEnv(dataDir());
     for (const k of ['FAL_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY']) log(`${process.env[k] ? 'set  ' : 'unset'} ${k}`);
-    log(`licence:  ${inWords(licence())}`);
     log(`projects: ${projectsHome()}\ndata:     ${dataDir()}`);
     return log(`node ${process.version} on ${process.platform}`);
-  }
-  if (cmd === 'licence' || cmd === 'license') {
-    const l = !target ? licence() : target === 'remove' ? forget() : enter(target);
-    return log(`${inWords(l)}${l.email ? ` <${l.email}>` : ''}${l.kind === 'licensed' ? ` · plan ${l.plan}` : l.kind === 'trial' ? '. A licence key keeps Songbe making things after that: songbe licence <key>' : '. Everything you made still opens; to make more, enter a key: songbe licence <key>'}`);
   }
   if (cmd === 'account') {
     loadDotEnv(dataDir());
@@ -158,7 +151,6 @@ export async function main(argv) {
   if (cmd === 'film' || cmd === 'flow') return (await import('./film/cli.mjs')).main(cmd, argv.slice(1));
   if (!target) throw new Error('which project directory?\n\n' + HELP);
   const dir = path.resolve(target);
-  if (['write', 'footage', 'build'].includes(cmd)) mayMake();      // making needs a licence or a running trial; everything else never does
   if (cmd === 'write') {
     const opt = (name) => rest.find((x) => x.startsWith(`--${name}=`))?.slice(name.length + 3), from = opt('brief');
     const brief = from ? fs.readFileSync(path.resolve(from), 'utf8') : rest.filter((x) => !x.startsWith('--')).join(' ');
