@@ -267,6 +267,7 @@ function writing() {
   const manage = el('button', { className: 'btn small', textContent: 'Manage usage' }), out = el('button', { className: 'btn small', textContent: 'Sign out' });
   manage.onclick = () => post('/api/open', { what: 'chatgpt' }); out.onclick = async () => { H.accounts = await post('/api/accounts/chatgpt/signout'); writing(); load(); };
   $('#cgdo').replaceChildren(...(c.signedIn ? [manage, out] : [go]));
+  if (c.pending && c.url) { const m = $('#cgmsg'), a = el('a', { href: c.url, target: '_blank', rel: 'noopener', textContent: 'open the sign-in page', className: 'lnk' }); m.hidden = false; m.className = 'msg note'; m.replaceChildren('Finish signing in in your browser. If none opened, ', a, '.'); }
   if (c.error && !c.pending) said(c.error, true);
   if (c.first) said('You\u2019re using your ChatGPT plan. What Songbe writes now counts against it; you can manage that in ChatGPT\u2019s settings.');
   const pick = $('#wpick'), names = A.writer.names, auto = A.writer.using && names[A.writer.using] ? `Automatic — now: ${names[A.writer.using]}` : 'Automatic — nothing is set up yet';

@@ -64,8 +64,8 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
   const pinnedFilm = film ? path.resolve(film) : null;        // `songbe flow open <dir>`: the canvas of this film is
   const registry = path.join(dataDir(), 'projects.json');
   // Signing in with ChatGPT happens in the person's own browser; this only remembers that it is under way, and how it ended.
-  let signing = { pending: false, error: null };
-  const accounts = () => ({ chatgpt: { signedIn: chatgpt.signedIn(), ...(chatgpt.account() || {}), pending: signing.pending, error: signing.error, first: chatgpt.signedIn() && chatgpt.firstTime() },
+  let signing = { pending: false, error: null, url: null };
+  const accounts = () => ({ chatgpt: { signedIn: chatgpt.signedIn(), ...(chatgpt.account() || {}), pending: signing.pending, error: signing.error, url: signing.pending ? signing.url : null, first: chatgpt.signedIn() && chatgpt.firstTime() },
     writer: { chosen: chosenWriter(), using: ask ? 'custom' : writerFor(keyEnv()), can: writersFor(keyEnv()), names: WRITERS } });
   const jobs = new Map(), posters = { queue: [], now: null, failed: new Map() }, writing = new Map(), footage = new Map(), filming = new Map();
   let setup = { running: false, step: null, done: 0, total: 0, error: null, version: null }, toolsSeen = null, toolsAt = 0;
@@ -375,8 +375,8 @@ export async function serve({ port: wantPort = 4173, project = null, film = null
       if (route === 'GET /api/accounts') return send(res, 200, accounts());
       if (route === 'POST /api/accounts/chatgpt/signin') {
         if (signing.pending) return send(res, 409, { error: 'A sign-in is already under way: finish it in your browser.' });
-        signing = { pending: true, error: null };
-        chatgpt.signIn({ open: (url) => browse(url) }).catch((e) => { signing.error = e.message; }).finally(() => { signing.pending = false; });
+        signing = { pending: true, error: null, url: null };      // the address is kept for the page to show, should no browser open by itself
+        chatgpt.signIn({ open: (url) => { signing.url = url; return browse(url); } }).catch((e) => { signing.error = e.message; }).finally(() => { signing.pending = false; signing.url = null; });
         return send(res, 200, { started: true });
       }
       if (route === 'POST /api/accounts/chatgpt/signout') { await chatgpt.signOut(); signing.error = null; return send(res, 200, accounts()); }
